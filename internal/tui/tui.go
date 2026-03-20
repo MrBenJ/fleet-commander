@@ -89,6 +89,11 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 // refreshMsg triggers a status refresh
 type refreshMsg struct{}
 
+// attachMsg carries the agent name for attach
+type attachMsg struct {
+	agentName string
+}
+
 // Model is the TUI model
 type Model struct {
 	list     list.Model
@@ -153,6 +158,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return refreshMsg{}
 		})
 		
+	case attachMsg:
+		// Print message and quit
+		fmt.Printf("\n👉  Run: fleet attach %s\n\n", msg.agentName)
+		m.quitting = true
+		return m, tea.Quit
+		
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -176,12 +187,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					fmt.Fprintf(os.Stderr, "✅  Session started (PID: %d)\n", pid)
 				}
 				
-				// Print attach command and quit
-				m.quitting = true
-				return m, tea.Batch(
-					tea.Printf("\n👉  Run: fleet attach %s\n", agent.Name),
-					tea.Quit,
-				)
+				// Signal attach and quit
+				return m, func() tea.Msg {
+					return attachMsg{agentName: agent.Name}
+				}
 			}
 			
 		case "s":
