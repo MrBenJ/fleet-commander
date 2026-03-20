@@ -213,6 +213,11 @@ var stopCmd = &cobra.Command{
 			f.UpdateAgentStateFile(agentName, "")
 		}
 
+		// Remove fleet hooks so they don't fire after the session ends
+		if err := hooks.Remove(agent.WorktreePath); err != nil {
+			fmt.Printf("Warning: could not remove hooks: %v\n", err)
+		}
+
 		f.UpdateAgent(agentName, "stopped", 0)
 		fmt.Printf("Stopped agent '%s'\n", agentName)
 		return nil

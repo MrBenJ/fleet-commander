@@ -187,7 +187,7 @@ func isFleetEntry(e interface{}) bool {
 
 // filterFleetEntries removes entries that are fleet entries (identified by _fleet sentinel).
 func filterFleetEntries(entries []interface{}) []interface{} {
-	var result []interface{}
+	result := make([]interface{}, 0)
 	for _, e := range entries {
 		if isFleetEntry(e) {
 			continue

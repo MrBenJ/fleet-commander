@@ -214,7 +214,9 @@ func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.I
 // wiring the state file path.
 func (m *Model) startAgentSession(agent *fleet.Agent) error {
 	statesDir := filepath.Join(m.fleet.FleetDir, "states")
-	os.MkdirAll(statesDir, 0755)
+	if err := os.MkdirAll(statesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create states dir: %w", err)
+	}
 	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
 
 	if err := hooks.Inject(agent.WorktreePath); err != nil {
@@ -311,6 +313,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if err := m.tmux.KillSession(agent.Name); err != nil {
 					return m, nil
+				}
+				if agent.StateFilePath != "" {
+					if err := os.Remove(agent.StateFilePath); err != nil {
+						// best-effort, don't fail the UI
+						_ = err
+					}
+					m.fleet.UpdateAgentStateFile(agent.Name, "")
+					hooks.Remove(agent.WorktreePath) // best-effort
 				}
 				m.fleet.UpdateAgent(agent.Name, "stopped", 0)
 				items := buildItems(m.fleet, m.tmux, m.monitor)
