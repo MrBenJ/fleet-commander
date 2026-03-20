@@ -116,7 +116,7 @@ var startCmd = &cobra.Command{
 		
 		// Create session if it doesn't exist
 		if !tm.SessionExists(agentName) {
-			if err := tm.CreateSession(agentName, agent.WorktreePath, ""); err != nil {
+			if err := tm.CreateSession(agentName, agent.WorktreePath, "", ""); err != nil {
 				return fmt.Errorf("failed to create tmux session: %w", err)
 			}
 			fmt.Printf("Created tmux session for agent '%s'\n", agentName)

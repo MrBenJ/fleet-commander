@@ -71,7 +71,7 @@ func findFleetTmuxConf() string {
 }
 
 // CreateSession creates a new tmux session for an agent
-func (m *Manager) CreateSession(agentName, worktreePath, command string) error {
+func (m *Manager) CreateSession(agentName, worktreePath, command, stateFilePath string) error {
 	sessionName := m.SessionName(agentName)
 
 	// Check if claude is available
@@ -87,6 +87,12 @@ func (m *Manager) CreateSession(agentName, worktreePath, command string) error {
 		"-d", // detached
 		"-s", sessionName,
 		"-c", worktreePath,
+	}
+
+	// Add environment variables if stateFilePath is provided
+	if stateFilePath != "" {
+		args = append(args, "-e", fmt.Sprintf("FLEET_AGENT_NAME=%s", agentName))
+		args = append(args, "-e", fmt.Sprintf("FLEET_STATE_FILE=%s", stateFilePath))
 	}
 
 	if command != "" {

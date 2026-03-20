@@ -253,7 +253,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				agent := item.Agent
 
 				if item.State == monitor.StateStopped {
-					if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, ""); err != nil {
+					if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, "", ""); err != nil {
 						return m, nil
 					}
 					pid, _ := m.tmux.GetPID(agent.Name)
@@ -271,7 +271,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.tmux.SessionExists(agent.Name) {
 					return m, nil
 				}
-				if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, ""); err != nil {
+				if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, "", ""); err != nil {
 					return m, nil
 				}
 				pid, _ := m.tmux.GetPID(agent.Name)
