@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/teknal/fleet-commander/internal/fleet"
@@ -42,6 +43,11 @@ var (
 		Foreground(lipgloss.Color("#FF0000"))
 )
 
+// AddNewItem is the "add new agent" entry at the top of the list
+type AddNewItem struct{}
+
+func (i AddNewItem) FilterValue() string { return "+ Add New Agent" }
+
 // AgentItem represents an agent in the list
 type AgentItem struct {
 	Agent    *fleet.Agent
@@ -59,6 +65,23 @@ func (d AgentDelegate) Spacing() int                            { return 0 }
 func (d AgentDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 
 func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	// Handle "Add New Agent" item
+	if _, ok := item.(AddNewItem); ok {
+		addStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7D56F4")).
+			Bold(true)
+
+		title := "+ Add New Agent"
+		if index == m.Index() {
+			title = selectedItemStyle.Render("> " + title)
+		} else {
+			title = itemStyle.Render("  " + addStyle.Render(title))
+		}
+		desc := statusStyle.Render("    Create a new agent workspace")
+		fmt.Fprint(w, title+"\n"+desc+"\n")
+		return
+	}
+
 	i, ok := item.(AgentItem)
 	if !ok || i.Agent == nil {
 		return
@@ -110,6 +133,15 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 // refreshMsg triggers a status refresh
 type refreshMsg struct{}
 
+// inputMode tracks which input field is active
+type inputMode int
+
+const (
+	modeList inputMode = iota
+	modeAddName
+	modeAddBranch
+)
+
 // Model is the TUI model
 type Model struct {
 	list        list.Model
@@ -120,6 +152,10 @@ type Model struct {
 	height      int
 	quitting    bool
 	attachAgent string
+	mode        inputMode
+	nameInput   textinput.Model
+	branchInput textinput.Model
+	addError    string
 }
 
 // New creates a new TUI model
@@ -136,23 +172,37 @@ func New(f *fleet.Fleet) Model {
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = titleStyle
 
+	// Name input
+	ni := textinput.New()
+	ni.Placeholder = "agent-name"
+	ni.CharLimit = 30
+
+	// Branch input
+	bi := textinput.New()
+	bi.Placeholder = "feature/my-branch"
+	bi.CharLimit = 80
+
 	return Model{
-		list:    l,
-		fleet:   f,
-		tmux:    tm,
-		monitor: mon,
+		list:        l,
+		fleet:       f,
+		tmux:        tm,
+		monitor:     mon,
+		nameInput:   ni,
+		branchInput: bi,
 	}
 }
 
 func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.Item {
-	items := make([]list.Item, len(f.Agents))
-	for i, a := range f.Agents {
+	// First item is always "Add New Agent"
+	items := []list.Item{AddNewItem{}}
+
+	for _, a := range f.Agents {
 		snap := mon.Check(a.Name)
-		items[i] = AgentItem{
+		items = append(items, AgentItem{
 			Agent:    a,
 			State:    snap.State,
 			LastLine: snap.LastLine,
-		}
+		})
 	}
 	return items
 }
@@ -166,6 +216,11 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles messages
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle input modes first
+	if m.mode == modeAddName || m.mode == modeAddBranch {
+		return m.updateAddMode(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -186,6 +241,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "enter":
+			// Handle "Add New Agent" item
+			if _, ok := m.list.SelectedItem().(AddNewItem); ok {
+				m.mode = modeAddName
+				m.nameInput.Focus()
+				m.addError = ""
+				return m, m.nameInput.Focus()
+			}
+
 			if item, ok := m.list.SelectedItem().(AgentItem); ok {
 				agent := item.Agent
 
@@ -242,6 +305,70 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// updateAddMode handles the "Add New Agent" input flow
+func (m Model) updateAddMode(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc":
+			// Cancel add flow
+			m.mode = modeList
+			m.nameInput.Reset()
+			m.branchInput.Reset()
+			m.addError = ""
+			return m, nil
+
+		case "enter":
+			if m.mode == modeAddName {
+				name := m.nameInput.Value()
+				if name == "" {
+					m.addError = "Name cannot be empty"
+					return m, nil
+				}
+				m.mode = modeAddBranch
+				m.branchInput.Focus()
+				return m, m.branchInput.Focus()
+			}
+
+			if m.mode == modeAddBranch {
+				name := m.nameInput.Value()
+				branch := m.branchInput.Value()
+				if branch == "" {
+					m.addError = "Branch cannot be empty"
+					return m, nil
+				}
+
+				// Create the agent
+				_, err := m.fleet.AddAgent(name, branch)
+				if err != nil {
+					m.addError = err.Error()
+					return m, nil
+				}
+
+				// Reset inputs and go back to list
+				m.mode = modeList
+				m.nameInput.Reset()
+				m.branchInput.Reset()
+				m.addError = ""
+
+				// Refresh list
+				items := buildItems(m.fleet, m.tmux, m.monitor)
+				m.list.SetItems(items)
+				return m, nil
+			}
+		}
+	}
+
+	// Update the active text input
+	var cmd tea.Cmd
+	if m.mode == modeAddName {
+		m.nameInput, cmd = m.nameInput.Update(msg)
+	} else {
+		m.branchInput, cmd = m.branchInput.Update(msg)
+	}
+	return m, cmd
+}
+
 // View renders the TUI
 func (m Model) View() string {
 	if m.quitting {
@@ -250,6 +377,32 @@ func (m Model) View() string {
 
 	if m.width == 0 {
 		return "Loading..."
+	}
+
+	// Show add agent form
+	if m.mode == modeAddName || m.mode == modeAddBranch {
+		var s string
+		s += titleStyle.Render("⚓ Add New Agent") + "\n\n"
+
+		nameLabel := "  Agent name:  "
+		branchLabel := "  Branch name: "
+
+		if m.mode == modeAddName {
+			nameLabel = selectedItemStyle.Render("> Agent name:  ")
+		}
+		if m.mode == modeAddBranch {
+			branchLabel = selectedItemStyle.Render("> Branch name: ")
+		}
+
+		s += nameLabel + m.nameInput.View() + "\n"
+		s += branchLabel + m.branchInput.View() + "\n"
+
+		if m.addError != "" {
+			s += "\n" + stoppedStyle.Render("  ❌ " + m.addError)
+		}
+
+		s += "\n" + helpStyle.Render("  enter: next/confirm • esc: cancel")
+		return s
 	}
 
 	// Count states
