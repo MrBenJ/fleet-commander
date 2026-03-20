@@ -2,7 +2,7 @@ package state
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -16,12 +16,17 @@ type AgentState struct {
 }
 
 // IsStale returns true if the state is older than ttl.
-func (s *AgentState) IsStale(ttl time.Duration) bool {
+func (s AgentState) IsStale(ttl time.Duration) bool {
 	return time.Since(s.UpdatedAt) > ttl
 }
 
 // Write atomically writes the agent state to path.
 func Write(path, agentName, stateStr string) error {
+	// Validate stateStr
+	if stateStr != "waiting" && stateStr != "working" {
+		return fmt.Errorf("invalid state: %q, must be 'waiting' or 'working'", stateStr)
+	}
+
 	state := &AgentState{
 		Agent:     agentName,
 		State:     stateStr,
@@ -44,10 +49,10 @@ func Write(path, agentName, stateStr string) error {
 	if err != nil {
 		return err
 	}
-	defer tmpFile.Close()
 
 	if _, err := tmpFile.Write(data); err != nil {
 		os.Remove(tmpFile.Name())
+		tmpFile.Close()
 		return err
 	}
 
@@ -69,7 +74,7 @@ func Read(path string) (*AgentState, error) {
 
 	var state AgentState
 	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, errors.New("failed to parse state file: " + err.Error())
+		return nil, fmt.Errorf("failed to parse state file: %w", err)
 	}
 
 	return &state, nil

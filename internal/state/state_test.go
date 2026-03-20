@@ -1,6 +1,7 @@
 package state_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -39,9 +40,26 @@ func TestWriteAndRead(t *testing.T) {
 
 func TestReadMissing(t *testing.T) {
 	// Try to read from a nonexistent path
-	_, err := state.Read("/nonexistent/path/state.json")
+	_, err := state.Read(filepath.Join(t.TempDir(), "does-not-exist.json"))
 	if err == nil {
 		t.Error("Read should return an error for nonexistent file")
+	}
+}
+
+func TestReadMalformedJSON(t *testing.T) {
+	// Create a temporary directory and file with invalid JSON
+	tmpDir := t.TempDir()
+	testPath := filepath.Join(tmpDir, "malformed.json")
+
+	// Write invalid JSON
+	if err := os.WriteFile(testPath, []byte("{not valid json"), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	// Try to read the malformed file
+	_, err := state.Read(testPath)
+	if err == nil {
+		t.Error("Read should return an error for malformed JSON")
 	}
 }
 
