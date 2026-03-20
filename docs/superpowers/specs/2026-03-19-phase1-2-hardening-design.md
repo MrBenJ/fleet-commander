@@ -387,7 +387,10 @@ case refreshMsg:
 - Kill handler: `hooks.Remove` fails → set `m.statusMsg`
 - `startAgentSession` returns an error → set `m.statusMsg`
 
-**Consolidate `addError`:** The existing `addError string` field on `Model` serves the same purpose. Replace it with `statusMsg` + `statusMsgTimer`. Update the add-agent flow to set `m.statusMsg` instead of `m.addError`. Remove the `addError` field.
+**Consolidate `addError`:** The existing `addError string` field on `Model` serves the same purpose. Replace it with `statusMsg` + `statusMsgTimer`. Three places in `tui.go` reference `addError` and must be updated:
+1. The field declaration in `Model` — remove `addError string`
+2. `updateAddMode()` — where `m.addError = "..."` is currently set, replace with inline `m.statusMsg`/`m.statusMsgTimer` assignment
+3. `View()` add-agent form branch (around line 433) — where `m.addError` is rendered, change to render `m.statusMsg` instead
 
 ---
 
