@@ -207,7 +207,9 @@ var stopCmd = &cobra.Command{
 		// Clean up state file so monitor doesn't show stale state
 		agent, err := f.GetAgent(agentName)
 		if err == nil && agent.StateFilePath != "" {
-			os.Remove(agent.StateFilePath)
+			if err := os.Remove(agent.StateFilePath); err != nil {
+				fmt.Printf("Warning: could not remove state file: %v\n", err)
+			}
 			f.UpdateAgentStateFile(agentName, "")
 		}
 
@@ -266,7 +268,9 @@ Use --branch to also delete the branch.`,
 
 		// Remove state file if present
 		if agent.StateFilePath != "" {
-			os.Remove(agent.StateFilePath)
+			if err := os.Remove(agent.StateFilePath); err != nil {
+				fmt.Printf("Warning: could not remove state file: %v\n", err)
+			}
 		}
 
 		// Remove git worktree
