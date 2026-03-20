@@ -277,7 +277,7 @@ var hintCmd = &cobra.Command{
 	Use:   "hint",
 	Short: "Show keyboard shortcuts and workflow tips",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(`
+		fmt.Print(`
 Fleet Commander - Quick Reference
 ══════════════════════════════════
 
