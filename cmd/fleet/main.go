@@ -205,6 +205,37 @@ var queueCmd = &cobra.Command{
 	},
 }
 
+var hintCmd = &cobra.Command{
+	Use:   "hint",
+	Short: "Show keyboard shortcuts and workflow tips",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(`
+Fleet Commander - Quick Reference
+══════════════════════════════════
+
+  WORKFLOW
+  ─────────────────────────────────────────
+  fleet queue          Open agent selector
+  fleet attach <name>  Jump into an agent
+  fleet list           Show all agents
+
+  INSIDE A TMUX SESSION
+  ─────────────────────────────────────────
+  Ctrl+B, Q            Detach → back to shell (agent keeps running)
+  Ctrl+B, D            Detach (standard tmux)
+  Ctrl+B, L            List all fleet sessions
+
+  TYPICAL LOOP
+  ─────────────────────────────────────────
+  1. fleet queue       → pick an agent
+  2. Give Claude a task
+  3. Ctrl+B, Q         → detach (Claude keeps working)
+  4. fleet queue       → pick another agent
+  5. Repeat!
+`)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
@@ -213,6 +244,7 @@ func init() {
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(queueCmd)
+	rootCmd.AddCommand(hintCmd)
 }
 
 func main() {

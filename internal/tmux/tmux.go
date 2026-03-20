@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -39,17 +40,47 @@ func (m *Manager) SessionExists(agentName string) bool {
 	return err == nil
 }
 
+// findFleetTmuxConf locates fleet.tmux.conf relative to the fleet binary
+func findFleetTmuxConf() string {
+	// Find the binary's directory
+	exe, err := os.Executable()
+	if err == nil {
+		// Resolve symlinks
+		exe, err = filepath.EvalSymlinks(exe)
+		if err == nil {
+			confPath := filepath.Join(filepath.Dir(exe), "fleet.tmux.conf")
+			if _, err := os.Stat(confPath); err == nil {
+				return confPath
+			}
+		}
+	}
+
+	// Fallback: check common locations
+	home, _ := os.UserHomeDir()
+	candidates := []string{
+		filepath.Join(home, "code", "fleet-commander", "fleet.tmux.conf"),
+		filepath.Join(home, ".config", "fleet", "fleet.tmux.conf"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+
+	return ""
+}
+
 // CreateSession creates a new tmux session for an agent
 func (m *Manager) CreateSession(agentName, worktreePath, command string) error {
 	sessionName := m.SessionName(agentName)
-	
+
 	// Check if claude is available
 	if command == "" {
 		if _, err := exec.LookPath("claude"); err != nil {
 			return fmt.Errorf("claude command not found in PATH")
 		}
 	}
-	
+
 	// Build tmux command: new-session -d -s <name> -c <path> <command>
 	args := []string{
 		"new-session",
@@ -57,23 +88,32 @@ func (m *Manager) CreateSession(agentName, worktreePath, command string) error {
 		"-s", sessionName,
 		"-c", worktreePath,
 	}
-	
+
 	if command != "" {
 		args = append(args, command)
 	} else {
 		args = append(args, "claude", "code")
 	}
-	
+
 	cmd := exec.Command("tmux", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create tmux session: %w", err)
 	}
-	
+
+	// Source the fleet tmux config if available
+	confPath := findFleetTmuxConf()
+	if confPath != "" {
+		sourceCmd := exec.Command("tmux", "source-file", confPath)
+		_ = sourceCmd.Run() // best-effort, don't fail if config has issues
+	}
+
 	return nil
 }
+
+
 
 // Attach attaches to a tmux session
 func (m *Manager) Attach(agentName string) error {
