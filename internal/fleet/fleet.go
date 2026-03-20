@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/teknal/fleet-commander/internal/worktree"
 )
@@ -53,6 +54,9 @@ func Init(repoPath string) (*Fleet, error) {
 		return nil, fmt.Errorf("failed to create worktrees directory: %w", err)
 	}
 	
+	// Add .fleet/ to .gitignore if not already there
+	addToGitignore(absPath, ".fleet/")
+
 	f := &Fleet{
 		RepoPath: absPath,
 		FleetDir: fleetDir,
@@ -189,4 +193,36 @@ func (f *Fleet) UpdateAgent(name string, status string, pid int) error {
 		}
 	}
 	return fmt.Errorf("agent '%s' not found", name)
+}
+
+// addToGitignore adds an entry to .gitignore if it's not already present
+func addToGitignore(repoPath, entry string) {
+	gitignorePath := filepath.Join(repoPath, ".gitignore")
+
+	// Read existing content
+	content, err := os.ReadFile(gitignorePath)
+	if err != nil && !os.IsNotExist(err) {
+		return // can't read, skip
+	}
+
+	// Check if entry already exists
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == entry {
+			return // already there
+		}
+	}
+
+	// Append entry
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	// Add newline before entry if file doesn't end with one
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		f.WriteString("\n")
+	}
+	f.WriteString(entry + "\n")
 }
