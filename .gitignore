@@ -18,7 +18,7 @@ vendor/
 go.work
 
 # Binary
-fleet
+/fleet
 
 # Fleet-specific
 .fleet/
