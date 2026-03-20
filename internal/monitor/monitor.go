@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teknal/fleet-commander/internal/state"
 	"github.com/teknal/fleet-commander/internal/tmux"
 )
 
@@ -68,6 +69,40 @@ func (m *Monitor) Check(agentName string) *Snapshot {
 
 	m.snapshots[agentName] = snap
 	return snap
+}
+
+const stateFileTTL = 10 * time.Minute
+
+// CheckWithStateFile checks agent state, preferring the state file over
+// tmux pane scraping. Falls back to tmux scraping if the file is absent or stale.
+// If m.tmux is nil, returns StateStopped rather than panicking (used in tests).
+func (m *Monitor) CheckWithStateFile(agentName, stateFilePath string) *Snapshot {
+	if stateFilePath != "" {
+		if s, err := state.Read(stateFilePath); err == nil && !s.IsStale(stateFileTTL) {
+			snap := &Snapshot{
+				AgentName: agentName,
+				State:     stateFromString(s.State),
+				Timestamp: s.UpdatedAt,
+			}
+			m.snapshots[agentName] = snap
+			return snap
+		}
+	}
+	if m.tmux == nil {
+		return &Snapshot{AgentName: agentName, State: StateStopped, Timestamp: time.Now()}
+	}
+	return m.Check(agentName)
+}
+
+func stateFromString(s string) AgentState {
+	switch s {
+	case "waiting":
+		return StateWaiting
+	case "working":
+		return StateWorking
+	default:
+		return StateStopped
+	}
 }
 
 // GetSnapshot returns the last snapshot for an agent

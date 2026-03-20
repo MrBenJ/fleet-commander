@@ -200,7 +200,7 @@ func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.I
 	items := []list.Item{AddNewItem{}}
 
 	for _, a := range f.Agents {
-		snap := mon.Check(a.Name)
+		snap := mon.CheckWithStateFile(a.Name, a.StateFilePath)
 		items = append(items, AgentItem{
 			Agent:    a,
 			State:    snap.State,
