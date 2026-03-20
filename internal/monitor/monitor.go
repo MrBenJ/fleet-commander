@@ -85,84 +85,67 @@ func detectState(lastLine, fullContent string) AgentState {
 		return StateStarting
 	}
 
+	// Only look at the BOTTOM of the pane (last 10 non-empty lines)
+	// Old prompts may still be visible higher up — ignore them
+	allLines := strings.Split(stripped, "\n")
+	bottom := getLastNonEmptyLines(allLines, 10)
+	bottomText := strings.Join(bottom, "\n")
+
 	// WORKING CHECK FIRST — spinners take priority over everything
-	// If there's a spinner anywhere on screen, the agent is actively working
 	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	for _, s := range spinners {
-		if strings.Contains(stripped, s) {
+		if strings.Contains(bottomText, s) {
 			return StateWorking
 		}
 	}
 
-	// Check the FULL content for Claude Code patterns (not just last line)
-	// Claude Code shows multi-line prompts, so the last line alone isn't enough
+	// WAITING PATTERNS — check only the bottom of the pane
 
-	// Claude Code permission/action prompts
-	// These appear as multi-line blocks ending with "Esc to cancel"
-	if strings.Contains(stripped, "Esc to cancel") {
+	// Claude Code permission prompts ("Esc to cancel" footer)
+	if strings.Contains(bottomText, "Esc to cancel") {
 		return StateWaiting
 	}
 
-	// Claude Code tool confirmation: "Do you want to proceed?"
-	if strings.Contains(stripped, "Do you want to proceed") {
+	// Claude Code tool confirmation
+	if strings.Contains(bottomText, "Do you want to proceed") {
 		return StateWaiting
 	}
 
 	// Claude Code edit acceptance prompt
-	if strings.Contains(stripped, "accept edits") {
+	if strings.Contains(bottomText, "accept edits") {
 		return StateWaiting
 	}
 
-	// Claude Code shift+tab hint (appears on various input prompts)
-	if strings.Contains(stripped, "shift+tab to cycle") {
+	// Claude Code input hint bar
+	if strings.Contains(bottomText, "shift+tab to cycle") {
 		return StateWaiting
 	}
 
-	// Claude Code numbered choice menus (❯ 1. Yes / 2. No pattern)
-	if strings.Contains(stripped, "❯") && (strings.Contains(stripped, "1. Yes") || strings.Contains(stripped, "1.") && strings.Contains(stripped, "2.")) {
+	// Claude Code numbered choice menus
+	if strings.Contains(bottomText, "❯") && strings.Contains(bottomText, "1.") && strings.Contains(bottomText, "2.") {
 		return StateWaiting
 	}
 
-	// Claude Code input prompt: ❯ on its own line (check full content)
-	for _, line := range strings.Split(stripped, "\n") {
+	// Claude Code bare input prompt: ❯ on its own line near the bottom
+	for _, line := range bottom {
 		if strings.TrimSpace(line) == "❯" {
 			return StateWaiting
 		}
 	}
 
-	// Claude Code asking a question in conversation
-	// Check last few lines for question patterns
-	lines := strings.Split(stripped, "\n")
-	lastFew := getLastNonEmptyLines(lines, 5)
-	for _, line := range lastFew {
+	// Question at the very bottom (last 3 lines only)
+	veryBottom := getLastNonEmptyLines(allLines, 3)
+	for _, line := range veryBottom {
 		trimmed := strings.TrimSpace(line)
-
-		// Question marks at end of a substantive line (not spinners or progress)
-		if strings.HasSuffix(trimmed, "?") && len(trimmed) > 5 {
+		if strings.HasSuffix(trimmed, "?") && len(trimmed) > 10 {
 			return StateWaiting
 		}
-
-		// Yes/No prompts
-		if strings.Contains(trimmed, "(y/n)") ||
-			strings.Contains(trimmed, "(Y/n)") ||
-			strings.Contains(trimmed, "[Y/n]") ||
-			strings.Contains(trimmed, "[y/N]") {
-			return StateWaiting
-		}
-
-		// Permission patterns
-		if strings.Contains(trimmed, "Allow") && strings.HasSuffix(trimmed, "?") {
+		if strings.Contains(trimmed, "(y/n)") || strings.Contains(trimmed, "[Y/n]") {
 			return StateWaiting
 		}
 	}
 
-	// Claude Code input prompt: just ">" or "❯" on its own line
-	lastNonEmpty := strings.TrimSpace(stripANSI(lastLine))
-	if lastNonEmpty == ">" || lastNonEmpty == "❯" || lastNonEmpty == "$" {
-		return StateWaiting
-	}
-
-	// Default: assume working (no spinner, no waiting pattern = probably working)
+	// Default: working
 	return StateWorking
 }
 
