@@ -43,6 +43,13 @@ func (m *Manager) SessionExists(agentName string) bool {
 func (m *Manager) CreateSession(agentName, worktreePath, command string) error {
 	sessionName := m.SessionName(agentName)
 	
+	// Check if claude is available
+	if command == "" {
+		if _, err := exec.LookPath("claude"); err != nil {
+			return fmt.Errorf("claude command not found in PATH")
+		}
+	}
+	
 	// Build tmux command: new-session -d -s <name> -c <path> <command>
 	args := []string{
 		"new-session",
