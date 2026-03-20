@@ -285,25 +285,46 @@ func (m Model) View() string {
 	)
 }
 
-// Run starts the TUI, and if the user selected an agent, attaches to it after exit
+// Run starts the TUI in a loop.
+// When the user selects an agent, it attaches to the tmux session.
+// When the user detaches (Ctrl+B, Q), it returns to the queue.
+// Press 'q' in the queue to fully exit.
 func Run(f *fleet.Fleet) error {
-	m := New(f)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	for {
+		m := New(f)
+		p := tea.NewProgram(m, tea.WithAltScreen())
 
-	finalModel, err := p.Run()
-	if err != nil {
-		return fmt.Errorf("failed to run TUI: %w", err)
-	}
+		finalModel, err := p.Run()
+		if err != nil {
+			return fmt.Errorf("failed to run TUI: %w", err)
+		}
 
-	// After TUI has fully exited, attach to selected agent
-	if fm, ok := finalModel.(Model); ok && fm.attachAgent != "" {
+		fm, ok := finalModel.(Model)
+		if !ok {
+			return nil
+		}
+
+		// If user pressed 'q' (no agent selected), exit the loop
+		if fm.attachAgent == "" {
+			return nil
+		}
+
+		// Attach to the selected agent's tmux session
 		tm := tmux.NewManager("fleet")
 
 		if tmux.IsInsideTmux() {
-			return tm.SwitchClient(fm.attachAgent)
+			tm.SwitchClient(fm.attachAgent)
+		} else {
+			tm.Attach(fm.attachAgent)
 		}
-		return tm.Attach(fm.attachAgent)
-	}
 
-	return nil
+		// When tmux detach happens (Ctrl+B, Q), we land here
+		// and loop back to showing the queue again
+
+		// Reload fleet config in case anything changed
+		reloaded, err := fleet.Load(f.RepoPath)
+		if err == nil {
+			f = reloaded
+		}
+	}
 }
