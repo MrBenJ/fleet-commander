@@ -85,10 +85,10 @@ func detectState(lastLine, fullContent string) AgentState {
 		return StateStarting
 	}
 
-	// Only look at the BOTTOM of the pane (last 10 non-empty lines)
+	// Only look at the BOTTOM of the pane (last 15 non-empty lines)
 	// Old prompts may still be visible higher up — ignore them
 	allLines := strings.Split(stripped, "\n")
-	bottom := getLastNonEmptyLines(allLines, 10)
+	bottom := getLastNonEmptyLines(allLines, 15)
 	bottomText := strings.Join(bottom, "\n")
 
 	// WORKING CHECK FIRST — spinners take priority over everything
