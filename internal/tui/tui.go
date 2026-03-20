@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -172,12 +173,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.fleet.UpdateAgent(agent.Name, "running", pid)
 				}
 				
-				// Store selected agent for shell wrapper to use
+				// Print attach command and quit
+				fmt.Fprintf(os.Stderr, "\n👉  Run: fleet attach %s\n\n", agent.Name)
 				m.quitting = true
-				return m, tea.Sequence(
-					tea.Printf("\nUse: fleet attach %s\n", agent.Name),
-					tea.Quit,
-				)
+				return m, tea.Quit
 			}
 			
 		case "s":
