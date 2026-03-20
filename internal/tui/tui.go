@@ -3,8 +3,6 @@ package tui
 import (
 	"fmt"
 	"io"
-	"os"
-	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,23 +15,23 @@ var (
 	titleStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#7D56F4"))
-	
+
 	itemStyle = lipgloss.NewStyle().
 		PaddingLeft(2)
-	
+
 	selectedItemStyle = lipgloss.NewStyle().
 		PaddingLeft(2).
 		Foreground(lipgloss.Color("#7D56F4"))
-	
+
 	statusStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#666666"))
-	
+
 	helpStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#666666"))
-	
+
 	runningStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#00FF00"))
-	
+
 	stoppedStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FF0000"))
 )
@@ -49,21 +47,18 @@ func (i AgentItem) FilterValue() string { return i.Agent.Name }
 // AgentDelegate customizes how agents are rendered
 type AgentDelegate struct{}
 
-func (d AgentDelegate) Height() int                             { return 2 }
-func (d AgentDelegate) Spacing() int                            { return 1 }
-func (d AgentDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
+func (d AgentDelegate) Height() int                                { return 2 }
+func (d AgentDelegate) Spacing() int                               { return 1 }
+func (d AgentDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd    { return nil }
 
 func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	i, ok := item.(AgentItem)
-	if !ok {
+	if !ok || i.Agent == nil {
 		return
 	}
-	
+
 	agent := i.Agent
-	if agent == nil {
-		return
-	}
-	
+
 	// Status indicator (use cached value)
 	status := "○"
 	statusColor := stoppedStyle
@@ -71,7 +66,7 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 		status = "●"
 		statusColor = runningStyle
 	}
-	
+
 	// Title with status
 	title := fmt.Sprintf("%s %s", statusColor.Render(status), agent.Name)
 	if index == m.Index() {
@@ -79,45 +74,40 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	} else {
 		title = itemStyle.Render("  " + title)
 	}
-	
+
 	// Description
 	desc := fmt.Sprintf("    %s • %s", agent.Branch, agent.Status)
-	
+
 	fmt.Fprint(w, title+"\n"+statusStyle.Render(desc))
 }
 
 // refreshMsg triggers a status refresh
 type refreshMsg struct{}
 
-// attachMsg carries the agent name for attach
-type attachMsg struct {
-	agentName string
-}
-
 // Model is the TUI model
 type Model struct {
-	list     list.Model
-	fleet    *fleet.Fleet
-	tmux     *tmux.Manager
-	width    int
-	height   int
-	quitting bool
+	list        list.Model
+	fleet       *fleet.Fleet
+	tmux        *tmux.Manager
+	width       int
+	height      int
+	quitting    bool
+	attachAgent string // set when user selects an agent to attach to
 }
 
 // New creates a new TUI model
 func New(f *fleet.Fleet) Model {
 	tm := tmux.NewManager("fleet")
-	
-	// Build items with cached running status
+
 	items := buildItems(f, tm)
-	
+
 	delegate := AgentDelegate{}
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Fleet Commander"
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = titleStyle
-	
+
 	return Model{
 		list:  l,
 		fleet: f,
@@ -136,10 +126,7 @@ func buildItems(f *fleet.Fleet, tm *tmux.Manager) []list.Item {
 
 // Init initializes the TUI
 func (m Model) Init() tea.Cmd {
-	// Refresh status periodically
-	return tea.Tick(0, func(t time.Time) tea.Msg {
-		return refreshMsg{}
-	})
+	return nil
 }
 
 // Update handles messages
@@ -148,98 +135,74 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.list.SetSize(msg.Width, msg.Height-6)
-		
+		m.list.SetSize(msg.Width, msg.Height-4)
+
 	case refreshMsg:
-		// Refresh the list with current status
 		items := buildItems(m.fleet, m.tmux)
 		m.list.SetItems(items)
-		return m, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
-			return refreshMsg{}
-		})
-		
-	case attachMsg:
-		// Write message to a temp file for shell to read
-		msgFile := "/tmp/fleet_commander_last_msg"
-		os.WriteFile(msgFile, []byte(fmt.Sprintf("fleet attach %s", msg.agentName)), 0644)
-		// Also try printing after a short delay
-		m.quitting = true
-		return m, tea.Sequence(
-			tea.Printf("\n👉  Run: fleet attach %s\n", msg.agentName),
-			tea.Quit,
-		)
-		
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
-			
+
 		case "enter":
 			if item, ok := m.list.SelectedItem().(AgentItem); ok {
 				agent := item.Agent
-				
+
 				// If session doesn't exist, create it
 				if !item.IsRunning {
-					fmt.Fprintf(os.Stderr, "\n🚀  Starting %s...\n", agent.Name)
 					if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, ""); err != nil {
-						fmt.Fprintf(os.Stderr, "❌  Error creating session: %v\n", err)
+						// Don't crash — just stay in TUI
 						return m, nil
 					}
-					// Update status
 					pid, _ := m.tmux.GetPID(agent.Name)
 					m.fleet.UpdateAgent(agent.Name, "running", pid)
-					fmt.Fprintf(os.Stderr, "✅  Session started (PID: %d)\n", pid)
 				}
-				
-				// Signal attach and quit
-				return m, func() tea.Msg {
-					return attachMsg{agentName: agent.Name}
-				}
+
+				// Store the agent name and quit — Run() will handle the attach
+				m.attachAgent = agent.Name
+				m.quitting = true
+				return m, tea.Quit
 			}
-			
+
 		case "s":
-			// Start selected agent
 			if item, ok := m.list.SelectedItem().(AgentItem); ok {
 				agent := item.Agent
 				if m.tmux.SessionExists(agent.Name) {
-					return m, tea.Printf("Agent '%s' is already running", agent.Name)
+					return m, nil
 				}
 				if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, ""); err != nil {
-					return m, tea.Printf("Error starting agent: %v", err)
+					return m, nil
 				}
 				pid, _ := m.tmux.GetPID(agent.Name)
 				m.fleet.UpdateAgent(agent.Name, "running", pid)
-				
-				// Refresh list
 				items := buildItems(m.fleet, m.tmux)
 				m.list.SetItems(items)
 			}
-			
+
 		case "k":
-			// Kill selected agent
 			if item, ok := m.list.SelectedItem().(AgentItem); ok {
 				agent := item.Agent
 				if !m.tmux.SessionExists(agent.Name) {
-					return m, tea.Printf("Agent '%s' is not running", agent.Name)
+					return m, nil
 				}
 				if err := m.tmux.KillSession(agent.Name); err != nil {
-					return m, tea.Printf("Error stopping agent: %v", err)
+					return m, nil
 				}
 				m.fleet.UpdateAgent(agent.Name, "stopped", 0)
-				
-				// Refresh list
 				items := buildItems(m.fleet, m.tmux)
 				m.list.SetItems(items)
 			}
-			
+
 		case "r":
-			// Refresh list manually
 			items := buildItems(m.fleet, m.tmux)
 			m.list.SetItems(items)
 		}
 	}
-	
+
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
 	return m, cmd
@@ -250,38 +213,40 @@ func (m Model) View() string {
 	if m.quitting {
 		return ""
 	}
-	
+
 	if m.width == 0 {
 		return "Loading..."
 	}
-	
-	var status string
-	if m.tmux.IsAvailable() {
-		sessions, _ := m.tmux.ListSessions()
-		status = fmt.Sprintf("tmux: %d sessions", len(sessions))
-	} else {
-		status = "tmux: not installed"
-	}
-	
+
 	help := helpStyle.Render("enter: attach • s: start • k: kill • r: refresh • q: quit")
-	
+
 	return fmt.Sprintf(
-		"%s\n%s\n%s\n%s",
+		"%s\n%s\n%s",
 		m.list.View(),
 		statusStyle.Render(fmt.Sprintf("Repo: %s", m.fleet.RepoPath)),
-		statusStyle.Render(status),
 		help,
 	)
 }
 
-// Run starts the TUI
+// Run starts the TUI, and if the user selected an agent, attaches to it after exit
 func Run(f *fleet.Fleet) error {
 	m := New(f)
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	
-	if _, err := p.Run(); err != nil {
+
+	finalModel, err := p.Run()
+	if err != nil {
 		return fmt.Errorf("failed to run TUI: %w", err)
 	}
-	
+
+	// After TUI has fully exited, check if user selected an agent to attach to
+	if fm, ok := finalModel.(Model); ok && fm.attachAgent != "" {
+		tm := tmux.NewManager("fleet")
+
+		if tmux.IsInsideTmux() {
+			return tm.SwitchClient(fm.attachAgent)
+		}
+		return tm.Attach(fm.attachAgent)
+	}
+
 	return nil
 }
