@@ -91,7 +91,14 @@ func detectState(lastLine, fullContent string) AgentState {
 	bottom := getLastNonEmptyLines(allLines, 15)
 	bottomText := strings.Join(bottom, "\n")
 
-	// WORKING CHECK FIRST — spinners take priority over everything
+	// WORKING CHECK FIRST — these take priority over everything
+
+	// Claude Code shows "esc to interrupt" when actively working
+	if strings.Contains(bottomText, "esc to interrupt") {
+		return StateWorking
+	}
+
+	// Spinner characters (may or may not be captured by tmux)
 	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	for _, s := range spinners {
 		if strings.Contains(bottomText, s) {
