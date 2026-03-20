@@ -177,9 +177,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				
 				// Print attach command and quit
-				fmt.Fprintf(os.Stderr, "\n👉  Run: fleet attach %s\n\n", agent.Name)
 				m.quitting = true
-				return m, tea.Quit
+				return m, tea.Batch(
+					tea.Printf("\n👉  Run: fleet attach %s\n", agent.Name),
+					tea.Quit,
+				)
 			}
 			
 		case "s":
