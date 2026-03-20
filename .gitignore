@@ -38,3 +38,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Git worktrees
+.worktrees/
