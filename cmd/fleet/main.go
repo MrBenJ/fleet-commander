@@ -126,7 +126,7 @@ var startCmd = &cobra.Command{
 
 			if err := hooks.Inject(agent.WorktreePath); err != nil {
 				// Non-fatal: common cause is malformed existing .claude/settings.json — check that file first.
-				fmt.Printf("Warning: could not inject hooks into %s: %v\n", agent.WorktreePath, err)
+				fmt.Printf("Warning: could not inject hooks into %s (.claude/settings.json may be malformed): %v\n", agent.WorktreePath, err)
 				stateFilePath = ""
 			}
 
