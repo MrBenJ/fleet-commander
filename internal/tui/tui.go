@@ -159,10 +159,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		
 	case attachMsg:
-		// Print message and quit
-		fmt.Printf("\n👉  Run: fleet attach %s\n\n", msg.agentName)
+		// Write message to a temp file for shell to read
+		msgFile := "/tmp/fleet_commander_last_msg"
+		os.WriteFile(msgFile, []byte(fmt.Sprintf("fleet attach %s", msg.agentName)), 0644)
+		// Also try printing after a short delay
 		m.quitting = true
-		return m, tea.Quit
+		return m, tea.Sequence(
+			tea.Printf("\n👉  Run: fleet attach %s\n", msg.agentName),
+			tea.Quit,
+		)
 		
 	case tea.KeyMsg:
 		switch msg.String() {
