@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/teknal/fleet-commander/internal/fleet"
+	"github.com/teknal/fleet-commander/internal/hooks"
+	"github.com/teknal/fleet-commander/internal/state"
 	"github.com/teknal/fleet-commander/internal/tmux"
 	"github.com/teknal/fleet-commander/internal/tui"
 )
@@ -47,17 +50,17 @@ var addCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		branch := args[1]
-		
+
 		f, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
-		
+
 		agent, err := f.AddAgent(name, branch)
 		if err != nil {
 			return fmt.Errorf("failed to add agent: %w", err)
 		}
-		
+
 		fmt.Printf("Agent '%s' created on branch '%s'\n", agent.Name, agent.Branch)
 		fmt.Printf("Worktree: %s\n", agent.WorktreePath)
 		return nil
@@ -72,12 +75,12 @@ var listCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
-		
+
 		if len(f.Agents) == 0 {
 			fmt.Println("No agents in fleet. Use 'fleet add' to create one.")
 			return nil
 		}
-		
+
 		fmt.Println("AGENT\t\tBRANCH\t\t\tSTATUS\t\tPID")
 		fmt.Println("─────\t\t──────\t\t\t──────\t\t───")
 		for _, a := range f.Agents {
@@ -97,34 +100,48 @@ var startCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agentName := args[0]
-		
+
 		f, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
-		
+
 		agent, err := f.GetAgent(agentName)
 		if err != nil {
 			return err
 		}
-		
+
 		tm := tmux.NewManager("fleet")
 		if !tm.IsAvailable() {
 			return fmt.Errorf("tmux is not installed")
 		}
-		
+
 		// Create session if it doesn't exist
 		if !tm.SessionExists(agentName) {
-			if err := tm.CreateSession(agentName, agent.WorktreePath, ""); err != nil {
+			statesDir := filepath.Join(f.FleetDir, "states")
+			if err := os.MkdirAll(statesDir, 0755); err != nil {
+				return fmt.Errorf("failed to create states dir: %w", err)
+			}
+			stateFilePath := filepath.Join(statesDir, agentName+".json")
+
+			if err := hooks.Inject(agent.WorktreePath); err != nil {
+				// Non-fatal: common cause is malformed existing .claude/settings.json — check that file first.
+				fmt.Printf("Warning: could not inject hooks into %s (.claude/settings.json may be malformed): %v\n", agent.WorktreePath, err)
+				stateFilePath = ""
+			}
+
+			if err := tm.CreateSession(agentName, agent.WorktreePath, "", stateFilePath); err != nil {
 				return fmt.Errorf("failed to create tmux session: %w", err)
 			}
 			fmt.Printf("Created tmux session for agent '%s'\n", agentName)
+
+			f.UpdateAgentStateFile(agentName, stateFilePath)
 		}
-		
+
 		// Update agent status
 		pid, _ := tm.GetPID(agentName)
 		f.UpdateAgent(agentName, "running", pid)
-		
+
 		fmt.Printf("Agent '%s' is running in tmux session: %s\n", agentName, tm.SessionName(agentName))
 		fmt.Printf("Attach with: fleet attach %s\n", agentName)
 		return nil
@@ -137,26 +154,26 @@ var attachCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agentName := args[0]
-		
+
 		_, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
-		
+
 		tm := tmux.NewManager("fleet")
 		if !tm.IsAvailable() {
 			return fmt.Errorf("tmux is not installed")
 		}
-		
+
 		if !tm.SessionExists(agentName) {
 			return fmt.Errorf("agent '%s' does not have a running session. Start it with 'fleet start %s'", agentName, agentName)
 		}
-		
+
 		// If already in tmux, switch clients
 		if tmux.IsInsideTmux() {
 			return tm.SwitchClient(agentName)
 		}
-		
+
 		// Otherwise attach to the session
 		return tm.Attach(agentName)
 	},
@@ -168,25 +185,39 @@ var stopCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agentName := args[0]
-		
+
 		f, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
-		
+
 		tm := tmux.NewManager("fleet")
 		if !tm.IsAvailable() {
 			return fmt.Errorf("tmux is not installed")
 		}
-		
+
 		if !tm.SessionExists(agentName) {
 			return fmt.Errorf("agent '%s' does not have a running session", agentName)
 		}
-		
+
 		if err := tm.KillSession(agentName); err != nil {
 			return fmt.Errorf("failed to stop session: %w", err)
 		}
-		
+
+		// Clean up state file so monitor doesn't show stale state
+		agent, err := f.GetAgent(agentName)
+		if err == nil && agent.StateFilePath != "" {
+			if err := os.Remove(agent.StateFilePath); err != nil {
+				fmt.Printf("Warning: could not remove state file: %v\n", err)
+			}
+			f.UpdateAgentStateFile(agentName, "")
+		}
+
+		// Remove fleet hooks so they don't fire after the session ends
+		if err := hooks.Remove(agent.WorktreePath); err != nil {
+			fmt.Printf("Warning: could not remove hooks: %v\n", err)
+		}
+
 		f.UpdateAgent(agentName, "stopped", 0)
 		fmt.Printf("Stopped agent '%s'\n", agentName)
 		return nil
@@ -201,7 +232,7 @@ var queueCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
-		
+
 		return tui.Run(f)
 	},
 }
@@ -233,6 +264,18 @@ Use --branch to also delete the branch.`,
 		if tm.SessionExists(agentName) {
 			fmt.Printf("Killing tmux session for '%s'...\n", agentName)
 			tm.KillSession(agentName)
+		}
+
+		// Remove fleet hooks from the worktree
+		if err := hooks.Remove(agent.WorktreePath); err != nil {
+			fmt.Printf("Warning: could not remove hooks: %v\n", err)
+		}
+
+		// Remove state file if present
+		if agent.StateFilePath != "" {
+			if err := os.Remove(agent.StateFilePath); err != nil {
+				fmt.Printf("Warning: could not remove state file: %v\n", err)
+			}
 		}
 
 		// Remove git worktree
@@ -277,7 +320,7 @@ var hintCmd = &cobra.Command{
 	Use:   "hint",
 	Short: "Show keyboard shortcuts and workflow tips",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(`
+		fmt.Print(`
 Fleet Commander - Quick Reference
 ══════════════════════════════════
 
@@ -304,6 +347,21 @@ Fleet Commander - Quick Reference
 	},
 }
 
+var signalCmd = &cobra.Command{
+	Use:    "signal [state]",
+	Short:  "Write agent state (called by Claude Code hooks)",
+	Args:   cobra.ExactArgs(1),
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		stateFile := os.Getenv("FLEET_STATE_FILE")
+		agentName := os.Getenv("FLEET_AGENT_NAME")
+		if stateFile == "" || agentName == "" {
+			return nil  // not in a fleet session — silently succeed
+		}
+		return state.Write(stateFile, agentName, args[0])
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
@@ -314,6 +372,7 @@ func init() {
 	rootCmd.AddCommand(queueCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(hintCmd)
+	rootCmd.AddCommand(signalCmd)
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
 }
