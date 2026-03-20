@@ -99,9 +99,26 @@ func detectState(lastLine, fullContent string) AgentState {
 		return StateWaiting
 	}
 
+	// Claude Code edit acceptance prompt
+	if strings.Contains(stripped, "accept edits") {
+		return StateWaiting
+	}
+
+	// Claude Code shift+tab hint (appears on various input prompts)
+	if strings.Contains(stripped, "shift+tab to cycle") {
+		return StateWaiting
+	}
+
 	// Claude Code numbered choice menus (❯ 1. Yes / 2. No pattern)
 	if strings.Contains(stripped, "❯") && (strings.Contains(stripped, "1. Yes") || strings.Contains(stripped, "1.") && strings.Contains(stripped, "2.")) {
 		return StateWaiting
+	}
+
+	// Claude Code input prompt: ❯ on its own line (check full content)
+	for _, line := range strings.Split(stripped, "\n") {
+		if strings.TrimSpace(line) == "❯" {
+			return StateWaiting
+		}
 	}
 
 	// Claude Code asking a question in conversation
