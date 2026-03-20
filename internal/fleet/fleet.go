@@ -168,6 +168,17 @@ func (f *Fleet) GetAgent(name string) (*Agent, error) {
 	return nil, fmt.Errorf("agent '%s' not found", name)
 }
 
+// RemoveAgent removes an agent from the fleet config
+func (f *Fleet) RemoveAgent(name string) error {
+	for i, a := range f.Agents {
+		if a.Name == name {
+			f.Agents = append(f.Agents[:i], f.Agents[i+1:]...)
+			return f.save()
+		}
+	}
+	return fmt.Errorf("agent '%s' not found", name)
+}
+
 // UpdateAgent updates an agent's status and PID
 func (f *Fleet) UpdateAgent(name string, status string, pid int) error {
 	for _, a := range f.Agents {

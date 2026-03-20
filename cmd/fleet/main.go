@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/spf13/cobra"
 	"github.com/teknal/fleet-commander/internal/fleet"
@@ -205,6 +206,73 @@ var queueCmd = &cobra.Command{
 	},
 }
 
+var removeCmd = &cobra.Command{
+	Use:   "remove [agent-name]",
+	Short: "Remove an agent and clean up its worktree",
+	Long: `Remove an agent, kill its tmux session, and clean up the git worktree.
+
+The branch is NOT deleted — it stays in git for PRs and review.
+Use --branch to also delete the branch.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		agentName := args[0]
+		deleteBranch, _ := cmd.Flags().GetBool("branch")
+
+		f, err := fleet.Load(".")
+		if err != nil {
+			return fmt.Errorf("failed to load fleet: %w", err)
+		}
+
+		agent, err := f.GetAgent(agentName)
+		if err != nil {
+			return err
+		}
+
+		// Kill tmux session if running
+		tm := tmux.NewManager("fleet")
+		if tm.SessionExists(agentName) {
+			fmt.Printf("Killing tmux session for '%s'...\n", agentName)
+			tm.KillSession(agentName)
+		}
+
+		// Remove git worktree
+		fmt.Printf("Removing worktree at %s...\n", agent.WorktreePath)
+		removeWorktree := exec.Command("git", "worktree", "remove", agent.WorktreePath)
+		removeWorktree.Dir = f.RepoPath
+		if out, err := removeWorktree.CombinedOutput(); err != nil {
+			// Try force remove
+			forceRemove := exec.Command("git", "worktree", "remove", "--force", agent.WorktreePath)
+			forceRemove.Dir = f.RepoPath
+			if out2, err2 := forceRemove.CombinedOutput(); err2 != nil {
+				return fmt.Errorf("failed to remove worktree: %s\n%s", string(out), string(out2))
+			}
+		} else {
+			_ = out
+		}
+
+		// Optionally delete branch
+		if deleteBranch {
+			fmt.Printf("Deleting branch '%s'...\n", agent.Branch)
+			deleteBr := exec.Command("git", "branch", "-D", agent.Branch)
+			deleteBr.Dir = f.RepoPath
+			if out, err := deleteBr.CombinedOutput(); err != nil {
+				fmt.Printf("Warning: could not delete branch: %s\n", string(out))
+			}
+		}
+
+		// Remove agent from fleet config
+		if err := f.RemoveAgent(agentName); err != nil {
+			return err
+		}
+
+		fmt.Printf("✅ Agent '%s' removed\n", agentName)
+		if !deleteBranch {
+			fmt.Printf("Branch '%s' preserved (push it for a PR, or use --branch to delete)\n", agent.Branch)
+		}
+		return nil
+	},
+}
+
 var hintCmd = &cobra.Command{
 	Use:   "hint",
 	Short: "Show keyboard shortcuts and workflow tips",
@@ -244,7 +312,10 @@ func init() {
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(queueCmd)
+	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(hintCmd)
+
+	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
 }
 
 func main() {
