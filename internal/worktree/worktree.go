@@ -25,6 +25,21 @@ func (m *Manager) Create(worktreePath, branch string) error {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 	
+	// Check if repo has any commits (HEAD exists)
+	headCmd := exec.Command("git", "rev-parse", "--verify", "HEAD")
+	headCmd.Dir = m.RepoPath
+	headCmd.Stderr = nil
+	if err := headCmd.Run(); err != nil {
+		// No commits yet - create an empty commit first
+		emptyCommitCmd := exec.Command("git", "commit", "--allow-empty", "-m", "Initial commit")
+		emptyCommitCmd.Dir = m.RepoPath
+		emptyCommitCmd.Stdout = os.Stdout
+		emptyCommitCmd.Stderr = os.Stderr
+		if err := emptyCommitCmd.Run(); err != nil {
+			return fmt.Errorf("failed to create initial commit: %w", err)
+		}
+	}
+	
 	// Create worktree with new branch
 	cmd := exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
 	cmd.Dir = m.RepoPath
