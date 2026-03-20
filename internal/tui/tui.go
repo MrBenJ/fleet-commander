@@ -59,6 +59,9 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	}
 	
 	agent := i.Agent
+	if agent == nil {
+		return
+	}
 	
 	// Status indicator (use cached value)
 	status := "○"
@@ -160,7 +163,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				agent := item.Agent
 				
 				// If session doesn't exist, create it
-				if !m.tmux.SessionExists(agent.Name) {
+				if !item.IsRunning {
 					if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, ""); err != nil {
 						return m, tea.Printf("Error: %v", err)
 					}
@@ -169,19 +172,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.fleet.UpdateAgent(agent.Name, "running", pid)
 				}
 				
-				// Switch to the session
+				// Store selected agent for shell wrapper to use
 				m.quitting = true
 				return m, tea.Sequence(
+					tea.Printf("\nUse: fleet attach %s\n", agent.Name),
 					tea.Quit,
-					func() tea.Msg {
-						// This will run after the TUI closes
-						if tmux.IsInsideTmux() {
-							m.tmux.SwitchClient(agent.Name)
-						} else {
-							m.tmux.Attach(agent.Name)
-						}
-						return nil
-					},
 				)
 			}
 			
