@@ -165,12 +165,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				
 				// If session doesn't exist, create it
 				if !item.IsRunning {
+					fmt.Fprintf(os.Stderr, "\n🚀  Starting %s...\n", agent.Name)
 					if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, ""); err != nil {
-						return m, tea.Printf("Error: %v", err)
+						fmt.Fprintf(os.Stderr, "❌  Error creating session: %v\n", err)
+						return m, nil
 					}
 					// Update status
 					pid, _ := m.tmux.GetPID(agent.Name)
 					m.fleet.UpdateAgent(agent.Name, "running", pid)
+					fmt.Fprintf(os.Stderr, "✅  Session started (PID: %d)\n", pid)
 				}
 				
 				// Print attach command and quit
