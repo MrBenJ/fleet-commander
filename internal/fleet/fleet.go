@@ -54,8 +54,8 @@ func Init(repoPath string) (*Fleet, error) {
 		return nil, fmt.Errorf("failed to create worktrees directory: %w", err)
 	}
 	
-	// Add .fleet/ to .gitignore if not already there
-	addToGitignore(absPath, ".fleet/")
+	// Add .fleet to .gitignore if not already there
+	addToGitignore(absPath, ".fleet")
 
 	f := &Fleet{
 		RepoPath: absPath,
