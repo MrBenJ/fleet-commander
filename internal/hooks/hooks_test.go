@@ -143,7 +143,7 @@ func TestInjectPreservesExistingHooks(t *testing.T) {
 					"hooks": []interface{}{
 						map[string]interface{}{
 							"type":    "command",
-							"command": "echo done",
+							"command": "my-existing-hook",
 						},
 					},
 				},
@@ -164,6 +164,12 @@ func TestInjectPreservesExistingHooks(t *testing.T) {
 	stopEntries := hooksMap["Stop"].([]interface{})
 	if len(stopEntries) < 2 {
 		t.Errorf("expected at least 2 Stop entries (existing + fleet), got %d", len(stopEntries))
+	}
+
+	// Verify the original command is still present
+	rawData, _ := json.Marshal(stopEntries)
+	if !strings.Contains(string(rawData), "my-existing-hook") {
+		t.Error("expected original 'my-existing-hook' command to still be present after Inject")
 	}
 }
 
@@ -201,5 +207,87 @@ func TestRemove(t *testing.T) {
 		if len(cmds) != 0 {
 			t.Errorf("expected no fleet signal commands in %s after Remove, got: %v", event, cmds)
 		}
+	}
+}
+
+// TestRemovePreservesNonFleetHooks verifies that Remove does not strip non-fleet hooks.
+func TestRemovePreservesNonFleetHooks(t *testing.T) {
+	dir := t.TempDir()
+	claudeDir := filepath.Join(dir, ".claude")
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		t.Fatalf("failed to create .claude dir: %v", err)
+	}
+
+	// Write existing settings with a custom Stop hook
+	existing := map[string]interface{}{
+		"hooks": map[string]interface{}{
+			"Stop": []interface{}{
+				map[string]interface{}{
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":    "command",
+							"command": "my-existing-hook",
+						},
+					},
+				},
+			},
+		},
+	}
+	data, _ := json.Marshal(existing)
+	if err := os.WriteFile(settingsPath(dir), data, 0644); err != nil {
+		t.Fatalf("failed to write existing settings: %v", err)
+	}
+
+	// Inject fleet hooks alongside the existing hook
+	if err := hooks.Inject(dir); err != nil {
+		t.Fatalf("Inject failed: %v", err)
+	}
+
+	// Remove fleet hooks
+	if err := hooks.Remove(dir); err != nil {
+		t.Fatalf("Remove failed: %v", err)
+	}
+
+	// Verify non-fleet hook is still present
+	settings := readSettings(t, dir)
+	hooksMap, ok := settings["hooks"].(map[string]interface{})
+	if !ok {
+		t.Fatal("'hooks' is not a map after Remove")
+	}
+	stopEntries, ok := hooksMap["Stop"].([]interface{})
+	if !ok {
+		t.Fatal("'Stop' entries is not an array after Remove")
+	}
+	rawData, _ := json.Marshal(stopEntries)
+	if !strings.Contains(string(rawData), "my-existing-hook") {
+		t.Error("expected non-fleet hook 'my-existing-hook' to still be present after Remove")
+	}
+}
+
+// TestRemoveMissingFile verifies that Remove is a no-op when settings.json does not exist.
+func TestRemoveMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	// No .claude/settings.json created
+
+	err := hooks.Remove(dir)
+	if err != nil {
+		t.Errorf("Remove on missing file should return nil, got: %v", err)
+	}
+}
+
+// TestHooksFieldUnexpectedType verifies that Inject returns an error when 'hooks' is not an object.
+func TestHooksFieldUnexpectedType(t *testing.T) {
+	dir := t.TempDir()
+	claudeDir := filepath.Join(dir, ".claude")
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		t.Fatalf("failed to create .claude dir: %v", err)
+	}
+	if err := os.WriteFile(settingsPath(dir), []byte(`{"hooks": "not-an-object"}`), 0644); err != nil {
+		t.Fatalf("failed to write settings: %v", err)
+	}
+
+	err := hooks.Inject(dir)
+	if err == nil {
+		t.Error("Inject should return an error when 'hooks' field is not an object")
 	}
 }

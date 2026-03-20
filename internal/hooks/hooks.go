@@ -1,41 +1,38 @@
 package hooks
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 )
 
 const (
-	settingsFile      = "settings.json"
-	claudeDir         = ".claude"
-	cmdWaiting        = "fleet signal waiting"
-	cmdWorking        = "fleet signal working"
-	eventStop         = "Stop"
-	eventPreToolUse   = "PreToolUse"
+	settingsFile    = "settings.json"
+	claudeDir       = ".claude"
+	cmdWaiting      = "fleet signal waiting"
+	cmdWorking      = "fleet signal working"
+	eventStop       = "Stop"
+	eventPreToolUse = "PreToolUse"
 )
 
-// fleetEntries maps each event to the hook entry Fleet Commander injects.
-var fleetEntries = map[string]map[string]interface{}{
-	eventStop: {
-		"hooks": []interface{}{
-			map[string]interface{}{
-				"type":    "command",
-				"command": cmdWaiting,
-			},
+// fleetHookEntries maps each event to the hook entry Fleet Commander injects.
+// Each outer entry includes a "_fleet": true sentinel for unambiguous identification.
+var fleetHookEntries = map[string][]map[string]interface{}{
+	"Stop": {{
+		"_fleet": true,
+		"hooks": []map[string]interface{}{
+			{"type": "command", "command": "fleet signal waiting"},
 		},
-	},
-	eventPreToolUse: {
-		"hooks": []interface{}{
-			map[string]interface{}{
-				"type":    "command",
-				"command": cmdWorking,
-			},
+	}},
+	"PreToolUse": {{
+		"_fleet": true,
+		"hooks": []map[string]interface{}{
+			{"type": "command", "command": "fleet signal working"},
 		},
-	},
+	}},
 }
 
 // Inject merges Fleet Commander hook entries into <worktreePath>/.claude/settings.json.
@@ -46,12 +43,17 @@ func Inject(worktreePath string) error {
 		return err
 	}
 
-	hooksMap := getOrCreateHooksMap(settings)
+	hooksMap, err := getHooksMap(settings)
+	if err != nil {
+		return err
+	}
 
-	for event, entry := range fleetEntries {
+	for event, fleetEntries := range fleetHookEntries {
 		entries := getEventEntries(hooksMap, event)
-		if !containsEntry(entries, entry) {
-			entries = append(entries, entry)
+		for _, fe := range fleetEntries {
+			if !containsEntry(entries, fe) {
+				entries = append(entries, fe)
+			}
 		}
 		hooksMap[event] = entries
 	}
@@ -73,12 +75,23 @@ func Remove(worktreePath string) error {
 		return err
 	}
 
-	hooksMap := getOrCreateHooksMap(settings)
+	hooksMap, err := getHooksMap(settings)
+	if err != nil {
+		return err
+	}
 
+	changed := false
 	for _, event := range []string{eventStop, eventPreToolUse} {
 		entries := getEventEntries(hooksMap, event)
 		filtered := filterFleetEntries(entries)
+		if len(filtered) != len(entries) {
+			changed = true
+		}
 		hooksMap[event] = filtered
+	}
+
+	if !changed {
+		return nil
 	}
 
 	settings["hooks"] = hooksMap
@@ -103,7 +116,9 @@ func loadSettings(worktreePath string) (map[string]interface{}, error) {
 	}
 
 	var settings map[string]interface{}
-	if err := json.Unmarshal(data, &settings); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&settings); err != nil {
 		return nil, err
 	}
 	return settings, nil
@@ -122,15 +137,18 @@ func saveSettings(worktreePath string, settings map[string]interface{}) error {
 	return os.WriteFile(settingsPath(worktreePath), data, 0644)
 }
 
-// getOrCreateHooksMap extracts the top-level "hooks" map from settings,
-// creating it if it does not exist or is not a map.
-func getOrCreateHooksMap(settings map[string]interface{}) map[string]interface{} {
-	if raw, ok := settings["hooks"]; ok {
-		if m, ok := raw.(map[string]interface{}); ok {
-			return m
-		}
+// getHooksMap extracts the top-level "hooks" map from settings.
+// Returns an empty map if the key does not exist, or an error if it is not a map.
+func getHooksMap(settings map[string]interface{}) (map[string]interface{}, error) {
+	raw, exists := settings["hooks"]
+	if !exists {
+		return map[string]interface{}{}, nil
 	}
-	return map[string]interface{}{}
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("settings.json 'hooks' field is not an object (got %T)", raw)
+	}
+	return m, nil
 }
 
 // getEventEntries returns the slice of hook entries for a given event.
@@ -146,78 +164,32 @@ func getEventEntries(hooksMap map[string]interface{}, event string) []interface{
 	return entries
 }
 
-// entryCommandSet returns the sorted set of "command" values from an entry's inner hooks array.
-func entryCommandSet(entry map[string]interface{}) []string {
-	innerRaw, ok := entry["hooks"]
-	if !ok {
-		return nil
-	}
-	inner, ok := innerRaw.([]interface{})
-	if !ok {
-		return nil
-	}
-	var cmds []string
-	for _, ih := range inner {
-		ihMap, ok := ih.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if cmd, ok := ihMap["command"].(string); ok {
-			cmds = append(cmds, cmd)
-		}
-	}
-	sort.Strings(cmds)
-	return cmds
-}
-
-// sameCommandSet returns true if two sorted command slices are equal.
-func sameCommandSet(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// containsEntry returns true if entries already contains an entry with the same command set.
-func containsEntry(entries []interface{}, candidate map[string]interface{}) bool {
-	candidateCmds := entryCommandSet(candidate)
+// containsEntry returns true if entries already contains a fleet entry (identified by _fleet sentinel).
+func containsEntry(entries []interface{}, _ map[string]interface{}) bool {
 	for _, e := range entries {
-		eMap, ok := e.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if sameCommandSet(entryCommandSet(eMap), candidateCmds) {
-			return true
+		if m, ok := e.(map[string]interface{}); ok {
+			if m["_fleet"] == true {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-// isFleetEntry returns true if all commands in the entry's inner hooks are fleet signal commands.
-func isFleetEntry(entry map[string]interface{}) bool {
-	cmds := entryCommandSet(entry)
-	if len(cmds) == 0 {
+// isFleetEntry returns true if the entry has the _fleet sentinel field set to true.
+func isFleetEntry(e interface{}) bool {
+	m, ok := e.(map[string]interface{})
+	if !ok {
 		return false
 	}
-	for _, cmd := range cmds {
-		if !strings.HasPrefix(cmd, "fleet signal") {
-			return false
-		}
-	}
-	return true
+	return m["_fleet"] == true
 }
 
-// filterFleetEntries removes entries that are exclusively fleet signal commands.
+// filterFleetEntries removes entries that are fleet entries (identified by _fleet sentinel).
 func filterFleetEntries(entries []interface{}) []interface{} {
 	var result []interface{}
 	for _, e := range entries {
-		eMap, ok := e.(map[string]interface{})
-		if ok && isFleetEntry(eMap) {
+		if isFleetEntry(e) {
 			continue
 		}
 		result = append(result, e)
