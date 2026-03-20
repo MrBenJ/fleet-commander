@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -10,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/teknal/fleet-commander/internal/fleet"
+	"github.com/teknal/fleet-commander/internal/hooks"
 	"github.com/teknal/fleet-commander/internal/monitor"
 	"github.com/teknal/fleet-commander/internal/tmux"
 )
@@ -207,6 +210,26 @@ func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.I
 	return items
 }
 
+// startAgentSession creates a tmux session for an agent, injecting hooks and
+// wiring the state file path.
+func (m *Model) startAgentSession(agent *fleet.Agent) error {
+	statesDir := filepath.Join(m.fleet.FleetDir, "states")
+	os.MkdirAll(statesDir, 0755)
+	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
+
+	if err := hooks.Inject(agent.WorktreePath); err != nil {
+		stateFilePath = "" // degrade gracefully
+	}
+
+	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, "", stateFilePath); err != nil {
+		return err
+	}
+
+	// Persist so buildItems can pass stateFilePath to the monitor on next refresh
+	m.fleet.UpdateAgentStateFile(agent.Name, stateFilePath)
+	return nil
+}
+
 // Init starts periodic refresh
 func (m Model) Init() tea.Cmd {
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
@@ -253,7 +276,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				agent := item.Agent
 
 				if item.State == monitor.StateStopped {
-					if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, "", ""); err != nil {
+					if err := m.startAgentSession(agent); err != nil {
 						return m, nil
 					}
 					pid, _ := m.tmux.GetPID(agent.Name)
@@ -271,7 +294,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.tmux.SessionExists(agent.Name) {
 					return m, nil
 				}
-				if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, "", ""); err != nil {
+				if err := m.startAgentSession(agent); err != nil {
 					return m, nil
 				}
 				pid, _ := m.tmux.GetPID(agent.Name)

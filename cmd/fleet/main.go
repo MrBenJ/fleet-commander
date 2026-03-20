@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/teknal/fleet-commander/internal/fleet"
+	"github.com/teknal/fleet-commander/internal/hooks"
 	"github.com/teknal/fleet-commander/internal/state"
 	"github.com/teknal/fleet-commander/internal/tmux"
 	"github.com/teknal/fleet-commander/internal/tui"
@@ -116,10 +118,24 @@ var startCmd = &cobra.Command{
 		
 		// Create session if it doesn't exist
 		if !tm.SessionExists(agentName) {
-			if err := tm.CreateSession(agentName, agent.WorktreePath, "", ""); err != nil {
+			statesDir := filepath.Join(f.FleetDir, "states")
+			if err := os.MkdirAll(statesDir, 0755); err != nil {
+				return fmt.Errorf("failed to create states dir: %w", err)
+			}
+			stateFilePath := filepath.Join(statesDir, agentName+".json")
+
+			if err := hooks.Inject(agent.WorktreePath); err != nil {
+				// Non-fatal: common cause is malformed existing .claude/settings.json — check that file first.
+				fmt.Printf("Warning: could not inject hooks into %s: %v\n", agent.WorktreePath, err)
+				stateFilePath = ""
+			}
+
+			if err := tm.CreateSession(agentName, agent.WorktreePath, "", stateFilePath); err != nil {
 				return fmt.Errorf("failed to create tmux session: %w", err)
 			}
 			fmt.Printf("Created tmux session for agent '%s'\n", agentName)
+
+			f.UpdateAgentStateFile(agentName, stateFilePath)
 		}
 		
 		// Update agent status

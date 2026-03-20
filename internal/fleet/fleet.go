@@ -19,11 +19,12 @@ type Fleet struct {
 
 // Agent represents a single agent workspace
 type Agent struct {
-	Name         string `json:"name"`
-	Branch       string `json:"branch"`
-	WorktreePath string `json:"worktree_path"`
-	Status       string `json:"status"`
-	PID          int    `json:"pid"`
+	Name          string `json:"name"`
+	Branch        string `json:"branch"`
+	WorktreePath  string `json:"worktree_path"`
+	Status        string `json:"status"`
+	PID           int    `json:"pid"`
+	StateFilePath string `json:"state_file_path,omitempty"`
 }
 
 const configFile = ".fleet/config.json"
@@ -189,6 +190,17 @@ func (f *Fleet) UpdateAgent(name string, status string, pid int) error {
 		if a.Name == name {
 			a.Status = status
 			a.PID = pid
+			return f.save()
+		}
+	}
+	return fmt.Errorf("agent '%s' not found", name)
+}
+
+// UpdateAgentStateFile persists the state file path for an agent
+func (f *Fleet) UpdateAgentStateFile(name, stateFilePath string) error {
+	for _, a := range f.Agents {
+		if a.Name == name {
+			a.StateFilePath = stateFilePath
 			return f.save()
 		}
 	}
