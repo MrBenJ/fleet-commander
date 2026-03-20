@@ -51,7 +51,7 @@ func Inject(worktreePath string) error {
 	for event, fleetEntries := range fleetHookEntries {
 		entries := getEventEntries(hooksMap, event)
 		for _, fe := range fleetEntries {
-			if !containsEntry(entries, fe) {
+			if !containsEntry(entries) {
 				entries = append(entries, fe)
 			}
 		}
@@ -165,7 +165,7 @@ func getEventEntries(hooksMap map[string]interface{}, event string) []interface{
 }
 
 // containsEntry returns true if entries already contains a fleet entry (identified by _fleet sentinel).
-func containsEntry(entries []interface{}, _ map[string]interface{}) bool {
+func containsEntry(entries []interface{}) bool {
 	for _, e := range entries {
 		if m, ok := e.(map[string]interface{}); ok {
 			if m["_fleet"] == true {
