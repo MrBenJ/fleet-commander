@@ -78,72 +78,92 @@ func (m *Monitor) GetSnapshot(agentName string) *Snapshot {
 // detectState analyzes terminal content to determine agent state
 func detectState(lastLine, fullContent string) AgentState {
 	lastLine = strings.TrimSpace(lastLine)
+	stripped := stripANSI(fullContent)
 
 	// Empty content = probably starting up
-	if lastLine == "" {
+	if strings.TrimSpace(stripped) == "" {
 		return StateStarting
 	}
 
-	// Claude Code waiting-for-input patterns
-	waitingPatterns := []string{
-		// Claude Code prompt
-		">",
-		"❯",
-		// Question patterns
-		"?",
-		"(y/n)",
-		"(Y/n)",
-		"(yes/no)",
-		"[Y/n]",
-		"[y/N]",
-		// Permission prompts
-		"Allow?",
-		"Approve?",
-		"Continue?",
-		"Proceed?",
-		// Tool use confirmation
-		"Do you want",
-		"Would you like",
-		"Should I",
-		// Generic input indicators
-		"Enter ",
-		"Type ",
-		"Input:",
-		"Press ",
+	// Check the FULL content for Claude Code patterns (not just last line)
+	// Claude Code shows multi-line prompts, so the last line alone isn't enough
+
+	// Claude Code permission/action prompts
+	// These appear as multi-line blocks ending with "Esc to cancel"
+	if strings.Contains(stripped, "Esc to cancel") {
+		return StateWaiting
 	}
 
-	for _, pattern := range waitingPatterns {
-		if strings.HasSuffix(lastLine, pattern) || strings.Contains(lastLine, pattern) {
+	// Claude Code tool confirmation: "Do you want to proceed?"
+	if strings.Contains(stripped, "Do you want to proceed") {
+		return StateWaiting
+	}
+
+	// Claude Code numbered choice menus (❯ 1. Yes / 2. No pattern)
+	if strings.Contains(stripped, "❯") && (strings.Contains(stripped, "1. Yes") || strings.Contains(stripped, "1.") && strings.Contains(stripped, "2.")) {
+		return StateWaiting
+	}
+
+	// Claude Code asking a question in conversation
+	// Check last few lines for question patterns
+	lines := strings.Split(stripped, "\n")
+	lastFew := getLastNonEmptyLines(lines, 5)
+	for _, line := range lastFew {
+		trimmed := strings.TrimSpace(line)
+
+		// Question marks at end of a substantive line (not spinners or progress)
+		if strings.HasSuffix(trimmed, "?") && len(trimmed) > 5 {
+			return StateWaiting
+		}
+
+		// Yes/No prompts
+		if strings.Contains(trimmed, "(y/n)") ||
+			strings.Contains(trimmed, "(Y/n)") ||
+			strings.Contains(trimmed, "[Y/n]") ||
+			strings.Contains(trimmed, "[y/N]") {
+			return StateWaiting
+		}
+
+		// Permission patterns
+		if strings.Contains(trimmed, "Allow") && strings.HasSuffix(trimmed, "?") {
 			return StateWaiting
 		}
 	}
 
-	// Claude Code specific: check for the input prompt marker
-	// Claude Code typically shows a colored ">" or similar at the bottom
-	if isClaudeCodePrompt(lastLine) {
+	// Claude Code input prompt: just ">" or "❯" on its own line
+	lastNonEmpty := strings.TrimSpace(stripANSI(lastLine))
+	if lastNonEmpty == ">" || lastNonEmpty == "❯" || lastNonEmpty == "$" {
 		return StateWaiting
 	}
 
-	// If we see active output indicators, it's working
-	workingPatterns := []string{
-		"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", // spinners
-		"...",
-		"Running",
-		"Executing",
-		"Writing",
-		"Reading",
-		"Searching",
-		"Thinking",
-	}
-
-	for _, pattern := range workingPatterns {
-		if strings.Contains(lastLine, pattern) {
-			return StateWorking
+	// Active work indicators (check last few lines)
+	for _, line := range lastFew {
+		trimmed := strings.TrimSpace(line)
+		for _, pattern := range []string{
+			"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", // spinners
+			"Thinking",
+			"in progress",
+			"◼", // in-progress task marker
+		} {
+			if strings.Contains(trimmed, pattern) {
+				return StateWorking
+			}
 		}
 	}
 
-	// Default: assume working if we can't tell
+	// Default: assume working
 	return StateWorking
+}
+
+// getLastNonEmptyLines returns the last N non-empty lines
+func getLastNonEmptyLines(lines []string, n int) []string {
+	var result []string
+	for i := len(lines) - 1; i >= 0 && len(result) < n; i-- {
+		if strings.TrimSpace(lines[i]) != "" {
+			result = append(result, lines[i])
+		}
+	}
+	return result
 }
 
 // isClaudeCodePrompt detects Claude Code's input prompt
