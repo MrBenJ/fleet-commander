@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teknal/fleet-commander/internal/fleet"
+	"github.com/teknal/fleet-commander/internal/state"
 	"github.com/teknal/fleet-commander/internal/tmux"
 	"github.com/teknal/fleet-commander/internal/tui"
 )
@@ -304,6 +305,21 @@ Fleet Commander - Quick Reference
 	},
 }
 
+var signalCmd = &cobra.Command{
+	Use:    "signal [state]",
+	Short:  "Write agent state (called by Claude Code hooks)",
+	Args:   cobra.ExactArgs(1),
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		stateFile := os.Getenv("FLEET_STATE_FILE")
+		agentName := os.Getenv("FLEET_AGENT_NAME")
+		if stateFile == "" || agentName == "" {
+			return nil  // not in a fleet session — silently succeed
+		}
+		return state.Write(stateFile, agentName, args[0])
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
@@ -314,6 +330,7 @@ func init() {
 	rootCmd.AddCommand(queueCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(hintCmd)
+	rootCmd.AddCommand(signalCmd)
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
 }
