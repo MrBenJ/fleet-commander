@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,8 +39,8 @@ var (
 
 // AgentItem represents an agent in the list
 type AgentItem struct {
-	Agent  *fleet.Agent
-	Tmux   *tmux.Manager
+	Agent     *fleet.Agent
+	IsRunning bool
 }
 
 func (i AgentItem) FilterValue() string { return i.Agent.Name }
@@ -59,10 +60,10 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	
 	agent := i.Agent
 	
-	// Status indicator
+	// Status indicator (use cached value)
 	status := "○"
 	statusColor := stoppedStyle
-	if i.Tmux.SessionExists(agent.Name) {
+	if i.IsRunning {
 		status = "●"
 		statusColor = runningStyle
 	}
@@ -81,13 +82,16 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	fmt.Fprint(w, title+"\n"+statusStyle.Render(desc))
 }
 
+// refreshMsg triggers a status refresh
+type refreshMsg struct{}
+
 // Model is the TUI model
 type Model struct {
-	list    list.Model
-	fleet   *fleet.Fleet
-	tmux    *tmux.Manager
-	width   int
-	height  int
+	list     list.Model
+	fleet    *fleet.Fleet
+	tmux     *tmux.Manager
+	width    int
+	height   int
 	quitting bool
 }
 
@@ -95,10 +99,8 @@ type Model struct {
 func New(f *fleet.Fleet) Model {
 	tm := tmux.NewManager("fleet")
 	
-	items := make([]list.Item, len(f.Agents))
-	for i, a := range f.Agents {
-		items[i] = AgentItem{Agent: a, Tmux: tm}
-	}
+	// Build items with cached running status
+	items := buildItems(f, tm)
 	
 	delegate := AgentDelegate{}
 	l := list.New(items, delegate, 0, 0)
@@ -114,9 +116,21 @@ func New(f *fleet.Fleet) Model {
 	}
 }
 
+func buildItems(f *fleet.Fleet, tm *tmux.Manager) []list.Item {
+	items := make([]list.Item, len(f.Agents))
+	for i, a := range f.Agents {
+		isRunning := tm.SessionExists(a.Name)
+		items[i] = AgentItem{Agent: a, IsRunning: isRunning}
+	}
+	return items
+}
+
 // Init initializes the TUI
 func (m Model) Init() tea.Cmd {
-	return nil
+	// Refresh status periodically
+	return tea.Tick(0, func(t time.Time) tea.Msg {
+		return refreshMsg{}
+	})
 }
 
 // Update handles messages
@@ -126,6 +140,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.list.SetSize(msg.Width, msg.Height-6)
+		
+	case refreshMsg:
+		// Refresh the list with current status
+		items := buildItems(m.fleet, m.tmux)
+		m.list.SetItems(items)
+		return m, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+			return refreshMsg{}
+		})
 		
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -175,6 +197,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				pid, _ := m.tmux.GetPID(agent.Name)
 				m.fleet.UpdateAgent(agent.Name, "running", pid)
+				
+				// Refresh list
+				items := buildItems(m.fleet, m.tmux)
+				m.list.SetItems(items)
 			}
 			
 		case "k":
@@ -188,11 +214,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Printf("Error stopping agent: %v", err)
 				}
 				m.fleet.UpdateAgent(agent.Name, "stopped", 0)
+				
+				// Refresh list
+				items := buildItems(m.fleet, m.tmux)
+				m.list.SetItems(items)
 			}
 			
 		case "r":
-			// Refresh list
-			// TODO: Reload fleet config
+			// Refresh list manually
+			items := buildItems(m.fleet, m.tmux)
+			m.list.SetItems(items)
 		}
 	}
 	
