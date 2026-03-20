@@ -85,6 +85,15 @@ func detectState(lastLine, fullContent string) AgentState {
 		return StateStarting
 	}
 
+	// WORKING CHECK FIRST — spinners take priority over everything
+	// If there's a spinner anywhere on screen, the agent is actively working
+	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	for _, s := range spinners {
+		if strings.Contains(stripped, s) {
+			return StateWorking
+		}
+	}
+
 	// Check the FULL content for Claude Code patterns (not just last line)
 	// Claude Code shows multi-line prompts, so the last line alone isn't enough
 
@@ -153,22 +162,7 @@ func detectState(lastLine, fullContent string) AgentState {
 		return StateWaiting
 	}
 
-	// Active work indicators (check last few lines)
-	for _, line := range lastFew {
-		trimmed := strings.TrimSpace(line)
-		for _, pattern := range []string{
-			"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", // spinners
-			"Thinking",
-			"in progress",
-			"◼", // in-progress task marker
-		} {
-			if strings.Contains(trimmed, pattern) {
-				return StateWorking
-			}
-		}
-	}
-
-	// Default: assume working
+	// Default: assume working (no spinner, no waiting pattern = probably working)
 	return StateWorking
 }
 
