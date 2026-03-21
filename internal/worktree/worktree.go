@@ -108,6 +108,18 @@ func (m *Manager) List() ([]string, error) {
 	return worktrees, nil
 }
 
+// Move moves a worktree to a new path using git worktree move
+func (m *Manager) Move(oldPath, newPath string) error {
+	cmd := exec.Command("git", "worktree", "move", oldPath, newPath)
+	cmd.Dir = m.RepoPath
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to move worktree: %s", strings.TrimSpace(string(out)))
+	}
+
+	return nil
+}
+
 // Exists checks if a worktree exists at the given path
 func (m *Manager) Exists(worktreePath string) bool {
 	_, err := os.Stat(filepath.Join(worktreePath, ".git"))

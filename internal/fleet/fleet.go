@@ -186,6 +186,80 @@ func (f *Fleet) RemoveAgent(name string) error {
 	})
 }
 
+// RenameAgent renames an agent, moving its worktree and state file.
+// The agent must be stopped (no active tmux session) before renaming.
+func (f *Fleet) RenameAgent(oldName, newName string) error {
+	// Fast-fail checks before acquiring lock.
+	if oldName == newName {
+		return fmt.Errorf("new name is the same as the current name")
+	}
+	for _, a := range f.Agents {
+		if a.Name == newName {
+			return fmt.Errorf("agent '%s' already exists", newName)
+		}
+	}
+
+	agent, err := f.GetAgent(oldName)
+	if err != nil {
+		return err
+	}
+
+	oldWorktreePath := agent.WorktreePath
+	newWorktreePath := filepath.Join(f.FleetDir, "worktrees", newName)
+
+	// Move the git worktree
+	wt := worktree.NewManager(f.RepoPath)
+	if err := wt.Move(oldWorktreePath, newWorktreePath); err != nil {
+		return fmt.Errorf("failed to move worktree: %w", err)
+	}
+
+	// Rename state file if present
+	var newStateFilePath string
+	if agent.StateFilePath != "" {
+		newStateFilePath = filepath.Join(f.FleetDir, "states", newName+".json")
+		if err := os.Rename(agent.StateFilePath, newStateFilePath); err != nil {
+			// Non-fatal: state file may not exist on disk
+			newStateFilePath = ""
+		}
+	}
+
+	err = f.withLock(func() error {
+		// Re-check inside the lock.
+		for _, a := range f.Agents {
+			if a.Name == newName {
+				return fmt.Errorf("agent '%s' already exists", newName)
+			}
+		}
+		for _, a := range f.Agents {
+			if a.Name == oldName {
+				a.Name = newName
+				a.WorktreePath = newWorktreePath
+				if newStateFilePath != "" {
+					a.StateFilePath = newStateFilePath
+				} else if a.StateFilePath != "" {
+					a.StateFilePath = ""
+				}
+				return nil
+			}
+		}
+		return fmt.Errorf("agent '%s' not found", oldName)
+	})
+
+	if err != nil {
+		// Rollback: move worktree back
+		if moveErr := wt.Move(newWorktreePath, oldWorktreePath); moveErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not roll back worktree move: %v\n", moveErr)
+		}
+		// Rollback: move state file back
+		if newStateFilePath != "" && agent.StateFilePath != "" {
+			os.Rename(newStateFilePath, agent.StateFilePath)
+		}
+		return err
+	}
+
+	return nil
+}
+
 // UpdateAgent updates an agent's status and PID
 func (f *Fleet) UpdateAgent(name string, status string, pid int) error {
 	return f.withLock(func() error {

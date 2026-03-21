@@ -324,6 +324,37 @@ Use --branch to also delete the branch.`,
 	},
 }
 
+var renameCmd = &cobra.Command{
+	Use:   "rename [old-name] [new-name]",
+	Short: "Rename an agent and its worktree",
+	Long:  `Rename an agent, moving its git worktree and updating fleet config. The agent must be stopped first.`,
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		oldName := args[0]
+		newName := args[1]
+
+		f, err := fleet.Load(".")
+		if err != nil {
+			return fmt.Errorf("failed to load fleet: %w", err)
+		}
+
+		// Require the agent to be stopped (no active tmux session)
+		tm := tmux.NewManager("fleet")
+		if tm.SessionExists(oldName) {
+			return fmt.Errorf("agent '%s' has a running tmux session — stop it first with 'fleet stop %s'", oldName, oldName)
+		}
+
+		if err := f.RenameAgent(oldName, newName); err != nil {
+			return fmt.Errorf("failed to rename agent: %w", err)
+		}
+
+		agent, _ := f.GetAgent(newName)
+		fmt.Printf("Renamed agent '%s' → '%s'\n", oldName, newName)
+		fmt.Printf("Worktree: %s\n", agent.WorktreePath)
+		return nil
+	},
+}
+
 var hintCmd = &cobra.Command{
 	Use:   "hint",
 	Short: "Show keyboard shortcuts and workflow tips",
@@ -379,6 +410,7 @@ func init() {
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(queueCmd)
 	rootCmd.AddCommand(removeCmd)
+	rootCmd.AddCommand(renameCmd)
 	rootCmd.AddCommand(hintCmd)
 	rootCmd.AddCommand(signalCmd)
 
