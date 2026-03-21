@@ -25,6 +25,7 @@ type Agent struct {
 	Status        string `json:"status"`
 	PID           int    `json:"pid"`
 	StateFilePath string `json:"state_file_path,omitempty"`
+	HooksOK       bool   `json:"hooks_ok"`
 }
 
 const configFile = ".fleet/config.json"
@@ -57,6 +58,7 @@ func Init(repoPath string) (*Fleet, error) {
 	
 	// Add .fleet to .gitignore if not already there
 	addToGitignore(absPath, ".fleet")
+	addToGitignore(absPath, ".fleet/config.lock")
 
 	f := &Fleet{
 		RepoPath: absPath,
@@ -64,7 +66,7 @@ func Init(repoPath string) (*Fleet, error) {
 		Agents:   []*Agent{},
 	}
 	
-	if err := f.save(); err != nil {
+	if err := f.writeConfig(); err != nil {
 		return nil, fmt.Errorf("failed to save fleet config: %w", err)
 	}
 	
@@ -112,55 +114,53 @@ func loadFromPath(path string) (*Fleet, error) {
 	return &f, nil
 }
 
-// save persists the fleet configuration
-func (f *Fleet) save() error {
-	configPath := filepath.Join(f.FleetDir, "config.json")
-	
-	data, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-	
-	return nil
-}
 
-// AddAgent creates a new agent workspace
+// AddAgent creates a new agent workspace with a git worktree.
+// If the config save fails after the worktree is created, the worktree is
+// cleaned up automatically to avoid leaving orphaned directories.
 func (f *Fleet) AddAgent(name, branch string) (*Agent, error) {
-	// Check for duplicate name
+	// Fast-fail for duplicate before acquiring lock.
 	for _, a := range f.Agents {
 		if a.Name == name {
 			return nil, fmt.Errorf("agent '%s' already exists", name)
 		}
 	}
-	
-	// Create worktree path
+
 	worktreePath := filepath.Join(f.FleetDir, "worktrees", name)
-	
-	// Create git worktree
 	wt := worktree.NewManager(f.RepoPath)
 	if err := wt.Create(worktreePath, branch); err != nil {
 		return nil, fmt.Errorf("failed to create worktree: %w", err)
 	}
-	
-	agent := &Agent{
-		Name:         name,
-		Branch:       branch,
-		WorktreePath: worktreePath,
-		Status:       "ready",
-		PID:          0,
-	}
-	
-	f.Agents = append(f.Agents, agent)
-	
-	if err := f.save(); err != nil {
+
+	var created *Agent
+	err := f.withLock(func() error {
+		// Re-check inside the lock: another concurrent process may have added
+		// an agent with the same name between our fast-fail check and now.
+		for _, a := range f.Agents {
+			if a.Name == name {
+				return fmt.Errorf("agent '%s' already exists", name)
+			}
+		}
+		created = &Agent{
+			Name:         name,
+			Branch:       branch,
+			WorktreePath: worktreePath,
+			Status:       "ready",
+			PID:          0,
+		}
+		f.Agents = append(f.Agents, created)
+		return nil // withLock calls writeConfig after this returns nil
+	})
+
+	if err != nil {
+		// Rollback: remove the worktree we already created so it doesn't orphan.
+		if removeErr := wt.Remove(worktreePath); removeErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not clean up orphaned worktree at %s: %v\n",
+				worktreePath, removeErr)
+		}
 		return nil, err
 	}
-	
-	return agent, nil
+	return created, nil
 }
 
 // GetAgent returns an agent by name
@@ -175,36 +175,55 @@ func (f *Fleet) GetAgent(name string) (*Agent, error) {
 
 // RemoveAgent removes an agent from the fleet config
 func (f *Fleet) RemoveAgent(name string) error {
-	for i, a := range f.Agents {
-		if a.Name == name {
-			f.Agents = append(f.Agents[:i], f.Agents[i+1:]...)
-			return f.save()
+	return f.withLock(func() error {
+		for i, a := range f.Agents {
+			if a.Name == name {
+				f.Agents = append(f.Agents[:i], f.Agents[i+1:]...)
+				return nil
+			}
 		}
-	}
-	return fmt.Errorf("agent '%s' not found", name)
+		return fmt.Errorf("agent '%s' not found", name)
+	})
 }
 
 // UpdateAgent updates an agent's status and PID
 func (f *Fleet) UpdateAgent(name string, status string, pid int) error {
-	for _, a := range f.Agents {
-		if a.Name == name {
-			a.Status = status
-			a.PID = pid
-			return f.save()
+	return f.withLock(func() error {
+		for _, a := range f.Agents {
+			if a.Name == name {
+				a.Status = status
+				a.PID = pid
+				return nil
+			}
 		}
-	}
-	return fmt.Errorf("agent '%s' not found", name)
+		return fmt.Errorf("agent '%s' not found", name)
+	})
 }
 
 // UpdateAgentStateFile persists the state file path for an agent
 func (f *Fleet) UpdateAgentStateFile(name, stateFilePath string) error {
-	for _, a := range f.Agents {
-		if a.Name == name {
-			a.StateFilePath = stateFilePath
-			return f.save()
+	return f.withLock(func() error {
+		for _, a := range f.Agents {
+			if a.Name == name {
+				a.StateFilePath = stateFilePath
+				return nil
+			}
 		}
-	}
-	return fmt.Errorf("agent '%s' not found", name)
+		return fmt.Errorf("agent '%s' not found", name)
+	})
+}
+
+// UpdateAgentHooks records whether fleet hooks are currently injected for an agent.
+func (f *Fleet) UpdateAgentHooks(name string, hooksOK bool) error {
+	return f.withLock(func() error {
+		for _, a := range f.Agents {
+			if a.Name == name {
+				a.HooksOK = hooksOK
+				return nil
+			}
+		}
+		return fmt.Errorf("agent '%s' not found", name)
+	})
 }
 
 // addToGitignore adds an entry to .gitignore if it's not already present

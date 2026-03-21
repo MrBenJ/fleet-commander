@@ -105,6 +105,12 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 		indicator = stoppedStyle.Render("○ stopped")
 	}
 
+	// Add hooks warning if monitoring is degraded
+	if !agent.HooksOK && agent.Status != "stopped" {
+		hooksWarnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6666"))
+		indicator += " " + hooksWarnStyle.Render("⚠ hooks")
+	}
+
 	// Agent name
 	name := agent.Name
 	if index == m.Index() {
@@ -156,9 +162,10 @@ type Model struct {
 	quitting    bool
 	attachAgent string
 	mode        inputMode
-	nameInput   textinput.Model
-	branchInput textinput.Model
-	addError    string
+	nameInput      textinput.Model
+	branchInput    textinput.Model
+	statusMsg      string
+	statusMsgTimer time.Time
 }
 
 // New creates a new TUI model
@@ -221,6 +228,9 @@ func (m *Model) startAgentSession(agent *fleet.Agent) error {
 
 	if err := hooks.Inject(agent.WorktreePath); err != nil {
 		stateFilePath = "" // degrade gracefully
+		m.fleet.UpdateAgentHooks(agent.Name, false)
+	} else {
+		m.fleet.UpdateAgentHooks(agent.Name, true)
 	}
 
 	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, "", stateFilePath); err != nil {
@@ -255,6 +265,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case refreshMsg:
 		items := buildItems(m.fleet, m.tmux, m.monitor)
 		m.list.SetItems(items)
+		if !m.statusMsgTimer.IsZero() && time.Since(m.statusMsgTimer) >= 5*time.Second {
+			m.statusMsg = ""
+			m.statusMsgTimer = time.Time{}
+		}
 		return m, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 			return refreshMsg{}
 		})
@@ -270,7 +284,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if _, ok := m.list.SelectedItem().(AddNewItem); ok {
 				m.mode = modeAddName
 				m.nameInput.Focus()
-				m.addError = ""
+				m.statusMsg = ""
+			m.statusMsgTimer = time.Time{}
 				return m, m.nameInput.Focus()
 			}
 
@@ -279,6 +294,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				if item.State == monitor.StateStopped {
 					if err := m.startAgentSession(agent); err != nil {
+						m.statusMsg = "⚠ failed to start agent: " + err.Error()
+						m.statusMsgTimer = time.Now()
 						return m, nil
 					}
 					pid, _ := m.tmux.GetPID(agent.Name)
@@ -297,6 +314,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				if err := m.startAgentSession(agent); err != nil {
+					m.statusMsg = "⚠ failed to start agent: " + err.Error()
+					m.statusMsgTimer = time.Now()
 					return m, nil
 				}
 				pid, _ := m.tmux.GetPID(agent.Name)
@@ -316,11 +335,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if agent.StateFilePath != "" {
 					if err := os.Remove(agent.StateFilePath); err != nil {
-						// best-effort, don't fail the UI
-						_ = err
+						m.statusMsg = "⚠ could not remove state file: " + err.Error()
+						m.statusMsgTimer = time.Now()
 					}
 					m.fleet.UpdateAgentStateFile(agent.Name, "")
-					hooks.Remove(agent.WorktreePath) // best-effort
+					if err := hooks.Remove(agent.WorktreePath); err != nil {
+						m.statusMsg = "⚠ could not remove hooks: " + err.Error()
+						m.statusMsgTimer = time.Now()
+					}
+					m.fleet.UpdateAgentHooks(agent.Name, false)
 				}
 				m.fleet.UpdateAgent(agent.Name, "stopped", 0)
 				items := buildItems(m.fleet, m.tmux, m.monitor)
@@ -348,14 +371,16 @@ func (m Model) updateAddMode(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = modeList
 			m.nameInput.Reset()
 			m.branchInput.Reset()
-			m.addError = ""
+			m.statusMsg = ""
+			m.statusMsgTimer = time.Time{}
 			return m, nil
 
 		case "enter":
 			if m.mode == modeAddName {
 				name := m.nameInput.Value()
 				if name == "" {
-					m.addError = "Name cannot be empty"
+					m.statusMsg = "Name cannot be empty"
+					m.statusMsgTimer = time.Now()
 					return m, nil
 				}
 				m.mode = modeAddBranch
@@ -367,14 +392,16 @@ func (m Model) updateAddMode(msg tea.Msg) (tea.Model, tea.Cmd) {
 				name := m.nameInput.Value()
 				branch := m.branchInput.Value()
 				if branch == "" {
-					m.addError = "Branch cannot be empty"
+					m.statusMsg = "Branch cannot be empty"
+					m.statusMsgTimer = time.Now()
 					return m, nil
 				}
 
 				// Create the agent
 				_, err := m.fleet.AddAgent(name, branch)
 				if err != nil {
-					m.addError = err.Error()
+					m.statusMsg = err.Error()
+					m.statusMsgTimer = time.Now()
 					return m, nil
 				}
 
@@ -382,7 +409,8 @@ func (m Model) updateAddMode(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = modeList
 				m.nameInput.Reset()
 				m.branchInput.Reset()
-				m.addError = ""
+				m.statusMsg = ""
+			m.statusMsgTimer = time.Time{}
 
 				// Refresh list
 				items := buildItems(m.fleet, m.tmux, m.monitor)
@@ -430,8 +458,8 @@ func (m Model) View() string {
 		s += nameLabel + m.nameInput.View() + "\n"
 		s += branchLabel + m.branchInput.View() + "\n"
 
-		if m.addError != "" {
-			s += "\n" + stoppedStyle.Render("  ❌ " + m.addError)
+		if m.statusMsg != "" {
+			s += "\n" + stoppedStyle.Render("  ❌ " + m.statusMsg)
 		}
 
 		s += "\n" + helpStyle.Render("  enter: next/confirm • esc: cancel")
@@ -463,12 +491,17 @@ func (m Model) View() string {
 
 	help := helpStyle.Render("enter: attach • s: start • k: kill • r: refresh • q: quit")
 
-	return fmt.Sprintf(
+	view := fmt.Sprintf(
 		"%s\n%s\n%s",
 		m.list.View(),
 		summary,
 		help,
 	)
+	if m.statusMsg != "" {
+		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6666"))
+		view += "\n" + errorStyle.Render(m.statusMsg)
+	}
+	return view
 }
 
 // Run starts the TUI in a loop.
