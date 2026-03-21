@@ -42,3 +42,4 @@ Thumbs.db
 # Git worktrees
 .worktrees/
 .fleet
+.fleet/config.lock
