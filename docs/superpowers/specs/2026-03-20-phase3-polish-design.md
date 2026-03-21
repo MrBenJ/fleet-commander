@@ -39,13 +39,7 @@ Jobs:
 
 Go version: `1.25.x` (match `go.mod`). Runs on `ubuntu-latest`.
 
-**`build.yml`** — triggers on push to `main` (after CI passes). Builds binaries for:
-- `darwin/amd64`
-- `darwin/arm64`
-- `linux/amd64`
-- `linux/arm64`
-
-This confirms cross-compilation works on every push to main. Binaries are not released — that's the release workflow's job.
+**`build.yml`** — triggers on push to `main` (after CI passes). Runs `goreleaser build --snapshot --clean` to build binaries for all four platform/arch combos (darwin/amd64, darwin/arm64, linux/amd64, linux/arm64) without publishing. This confirms cross-compilation works on every push to main. Binaries are not released — that's the release workflow's job.
 
 **`release.yml`** — triggers on tags matching `v*` (e.g., `v0.1.0`). Runs goreleaser to:
 - Build binaries for all four platform/arch combos
@@ -58,8 +52,11 @@ This confirms cross-compilation works on every push to main. Binaries are not re
 
 ```yaml
 version: 2
+project_name: fleet-commander
 builds:
-  - main: ./cmd/fleet/
+  - env:
+      - CGO_ENABLED=0
+    main: ./cmd/fleet/
     binary: fleet
     goos: [darwin, linux]
     goarch: [amd64, arm64]
@@ -71,6 +68,8 @@ builds:
 archives:
   - format: tar.gz
     name_template: "fleet-commander_{{ .Os }}_{{ .Arch }}"
+    files:
+      - fleet.tmux.conf
 checksum:
   name_template: checksums.txt
 changelog:
@@ -86,11 +85,34 @@ changelog:
 
 `.golangci.yml` at repo root:
 
-Enabled linters: `gofmt`, `govet`, `gosimple`, `staticcheck`, `errcheck`, `unused`, `ineffassign`. No style-only linters (e.g., `goimports`, `lll`) that would fire on existing code without value.
+```yaml
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - govet
+    - gosimple
+    - staticcheck
+    - errcheck
+    - unused
+    - ineffassign
+```
+
+No style-only linters (e.g., `goimports`, `lll`) that would fire on existing code without value.
 
 ### Version Embedding
 
-Add `version`, `commit`, and `date` variables to `cmd/fleet/main.go` (populated by goreleaser `ldflags`). Add a `--version` flag to the root command that prints these values. When built without ldflags (e.g., `go build`), the values default to `"dev"`.
+Add variables to `cmd/fleet/main.go` (populated by goreleaser `ldflags`):
+
+```go
+var (
+    version = "dev"
+    commit  = "unknown"
+    date    = "unknown"
+)
+```
+
+Set `rootCmd.Version` to format these values — Cobra provides both a `--version` flag and a `version` subcommand automatically. When built without ldflags (e.g., `go build`), the values default to the strings above. The `doctor` package accesses version info via a `Version` parameter on `RunAll` (or by reading `debug.ReadBuildInfo()`).
 
 ### Coverage Reporting
 
@@ -132,9 +154,9 @@ fleet doctor --strict # exits 1 if any critical check fails
 
 **Warning** (printed but doesn't block `--strict`):
 - `claude` binary not in PATH
-- Orphaned state files in `.fleet/states/` with no matching agent in config
-- Agent worktree directory missing on disk (agent exists in config but worktree path is gone)
-- `fleet.tmux.conf` not found in expected locations
+- Orphaned state files in `.fleet/states/` with no matching agent in config (skipped if no fleet)
+- Agent worktree directory missing on disk (agent exists in config but worktree path is gone) (skipped if no fleet)
+- `fleet.tmux.conf` not found in expected locations (`filepath.Dir(os.Executable())`)
 
 **Info** (always shown):
 - Fleet path and number of agents
@@ -186,7 +208,18 @@ type Checker func() Result
 func RunAll(fleetDir string) []Result
 ```
 
-The command in `main.go` calls `doctor.RunAll(f.FleetDir)` (or with an empty string if no fleet is found), iterates results, formats output, and checks `--strict` to decide the exit code.
+The `doctorCmd` in `main.go` does NOT follow the normal command pattern of calling `fleet.Load()` and failing on error. Instead, it attempts `fleet.Load(".")` and proceeds either way:
+
+```go
+f, _ := fleet.Load(".")  // error is OK — doctor works without a fleet
+fleetDir := ""
+if f != nil {
+    fleetDir = f.FleetDir
+}
+results := doctor.RunAll(fleetDir)
+```
+
+When `fleetDir` is empty, `RunAll` skips all fleet-dependent checks (config parse, orphaned states, agent worktree missing) and reports them as info-level "no fleet initialized" notes. Environment checks (git, tmux, claude) still run. This ensures `fleet doctor` never fails with "no fleet found" — that's exactly the scenario it should diagnose.
 
 Each check is a standalone `Checker` function registered in `RunAll`. This makes adding new checks trivial and each check independently testable.
 
