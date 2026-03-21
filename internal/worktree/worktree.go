@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // Manager handles git worktree operations
@@ -86,23 +87,24 @@ func (m *Manager) Remove(worktreePath string) error {
 	return nil
 }
 
-// List returns all worktrees for the repo
+// List returns all worktree paths for the repo.
+// The first entry is always the main worktree (the repo root itself).
+// Callers who want only fleet-managed worktrees must filter it out.
 func (m *Manager) List() ([]string, error) {
 	cmd := exec.Command("git", "worktree", "list", "--porcelain")
 	cmd.Dir = m.RepoPath
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list worktrees: %w", err)
 	}
-	
-	// Parse porcelain output
-	// Format: worktree <path>\nHEAD <sha>\nbranch <ref>\n\n
+
 	var worktrees []string
-	lines := string(output)
-	// Simple parsing - just extract paths for now
-	_ = lines
-	
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			worktrees = append(worktrees, strings.TrimPrefix(line, "worktree "))
+		}
+	}
 	return worktrees, nil
 }
 

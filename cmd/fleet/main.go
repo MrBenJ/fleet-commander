@@ -81,14 +81,18 @@ var listCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Println("AGENT\t\tBRANCH\t\t\tSTATUS\t\tPID")
-		fmt.Println("─────\t\t──────\t\t\t──────\t\t───")
+		fmt.Println("AGENT\t\tBRANCH\t\t\tSTATUS\t\tHOOKS\tPID")
+		fmt.Println("─────\t\t──────\t\t\t──────\t\t─────\t───")
 		for _, a := range f.Agents {
 			pid := "-"
 			if a.PID != 0 {
 				pid = fmt.Sprintf("%d", a.PID)
 			}
-			fmt.Printf("%-15s %-23s %-10s %s\n", a.Name, a.Branch, a.Status, pid)
+			hooksStatus := "✗"
+			if a.HooksOK {
+				hooksStatus = "✓"
+			}
+			fmt.Printf("%-15s %-23s %-10s %-7s %s\n", a.Name, a.Branch, a.Status, hooksStatus, pid)
 		}
 		return nil
 	},
@@ -128,6 +132,9 @@ var startCmd = &cobra.Command{
 				// Non-fatal: common cause is malformed existing .claude/settings.json — check that file first.
 				fmt.Printf("Warning: could not inject hooks into %s (.claude/settings.json may be malformed): %v\n", agent.WorktreePath, err)
 				stateFilePath = ""
+				f.UpdateAgentHooks(agentName, false)
+			} else {
+				f.UpdateAgentHooks(agentName, true)
 			}
 
 			if err := tm.CreateSession(agentName, agent.WorktreePath, "", stateFilePath); err != nil {
@@ -217,6 +224,7 @@ var stopCmd = &cobra.Command{
 		if err := hooks.Remove(agent.WorktreePath); err != nil {
 			fmt.Printf("Warning: could not remove hooks: %v\n", err)
 		}
+		f.UpdateAgentHooks(agentName, false)
 
 		f.UpdateAgent(agentName, "stopped", 0)
 		fmt.Printf("Stopped agent '%s'\n", agentName)
