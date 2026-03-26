@@ -70,12 +70,14 @@ func findFleetTmuxConf() string {
 	return ""
 }
 
-// CreateSession creates a new tmux session for an agent
-func (m *Manager) CreateSession(agentName, worktreePath, command, stateFilePath string) error {
+// CreateSession creates a new tmux session for an agent.
+// command is the command and arguments to run in the session.
+// If nil/empty, defaults to running "claude".
+func (m *Manager) CreateSession(agentName, worktreePath string, command []string, stateFilePath string) error {
 	sessionName := m.SessionName(agentName)
 
-	// Check if claude is available
-	if command == "" {
+	// Check if claude is available when using default command
+	if len(command) == 0 {
 		if _, err := exec.LookPath("claude"); err != nil {
 			return fmt.Errorf("claude command not found in PATH")
 		}
@@ -95,10 +97,10 @@ func (m *Manager) CreateSession(agentName, worktreePath, command, stateFilePath 
 		args = append(args, "-e", fmt.Sprintf("FLEET_STATE_FILE=%s", stateFilePath))
 	}
 
-	if command != "" {
-		args = append(args, command)
+	if len(command) > 0 {
+		args = append(args, command...)
 	} else {
-		args = append(args, "claude", "code")
+		args = append(args, "claude")
 	}
 
 	cmd := exec.Command("tmux", args...)

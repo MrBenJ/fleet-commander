@@ -137,7 +137,7 @@ var startCmd = &cobra.Command{
 				f.UpdateAgentHooks(agentName, true)
 			}
 
-			if err := tm.CreateSession(agentName, agent.WorktreePath, "", stateFilePath); err != nil {
+			if err := tm.CreateSession(agentName, agent.WorktreePath, nil, stateFilePath); err != nil {
 				return fmt.Errorf("failed to create tmux session: %w", err)
 			}
 			fmt.Printf("Created tmux session for agent '%s'\n", agentName)
@@ -245,6 +245,23 @@ var queueCmd = &cobra.Command{
 		}
 
 		return tui.Run(f)
+	},
+}
+
+var launchCmd = &cobra.Command{
+	Use:   "launch",
+	Short: "Launch multiple agents from a list of prompts",
+	Long: `Enter a list of tasks or prompts, review auto-generated agent names
+and branches, then launch them all as parallel Claude Code sessions.
+
+Each prompt becomes a separate agent with its own git worktree.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		f, err := fleet.Load(".")
+		if err != nil {
+			return fmt.Errorf("failed to load fleet: %w", err)
+		}
+
+		return tui.RunLaunch(f)
 	},
 }
 
@@ -412,6 +429,7 @@ func init() {
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(queueCmd)
+	rootCmd.AddCommand(launchCmd)
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(renameCmd)
 	rootCmd.AddCommand(hintCmd)
