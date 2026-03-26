@@ -81,6 +81,14 @@ var listCmd = &cobra.Command{
 			return nil
 		}
 
+		agentList, _ := cmd.Flags().GetBool("agent-list")
+		if agentList {
+			for _, a := range f.Agents {
+				fmt.Println(a.Name)
+			}
+			return nil
+		}
+
 		fmt.Println("AGENT\t\tBRANCH\t\t\tSTATUS\t\tHOOKS\tPID")
 		fmt.Println("─────\t\t──────\t\t\t──────\t\t─────\t───")
 		for _, a := range f.Agents {
@@ -426,6 +434,7 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(listCmd)
+	listCmd.Flags().Bool("agent-list", false, "Print only agent names, one per line (useful for piping to xargs)")
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(stopCmd)
