@@ -423,6 +423,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 
 	// Inject hooks for state signaling
 	if err := hooks.Inject(agent.WorktreePath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not inject hooks for agent '%s' (.claude/settings.json may be malformed): %v\n", agent.Name, err)
 		stateFilePath = ""
 		m.fleet.UpdateAgentHooks(agent.Name, false)
 	} else {
@@ -444,7 +445,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	m.fleet.UpdateAgentStateFile(agent.Name, stateFilePath)
 	pid, err := m.tmux.GetPID(agent.Name)
 	if err != nil {
-		m.statusMsg = fmt.Sprintf("Launched but could not get PID: %v", err)
+		fmt.Fprintf(os.Stderr, "Warning: launched agent '%s' but could not get PID: %v\n", agent.Name, err)
 	}
 	m.fleet.UpdateAgent(agent.Name, "running", pid)
 	m.launched = append(m.launched, agent.Name)
