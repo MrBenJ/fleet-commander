@@ -109,9 +109,9 @@ func TestDetectState(t *testing.T) {
 			want:        StateWorking,
 		},
 		{
-			name:        "working pattern beats waiting pattern (working checked first)",
+			name:        "waiting pattern beats working pattern (waiting checked first)",
 			fullContent: "esc to interrupt\n(y/n)",
-			want:        StateWorking,
+			want:        StateWaiting,
 		},
 	}
 

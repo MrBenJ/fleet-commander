@@ -110,6 +110,15 @@ fleet queue
 # etc.
 ```
 
+## Prerequisites
+
+Fleet Commander requires the following CLI tools to be installed and available on your `PATH`:
+
+- **[Go](https://go.dev/doc/install)** (1.21+) — required to build the binary
+- **[git](https://git-scm.com/)** — used for worktree creation and branch management
+- **[tmux](https://github.com/tmux/tmux/wiki)** — each agent runs in its own tmux session; Fleet Commander creates, attaches, and captures pane content via tmux commands
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — the AI coding agent spawned inside each worktree (`claude` must be on your `PATH`)
+
 ## Tech Stack
 
 - **Language:** Go (for single binary, fast startup)

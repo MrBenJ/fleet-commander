@@ -233,7 +233,7 @@ func (m *Model) startAgentSession(agent *fleet.Agent) error {
 		m.fleet.UpdateAgentHooks(agent.Name, true)
 	}
 
-	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, "", stateFilePath); err != nil {
+	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, nil, stateFilePath); err != nil {
 		return err
 	}
 
@@ -298,7 +298,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.statusMsgTimer = time.Now()
 						return m, nil
 					}
-					pid, _ := m.tmux.GetPID(agent.Name)
+					pid, err := m.tmux.GetPID(agent.Name)
+					if err != nil {
+						m.statusMsg = fmt.Sprintf("⚠ started but could not get PID: %v", err)
+						m.statusMsgTimer = time.Now()
+					}
 					m.fleet.UpdateAgent(agent.Name, "running", pid)
 				}
 
@@ -318,7 +322,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.statusMsgTimer = time.Now()
 					return m, nil
 				}
-				pid, _ := m.tmux.GetPID(agent.Name)
+				pid, err := m.tmux.GetPID(agent.Name)
+				if err != nil {
+					m.statusMsg = fmt.Sprintf("⚠ started but could not get PID: %v", err)
+					m.statusMsgTimer = time.Now()
+				}
 				m.fleet.UpdateAgent(agent.Name, "running", pid)
 				items := buildItems(m.fleet, m.tmux, m.monitor)
 				m.list.SetItems(items)
