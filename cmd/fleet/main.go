@@ -271,6 +271,9 @@ Each prompt becomes a separate agent with its own git worktree.`,
 
 		yoloMode, _ := cmd.Flags().GetBool("ultra-dangerous-yolo-mode")
 		skipYoloConfirm, _ := cmd.Flags().GetBool("i-know-what-im-doing")
+		if skipYoloConfirm && !yoloMode {
+			return fmt.Errorf("--i-know-what-im-doing requires --ultra-dangerous-yolo-mode")
+		}
 		return tui.RunLaunch(f, yoloMode, skipYoloConfirm)
 	},
 }
@@ -447,7 +450,7 @@ func init() {
 	rootCmd.AddCommand(signalCmd)
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
-	launchCmd.Flags().Bool("ultra-dangerous-yolo-mode", false, "Skip all reviews, pass --dangerously-skip-permissions and --yes to Claude, and auto-merge on completion")
+	launchCmd.Flags().Bool("ultra-dangerous-yolo-mode", false, "Skip all reviews, pass --dangerously-skip-permissions to Claude, and instruct agents to merge on completion")
 	launchCmd.Flags().Bool("i-know-what-im-doing", false, "Skip the yolo mode confirmation prompt")
 }
 
