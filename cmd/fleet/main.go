@@ -146,7 +146,10 @@ var startCmd = &cobra.Command{
 		}
 
 		// Update agent status
-		pid, _ := tm.GetPID(agentName)
+		pid, err := tm.GetPID(agentName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not get PID for agent '%s': %v\n", agentName, err)
+		}
 		f.UpdateAgent(agentName, "running", pid)
 
 		fmt.Printf("Agent '%s' is running in tmux session: %s\n", agentName, tm.SessionName(agentName))
