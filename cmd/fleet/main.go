@@ -419,14 +419,6 @@ Fleet Commander - Quick Reference
 	},
 }
 
-var betaCmd = &cobra.Command{
-	Use:   "beta",
-	Short: "Print beta message",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("betaaaaa!")
-	},
-}
-
 var signalCmd = &cobra.Command{
 	Use:    "signal [state]",
 	Short:  "Write agent state (called by Claude Code hooks)",
@@ -455,7 +447,6 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(renameCmd)
 	rootCmd.AddCommand(hintCmd)
-	rootCmd.AddCommand(betaCmd)
 	rootCmd.AddCommand(signalCmd)
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
