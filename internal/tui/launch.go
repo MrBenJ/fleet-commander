@@ -398,7 +398,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	// Create tmux session with the prompt passed to Claude
 	command := []string{"claude"}
 	if m.yoloMode {
-		command = append(command, "--dangerously-skip-permissions", "--yes")
+		command = append(command, "--dangerously-skip-permissions")
 	}
 	command = append(command, item.Prompt)
 	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, command, stateFilePath); err != nil {
