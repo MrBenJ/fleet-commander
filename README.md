@@ -110,6 +110,43 @@ fleet queue
 # etc.
 ```
 
+## YOLO Mode
+
+For those who like to live dangerously — and we mean *dangerously* dangerously — Fleet Commander ships with YOLO mode.
+
+```bash
+fleet launch --ultra-dangerous-yolo-mode
+```
+
+This skips all review steps, passes `--dangerously-skip-permissions` to Claude, and auto-merges on completion. Every agent fires off simultaneously with zero human oversight. You are giving a bunch of overconfident YC graduates AWS administrator access and they all have clearly been railing fat lines in the Planet Fitness bathroom for the past 4 days. Use with caution.
+
+When you hit `Ctrl+D` to submit your prompts, you'll be met with a sobering moment of reflection:
+
+```
+⚠  ARE YOU ABSOLUTELY SURE THIS IS READY?  ⚠
+
+This will run and you cannot stop it.
+Ensure you have enough usage in your account to make it through the end of this.
+Please don't destroy humanity.
+Please be sober.
+
+Ctrl+D: confirm and launch • Esc: go back
+```
+
+Hit `Ctrl+D` again to confirm you are, in fact, built different. Or hit `Esc` to return to the safety of rational decision-making.
+
+### The "Hold My Beer" Flag
+
+If even *two* whole keypresses feels like too much friction between you and mass unsupervised code generation:
+
+```bash
+fleet launch --ultra-dangerous-yolo-mode --i-know-what-im-doing
+```
+
+This skips the confirmation entirely. No warning. No safety net. Just you, your prompts, and the unshakeable confidence of someone who has never been burned by a rogue `rm -rf`.
+
+We are not responsible for what happens next. Godspeed.
+
 ## Prerequisites
 
 Fleet Commander requires the following CLI tools to be installed and available on your `PATH`:
