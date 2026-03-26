@@ -427,6 +427,14 @@ var alphaCmd = &cobra.Command{
 	},
 }
 
+var betaCmd = &cobra.Command{
+	Use:   "beta",
+	Short: "Print beta message",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("betaaaaa!")
+	},
+}
+
 var charlieCmd = &cobra.Command{
 	Use:   "charlie",
 	Short: "Print char char charlie",
@@ -464,6 +472,7 @@ func init() {
 	rootCmd.AddCommand(renameCmd)
 	rootCmd.AddCommand(hintCmd)
 	rootCmd.AddCommand(alphaCmd)
+	rootCmd.AddCommand(betaCmd)
 	rootCmd.AddCommand(charlieCmd)
 	rootCmd.AddCommand(signalCmd)
 
