@@ -419,11 +419,11 @@ Fleet Commander - Quick Reference
 	},
 }
 
-var alphaCmd = &cobra.Command{
-	Use:   "alpha",
-	Short: "Print alpha!",
+var charlieCmd = &cobra.Command{
+	Use:   "charlie",
+	Short: "Print char char charlie",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("alpha!")
+		fmt.Println("char char charlie")
 	},
 }
 
@@ -436,7 +436,7 @@ var signalCmd = &cobra.Command{
 		stateFile := os.Getenv("FLEET_STATE_FILE")
 		agentName := os.Getenv("FLEET_AGENT_NAME")
 		if stateFile == "" || agentName == "" {
-			return nil  // not in a fleet session — silently succeed
+			return nil // not in a fleet session — silently succeed
 		}
 		return state.Write(stateFile, agentName, args[0])
 	},
@@ -455,7 +455,7 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(renameCmd)
 	rootCmd.AddCommand(hintCmd)
-	rootCmd.AddCommand(alphaCmd)
+	rootCmd.AddCommand(charlieCmd)
 	rootCmd.AddCommand(signalCmd)
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
