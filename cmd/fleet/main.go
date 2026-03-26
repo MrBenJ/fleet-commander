@@ -261,7 +261,8 @@ Each prompt becomes a separate agent with its own git worktree.`,
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
 
-		return tui.RunLaunch(f)
+		yoloMode, _ := cmd.Flags().GetBool("ultra-dangerous-yolo-mode")
+		return tui.RunLaunch(f, yoloMode)
 	},
 }
 
@@ -436,6 +437,7 @@ func init() {
 	rootCmd.AddCommand(signalCmd)
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
+	launchCmd.Flags().Bool("ultra-dangerous-yolo-mode", false, "Skip all reviews, pass --dangerously-skip-permissions and --yes to Claude, and auto-merge on completion")
 }
 
 func main() {

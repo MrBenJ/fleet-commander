@@ -67,9 +67,13 @@ type LaunchModel struct {
 	quitting  bool
 	aborted   bool
 	statusMsg string
+
+	// YOLO mode
+	yoloMode     bool
+	targetBranch string // root repo's current branch, resolved at launch time
 }
 
-func newLaunchModel(f *fleet.Fleet) LaunchModel {
+func newLaunchModel(f *fleet.Fleet, yoloMode bool) LaunchModel {
 	tm := tmux.NewManager("fleet")
 
 	// Main input textarea
@@ -106,6 +110,7 @@ func newLaunchModel(f *fleet.Fleet) LaunchModel {
 		nameInput:   ni,
 		branchInput: bi,
 		promptEdit:  pe,
+		yoloMode:    yoloMode,
 	}
 }
 
@@ -132,6 +137,12 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.prompts = result.items
 		m.currentIdx = 0
+
+		// In YOLO mode, skip review and launch everything immediately
+		if m.yoloMode {
+			return m.launchAll()
+		}
+
 		m.mode = launchModeReview
 		m.statusMsg = ""
 		return m, nil
@@ -318,9 +329,48 @@ func (m LaunchModel) updateEditPrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// launchAll launches every prompt without review (YOLO mode).
+func (m LaunchModel) launchAll() (tea.Model, tea.Cmd) {
+	// Resolve target branch once for merge instructions
+	targetBranch, err := m.fleet.CurrentBranch()
+	if err != nil {
+		m.statusMsg = fmt.Sprintf("Failed to detect current branch: %s", err)
+		m.mode = launchModeInput
+		m.inputArea.Focus()
+		return m, nil
+	}
+	m.targetBranch = targetBranch
+
+	for m.currentIdx < len(m.prompts) {
+		model, _ := m.launchCurrent()
+		m = model.(LaunchModel)
+		if m.statusMsg != "" {
+			// Hit an error — stop launching, show the error
+			return m, tea.Quit
+		}
+	}
+
+	m.quitting = true
+	return m, tea.Quit
+}
+
 // launchCurrent creates the agent and tmux session for the current prompt.
 func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	item := m.prompts[m.currentIdx]
+
+	// In YOLO mode, append auto-merge instructions to the prompt
+	if m.yoloMode && m.targetBranch != "" {
+		item.Prompt = item.Prompt + fmt.Sprintf(`
+
+IMPORTANT — AUTOMATIC MERGE INSTRUCTIONS:
+After this feature is completed successfully, you MUST merge your changes back into the target branch. Do the following:
+1. Commit all your changes with a descriptive commit message
+2. Run: git checkout %s
+3. Run: git merge %s --no-edit
+4. If there are merge conflicts, resolve them and commit
+5. Run: git checkout %s
+This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, item.Branch)
+	}
 
 	// Create the agent (worktree + config registration)
 	agent, err := m.fleet.AddAgent(item.AgentName, item.Branch)
@@ -346,7 +396,11 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	}
 
 	// Create tmux session with the prompt passed to Claude
-	command := []string{"claude", item.Prompt}
+	command := []string{"claude"}
+	if m.yoloMode {
+		command = append(command, "--dangerously-skip-permissions", "--yes")
+	}
+	command = append(command, item.Prompt)
 	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, command, stateFilePath); err != nil {
 		m.statusMsg = fmt.Sprintf("Failed to create session: %s", err)
 		return m, nil
@@ -407,6 +461,21 @@ func (m LaunchModel) View() string {
 
 func (m LaunchModel) viewInput() string {
 	var b strings.Builder
+
+	if m.yoloMode {
+		yoloWarning := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#FF0000")).
+			Padding(0, 2).
+			Render("⚠  WARNING: ULTRA DANGEROUS YOLO MODE ACTIVATED  ⚠")
+		yoloSubtext := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FF0000")).
+			Render("ALL YOUR CHANGES WILL FIRE OFF WITHOUT ASKING FOR PERMISSION")
+		b.WriteString("\n  " + yoloWarning + "\n")
+		b.WriteString("  " + yoloSubtext + "\n\n")
+	}
 
 	b.WriteString(titleStyle.Render("⚓ Fleet Launch") + "\n\n")
 	b.WriteString("  Enter your tasks:\n\n")
@@ -519,8 +588,8 @@ func (m LaunchModel) renderSummary(header string) string {
 }
 
 // RunLaunch starts the launch TUI flow.
-func RunLaunch(f *fleet.Fleet) error {
-	m := newLaunchModel(f)
+func RunLaunch(f *fleet.Fleet, yoloMode bool) error {
+	m := newLaunchModel(f, yoloMode)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	_, err := p.Run()
