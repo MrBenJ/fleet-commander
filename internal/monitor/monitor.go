@@ -110,7 +110,11 @@ func (m *Monitor) GetSnapshot(agentName string) *Snapshot {
 	return m.snapshots[agentName]
 }
 
-// detectState analyzes terminal content to determine agent state
+// detectState analyzes terminal content to determine agent state.
+//
+// Detection order matters: waiting patterns are checked BEFORE working patterns
+// because Claude Code's persistent status bar (which contains "esc to interrupt")
+// stays visible even when the agent is idle at an input prompt.
 func detectState(lastLine, fullContent string) AgentState {
 	lastLine = strings.TrimSpace(lastLine)
 	stripped := stripANSI(fullContent)
@@ -126,22 +130,8 @@ func detectState(lastLine, fullContent string) AgentState {
 	bottom := getLastNonEmptyLines(allLines, 15)
 	bottomText := strings.Join(bottom, "\n")
 
-	// WORKING CHECK FIRST — these take priority over everything
-
-	// Claude Code shows "esc to interrupt" when actively working
-	if strings.Contains(bottomText, "esc to interrupt") {
-		return StateWorking
-	}
-
-	// Spinner characters (may or may not be captured by tmux)
-	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	for _, s := range spinners {
-		if strings.Contains(bottomText, s) {
-			return StateWorking
-		}
-	}
-
-	// WAITING PATTERNS — check only the bottom of the pane
+	// WAITING PATTERNS — check these FIRST because Claude Code's status bar
+	// contains "esc to interrupt" even when the agent is at an input prompt.
 
 	// Claude Code permission prompts ("Esc to cancel" footer)
 	if strings.Contains(bottomText, "Esc to cancel") {
@@ -184,6 +174,22 @@ func detectState(lastLine, fullContent string) AgentState {
 		}
 		if strings.Contains(trimmed, "(y/n)") || strings.Contains(trimmed, "[Y/n]") {
 			return StateWaiting
+		}
+	}
+
+	// WORKING PATTERNS — only checked after ruling out waiting states
+
+	// Claude Code shows "esc to interrupt" when actively working
+	// (but NOT when paired with a waiting indicator above)
+	if strings.Contains(bottomText, "esc to interrupt") {
+		return StateWorking
+	}
+
+	// Spinner characters (may or may not be captured by tmux)
+	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	for _, s := range spinners {
+		if strings.Contains(bottomText, s) {
+			return StateWorking
 		}
 	}
 

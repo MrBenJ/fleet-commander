@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,11 +20,18 @@ type launchMode int
 
 const (
 	launchModeInput launchMode = iota
+	launchModeGenerating
 	launchModeReview
 	launchModeEditName
 	launchModeEditBranch
 	launchModeEditPrompt
 )
+
+// claudeResultMsg carries the result of the async Claude CLI call.
+type claudeResultMsg struct {
+	items []LaunchItem
+	err   error
+}
 
 // LaunchModel is the Bubble Tea model for the fleet launch flow.
 type LaunchModel struct {
@@ -38,6 +46,9 @@ type LaunchModel struct {
 	// Parsed prompts
 	prompts    []LaunchItem
 	currentIdx int
+
+	// Generating phase
+	spinner spinner.Model
 
 	// Edit phase
 	nameInput   textinput.Model
@@ -63,10 +74,15 @@ func newLaunchModel(f *fleet.Fleet) LaunchModel {
 
 	// Main input textarea
 	ta := textarea.New()
-	ta.Placeholder = "1. Fix the login validation bug\n2. Add OAuth2 support\n3. Refactor the database layer"
+	ta.Placeholder = "Fix the login validation bug\nAdd OAuth2 support\nRefactor the database layer"
 	ta.SetWidth(60)
 	ta.SetHeight(8)
 	ta.Focus()
+
+	// Spinner for generating phase
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4"))
 
 	// Edit fields
 	ni := textinput.New()
@@ -86,6 +102,7 @@ func newLaunchModel(f *fleet.Fleet) LaunchModel {
 		tmux:        tm,
 		mode:        launchModeInput,
 		inputArea:   ta,
+		spinner:     sp,
 		nameInput:   ni,
 		branchInput: bi,
 		promptEdit:  pe,
@@ -105,9 +122,26 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Handle Claude CLI result regardless of mode
+	if result, ok := msg.(claudeResultMsg); ok {
+		if result.err != nil {
+			m.mode = launchModeInput
+			m.statusMsg = fmt.Sprintf("Claude generation failed: %s", result.err)
+			m.inputArea.Focus()
+			return m, nil
+		}
+		m.prompts = result.items
+		m.currentIdx = 0
+		m.mode = launchModeReview
+		m.statusMsg = ""
+		return m, nil
+	}
+
 	switch m.mode {
 	case launchModeInput:
 		return m.updateInput(msg)
+	case launchModeGenerating:
+		return m.updateGenerating(msg)
 	case launchModeReview:
 		return m.updateReview(msg)
 	case launchModeEditName:
@@ -126,30 +160,26 @@ func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key.String() {
 		case "ctrl+d":
 			input := m.inputArea.Value()
-			items := ParsePrompts(input)
-			if len(items) == 0 {
+			if strings.TrimSpace(input) == "" {
 				m.statusMsg = "No prompts found. Enter at least one task."
 				return m, nil
 			}
 
-			// Deduplicate against existing fleet agents
+			// Collect existing agent names for deduplication
 			var existingNames []string
 			for _, a := range m.fleet.Agents {
 				existingNames = append(existingNames, a.Name)
 			}
-			// Re-generate names with fleet context
-			for i := range items {
-				name, branch := GenerateNames(items[i].Prompt, existingNames)
-				items[i].AgentName = name
-				items[i].Branch = branch
-				existingNames = append(existingNames, name)
-			}
 
-			m.prompts = items
-			m.currentIdx = 0
-			m.mode = launchModeReview
+			m.mode = launchModeGenerating
 			m.statusMsg = ""
-			return m, nil
+
+			// Launch async Claude CLI call alongside the spinner
+			claudeCmd := func() tea.Msg {
+				items, err := GenerateWithClaude(input, existingNames)
+				return claudeResultMsg{items: items, err: err}
+			}
+			return m, tea.Batch(m.spinner.Tick, claudeCmd)
 
 		case "esc", "ctrl+c":
 			m.quitting = true
@@ -159,6 +189,20 @@ func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.inputArea, cmd = m.inputArea.Update(msg)
+	return m, cmd
+}
+
+func (m LaunchModel) updateGenerating(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyMsg); ok {
+		switch key.String() {
+		case "esc", "ctrl+c":
+			m.quitting = true
+			return m, tea.Quit
+		}
+	}
+
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
 	return m, cmd
 }
 
@@ -346,6 +390,8 @@ func (m LaunchModel) View() string {
 	switch m.mode {
 	case launchModeInput:
 		return m.viewInput()
+	case launchModeGenerating:
+		return m.viewGenerating()
 	case launchModeReview:
 		return m.viewReview()
 	case launchModeEditName:
@@ -363,7 +409,7 @@ func (m LaunchModel) viewInput() string {
 	var b strings.Builder
 
 	b.WriteString(titleStyle.Render("⚓ Fleet Launch") + "\n\n")
-	b.WriteString("  Enter your tasks (one per line, or use bullets/numbers):\n\n")
+	b.WriteString("  Enter your tasks:\n\n")
 	b.WriteString("  " + m.inputArea.View() + "\n\n")
 
 	if m.statusMsg != "" {
@@ -372,6 +418,14 @@ func (m LaunchModel) viewInput() string {
 
 	b.WriteString(helpStyle.Render("  Ctrl+D: submit • Esc: cancel"))
 
+	return b.String()
+}
+
+func (m LaunchModel) viewGenerating() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("⚓ Fleet Launch") + "\n\n")
+	b.WriteString(fmt.Sprintf("  %s Generating prompts, agent names, and branches...\n\n", m.spinner.View()))
+	b.WriteString(helpStyle.Render("  Esc: cancel"))
 	return b.String()
 }
 
