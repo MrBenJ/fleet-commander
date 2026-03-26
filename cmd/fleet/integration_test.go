@@ -138,6 +138,32 @@ func TestListShowsAgents(t *testing.T) {
 	}
 }
 
+func TestListAgentListFlag(t *testing.T) {
+	repoPath, binaryPath := setupTestRepo(t)
+
+	runFleet(t, binaryPath, repoPath, "init", repoPath)
+	runFleet(t, binaryPath, repoPath, "add", "alpha", "feature/alpha")
+	runFleet(t, binaryPath, repoPath, "add", "bravo", "feature/bravo")
+
+	out := runFleet(t, binaryPath, repoPath, "list", "--agent-list")
+
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %q", len(lines), out)
+	}
+	if lines[0] != "alpha" {
+		t.Errorf("expected first line to be 'alpha', got %q", lines[0])
+	}
+	if lines[1] != "bravo" {
+		t.Errorf("expected second line to be 'bravo', got %q", lines[1])
+	}
+
+	// Should not contain table headers
+	if strings.Contains(out, "AGENT") || strings.Contains(out, "BRANCH") {
+		t.Errorf("--agent-list output should not contain table headers\noutput: %s", out)
+	}
+}
+
 func TestStopCleansUp(t *testing.T) {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux not in PATH")

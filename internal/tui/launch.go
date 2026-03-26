@@ -20,6 +20,7 @@ type launchMode int
 
 const (
 	launchModeInput launchMode = iota
+	launchModeYoloConfirm
 	launchModeGenerating
 	launchModeReview
 	launchModeEditName
@@ -67,9 +68,15 @@ type LaunchModel struct {
 	quitting  bool
 	aborted   bool
 	statusMsg string
+
+	// YOLO mode
+	yoloMode          bool
+	skipYoloConfirm   bool // --i-know-what-im-doing flag
+	targetBranch      string // root repo's current branch, resolved at launch time
+	pendingYoloInput  string // input saved from first CTRL+D, waiting for confirmation
 }
 
-func newLaunchModel(f *fleet.Fleet) LaunchModel {
+func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) LaunchModel {
 	tm := tmux.NewManager("fleet")
 
 	// Main input textarea
@@ -98,14 +105,16 @@ func newLaunchModel(f *fleet.Fleet) LaunchModel {
 	pe.SetHeight(4)
 
 	return LaunchModel{
-		fleet:       f,
-		tmux:        tm,
-		mode:        launchModeInput,
-		inputArea:   ta,
-		spinner:     sp,
-		nameInput:   ni,
-		branchInput: bi,
-		promptEdit:  pe,
+		fleet:           f,
+		tmux:            tm,
+		mode:            launchModeInput,
+		inputArea:       ta,
+		spinner:         sp,
+		nameInput:       ni,
+		branchInput:     bi,
+		promptEdit:      pe,
+		yoloMode:        yoloMode,
+		skipYoloConfirm: skipYoloConfirm,
 	}
 }
 
@@ -132,6 +141,12 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.prompts = result.items
 		m.currentIdx = 0
+
+		// In YOLO mode, skip review and launch everything immediately
+		if m.yoloMode {
+			return m.launchAll()
+		}
+
 		m.mode = launchModeReview
 		m.statusMsg = ""
 		return m, nil
@@ -140,6 +155,8 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.mode {
 	case launchModeInput:
 		return m.updateInput(msg)
+	case launchModeYoloConfirm:
+		return m.updateYoloConfirm(msg)
 	case launchModeGenerating:
 		return m.updateGenerating(msg)
 	case launchModeReview:
@@ -165,21 +182,15 @@ func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			// Collect existing agent names for deduplication
-			var existingNames []string
-			for _, a := range m.fleet.Agents {
-				existingNames = append(existingNames, a.Name)
+			// In yolo mode, show confirmation unless --i-know-what-im-doing
+			if m.yoloMode && !m.skipYoloConfirm {
+				m.pendingYoloInput = input
+				m.mode = launchModeYoloConfirm
+				m.statusMsg = ""
+				return m, nil
 			}
 
-			m.mode = launchModeGenerating
-			m.statusMsg = ""
-
-			// Launch async Claude CLI call alongside the spinner
-			claudeCmd := func() tea.Msg {
-				items, err := GenerateWithClaude(input, existingNames)
-				return claudeResultMsg{items: items, err: err}
-			}
-			return m, tea.Batch(m.spinner.Tick, claudeCmd)
+			return m.submitInput(input)
 
 		case "esc", "ctrl+c":
 			m.quitting = true
@@ -190,6 +201,40 @@ func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.inputArea, cmd = m.inputArea.Update(msg)
 	return m, cmd
+}
+
+// submitInput starts the generation phase with the given input.
+func (m LaunchModel) submitInput(input string) (tea.Model, tea.Cmd) {
+	// Collect existing agent names for deduplication
+	var existingNames []string
+	for _, a := range m.fleet.Agents {
+		existingNames = append(existingNames, a.Name)
+	}
+
+	m.mode = launchModeGenerating
+	m.statusMsg = ""
+
+	// Launch async Claude CLI call alongside the spinner
+	claudeCmd := func() tea.Msg {
+		items, err := GenerateWithClaude(input, existingNames)
+		return claudeResultMsg{items: items, err: err}
+	}
+	return m, tea.Batch(m.spinner.Tick, claudeCmd)
+}
+
+func (m LaunchModel) updateYoloConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyMsg); ok {
+		switch key.String() {
+		case "ctrl+d":
+			return m.submitInput(m.pendingYoloInput)
+		case "esc", "ctrl+c":
+			m.mode = launchModeInput
+			m.statusMsg = ""
+			m.inputArea.Focus()
+			return m, nil
+		}
+	}
+	return m, nil
 }
 
 func (m LaunchModel) updateGenerating(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -318,9 +363,48 @@ func (m LaunchModel) updateEditPrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// launchAll launches every prompt without review (YOLO mode).
+func (m LaunchModel) launchAll() (tea.Model, tea.Cmd) {
+	// Resolve target branch once for merge instructions
+	targetBranch, err := m.fleet.CurrentBranch()
+	if err != nil {
+		m.statusMsg = fmt.Sprintf("Failed to detect current branch: %s", err)
+		m.mode = launchModeInput
+		m.inputArea.Focus()
+		return m, nil
+	}
+	m.targetBranch = targetBranch
+
+	for m.currentIdx < len(m.prompts) {
+		model, _ := m.launchCurrent()
+		m = model.(LaunchModel)
+		if m.statusMsg != "" {
+			// Hit an error — stop launching, show the error
+			return m, tea.Quit
+		}
+	}
+
+	m.quitting = true
+	return m, tea.Quit
+}
+
 // launchCurrent creates the agent and tmux session for the current prompt.
 func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	item := m.prompts[m.currentIdx]
+
+	// In YOLO mode, append auto-merge instructions to the prompt
+	if m.yoloMode && m.targetBranch != "" {
+		item.Prompt = item.Prompt + fmt.Sprintf(`
+
+IMPORTANT — AUTOMATIC MERGE INSTRUCTIONS:
+After this feature is completed successfully, you MUST merge your changes back into the target branch. Do the following:
+1. Commit all your changes with a descriptive commit message
+2. Run: git checkout %s
+3. Run: git merge %s --no-edit
+4. If there are merge conflicts, resolve them and commit
+5. Run: git checkout %s
+This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, item.Branch)
+	}
 
 	// Create the agent (worktree + config registration)
 	agent, err := m.fleet.AddAgent(item.AgentName, item.Branch)
@@ -346,7 +430,11 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	}
 
 	// Create tmux session with the prompt passed to Claude
-	command := []string{"claude", item.Prompt}
+	command := []string{"claude"}
+	if m.yoloMode {
+		command = append(command, "--dangerously-skip-permissions")
+	}
+	command = append(command, item.Prompt)
 	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, command, stateFilePath); err != nil {
 		m.statusMsg = fmt.Sprintf("Failed to create session: %s", err)
 		return m, nil
@@ -390,6 +478,8 @@ func (m LaunchModel) View() string {
 	switch m.mode {
 	case launchModeInput:
 		return m.viewInput()
+	case launchModeYoloConfirm:
+		return m.viewYoloConfirm()
 	case launchModeGenerating:
 		return m.viewGenerating()
 	case launchModeReview:
@@ -408,6 +498,21 @@ func (m LaunchModel) View() string {
 func (m LaunchModel) viewInput() string {
 	var b strings.Builder
 
+	if m.yoloMode {
+		yoloWarning := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(lipgloss.Color("#FF0000")).
+			Padding(0, 2).
+			Render("⚠  WARNING: ULTRA DANGEROUS YOLO MODE ACTIVATED  ⚠")
+		yoloSubtext := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FF0000")).
+			Render("ALL YOUR CHANGES WILL FIRE OFF WITHOUT ASKING FOR PERMISSION")
+		b.WriteString("\n  " + yoloWarning + "\n")
+		b.WriteString("  " + yoloSubtext + "\n\n")
+	}
+
 	b.WriteString(titleStyle.Render("⚓ Fleet Launch") + "\n\n")
 	b.WriteString("  Enter your tasks:\n\n")
 	b.WriteString("  " + m.inputArea.View() + "\n\n")
@@ -417,6 +522,29 @@ func (m LaunchModel) viewInput() string {
 	}
 
 	b.WriteString(helpStyle.Render("  Ctrl+D: submit • Esc: cancel"))
+
+	return b.String()
+}
+
+func (m LaunchModel) viewYoloConfirm() string {
+	var b strings.Builder
+
+	warningBox := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#FF0000")).
+		Padding(1, 3).
+		Render("⚠  ARE YOU ABSOLUTELY SURE THIS IS READY?  ⚠")
+
+	b.WriteString("\n  " + warningBox + "\n\n")
+
+	warnText := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF6600"))
+	b.WriteString("  " + warnText.Render("This will run and you cannot stop it.") + "\n")
+	b.WriteString("  " + warnText.Render("Ensure you have enough usage in your account to make it through the end of this.") + "\n")
+	b.WriteString("  " + warnText.Render("Please don't destroy humanity.") + "\n")
+	b.WriteString("  " + warnText.Render("Please be sober.") + "\n\n")
+
+	b.WriteString(helpStyle.Render("  Ctrl+D: confirm and launch • Esc: go back"))
 
 	return b.String()
 }
@@ -519,8 +647,8 @@ func (m LaunchModel) renderSummary(header string) string {
 }
 
 // RunLaunch starts the launch TUI flow.
-func RunLaunch(f *fleet.Fleet) error {
-	m := newLaunchModel(f)
+func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) error {
+	m := newLaunchModel(f, yoloMode, skipYoloConfirm)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	_, err := p.Run()

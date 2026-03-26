@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -298,6 +299,17 @@ func (f *Fleet) UpdateAgentHooks(name string, hooksOK bool) error {
 		}
 		return fmt.Errorf("agent '%s' not found", name)
 	})
+}
+
+// CurrentBranch returns the currently checked-out branch of the fleet's root repo.
+func (f *Fleet) CurrentBranch() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = f.RepoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current branch: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // addToGitignore adds an entry to .gitignore if it's not already present
