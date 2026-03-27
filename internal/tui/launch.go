@@ -82,6 +82,8 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) LaunchM
 	// Main input textarea
 	ta := textarea.New()
 	ta.Placeholder = "Fix the login validation bug\nAdd OAuth2 support\nRefactor the database layer"
+	ta.ShowLineNumbers = false
+	ta.Prompt = ""
 	ta.SetWidth(60)
 	ta.SetHeight(8)
 	ta.Focus()
@@ -101,6 +103,8 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) LaunchM
 	bi.CharLimit = 80
 
 	pe := textarea.New()
+	pe.ShowLineNumbers = false
+	pe.Prompt = ""
 	pe.SetWidth(60)
 	pe.SetHeight(4)
 
@@ -516,7 +520,7 @@ func (m LaunchModel) viewInput() string {
 
 	b.WriteString(titleStyle.Render("⚓ Fleet Launch") + "\n\n")
 	b.WriteString("  Enter your tasks:\n\n")
-	b.WriteString("  " + m.inputArea.View() + "\n\n")
+	b.WriteString(m.inputArea.View() + "\n\n")
 
 	if m.statusMsg != "" {
 		b.WriteString("  " + stoppedStyle.Render("❌ "+m.statusMsg) + "\n")
@@ -627,7 +631,7 @@ func (m LaunchModel) viewEditPrompt() string {
 	b.WriteString(titleStyle.Render("⚓ Edit Prompt") + "\n\n")
 	b.WriteString("  Agent: " + m.prompts[m.currentIdx].AgentName + "\n")
 	b.WriteString("  Branch: " + m.prompts[m.currentIdx].Branch + "\n\n")
-	b.WriteString("  " + m.promptEdit.View() + "\n")
+	b.WriteString(m.promptEdit.View() + "\n")
 	if m.statusMsg != "" {
 		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
 	}
