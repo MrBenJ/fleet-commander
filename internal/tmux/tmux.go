@@ -8,9 +8,41 @@ import (
 	"strings"
 )
 
+// CommandRunner abstracts shell command execution so Manager can be tested
+// without real tmux.
+type CommandRunner interface {
+	Run(name string, args ...string) error
+	Output(name string, args ...string) ([]byte, error)
+	RunInteractive(name string, args ...string) error
+	LookPath(name string) (string, error)
+}
+
+type execRunner struct{}
+
+func (e *execRunner) Run(name string, args ...string) error {
+	return exec.Command(name, args...).Run()
+}
+
+func (e *execRunner) Output(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
+
+func (e *execRunner) RunInteractive(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func (e *execRunner) LookPath(name string) (string, error) {
+	return exec.LookPath(name)
+}
+
 // Manager handles tmux session operations
 type Manager struct {
 	SessionPrefix string
+	runner        CommandRunner
 }
 
 // NewManager creates a new tmux manager
@@ -18,12 +50,20 @@ func NewManager(prefix string) *Manager {
 	if prefix == "" {
 		prefix = "fleet"
 	}
-	return &Manager{SessionPrefix: prefix}
+	return &Manager{SessionPrefix: prefix, runner: &execRunner{}}
+}
+
+// NewManagerWithRunner creates a new tmux manager with a custom CommandRunner
+func NewManagerWithRunner(prefix string, runner CommandRunner) *Manager {
+	if prefix == "" {
+		prefix = "fleet"
+	}
+	return &Manager{SessionPrefix: prefix, runner: runner}
 }
 
 // IsAvailable checks if tmux is installed
 func (m *Manager) IsAvailable() bool {
-	_, err := exec.LookPath("tmux")
+	_, err := m.runner.LookPath("tmux")
 	return err == nil
 }
 
@@ -35,8 +75,7 @@ func (m *Manager) SessionName(agentName string) string {
 // SessionExists checks if a tmux session exists
 func (m *Manager) SessionExists(agentName string) bool {
 	sessionName := m.SessionName(agentName)
-	cmd := exec.Command("tmux", "has-session", "-t", sessionName)
-	err := cmd.Run()
+	err := m.runner.Run("tmux", "has-session", "-t", sessionName)
 	return err == nil
 }
 
@@ -78,7 +117,7 @@ func (m *Manager) CreateSession(agentName, worktreePath string, command []string
 
 	// Check if claude is available when using default command
 	if len(command) == 0 {
-		if _, err := exec.LookPath("claude"); err != nil {
+		if _, err := m.runner.LookPath("claude"); err != nil {
 			return fmt.Errorf("claude command not found in PATH")
 		}
 	}
@@ -103,19 +142,14 @@ func (m *Manager) CreateSession(agentName, worktreePath string, command []string
 		args = append(args, "claude")
 	}
 
-	cmd := exec.Command("tmux", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := m.runner.Run("tmux", args...); err != nil {
 		return fmt.Errorf("failed to create tmux session: %w", err)
 	}
 
 	// Source the fleet tmux config if available
 	confPath := findFleetTmuxConf()
 	if confPath != "" {
-		sourceCmd := exec.Command("tmux", "source-file", confPath)
-		_ = sourceCmd.Run() // best-effort, don't fail if config has issues
+		_ = m.runner.Run("tmux", "source-file", confPath) // best-effort, don't fail if config has issues
 	}
 
 	return nil
@@ -133,31 +167,23 @@ func (m *Manager) Attach(agentName string) error {
 	}
 	
 	// Attach to session
-	cmd := exec.Command("tmux", "attach", "-t", sessionName)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	return cmd.Run()
+	return m.runner.RunInteractive("tmux", "attach", "-t", sessionName)
 }
 
 // Detach detaches from the current tmux session
 func (m *Manager) Detach() error {
-	cmd := exec.Command("tmux", "detach")
-	return cmd.Run()
+	return m.runner.Run("tmux", "detach")
 }
 
 // KillSession kills a tmux session
 func (m *Manager) KillSession(agentName string) error {
 	sessionName := m.SessionName(agentName)
-	cmd := exec.Command("tmux", "kill-session", "-t", sessionName)
-	return cmd.Run()
+	return m.runner.Run("tmux", "kill-session", "-t", sessionName)
 }
 
 // ListSessions lists all fleet tmux sessions
 func (m *Manager) ListSessions() ([]string, error) {
-	cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
-	output, err := cmd.Output()
+	output, err := m.runner.Output("tmux", "list-sessions", "-F", "#{session_name}")
 	if err != nil {
 		// No sessions is not an error
 		if strings.Contains(err.Error(), "no server running") {
@@ -180,15 +206,13 @@ func (m *Manager) ListSessions() ([]string, error) {
 // SendKeys sends keystrokes to a tmux session
 func (m *Manager) SendKeys(agentName string, keys string) error {
 	sessionName := m.SessionName(agentName)
-	cmd := exec.Command("tmux", "send-keys", "-t", sessionName, keys)
-	return cmd.Run()
+	return m.runner.Run("tmux", "send-keys", "-t", sessionName, keys)
 }
 
 // CapturePane captures the content of a tmux pane
 func (m *Manager) CapturePane(agentName string) (string, error) {
 	sessionName := m.SessionName(agentName)
-	cmd := exec.Command("tmux", "capture-pane", "-t", sessionName, "-p")
-	output, err := cmd.Output()
+	output, err := m.runner.Output("tmux", "capture-pane", "-t", sessionName, "-p")
 	if err != nil {
 		return "", fmt.Errorf("failed to capture pane: %w", err)
 	}
@@ -198,8 +222,7 @@ func (m *Manager) CapturePane(agentName string) (string, error) {
 // GetPID returns the PID of the process running in the tmux session
 func (m *Manager) GetPID(agentName string) (int, error) {
 	sessionName := m.SessionName(agentName)
-	cmd := exec.Command("tmux", "list-panes", "-t", sessionName, "-F", "#{pane_pid}")
-	output, err := cmd.Output()
+	output, err := m.runner.Output("tmux", "list-panes", "-t", sessionName, "-F", "#{pane_pid}")
 	if err != nil {
 		return 0, fmt.Errorf("failed to get PID: %w", err)
 	}
@@ -221,6 +244,5 @@ func IsInsideTmux() bool {
 // SwitchClient switches to a different tmux session (from within tmux)
 func (m *Manager) SwitchClient(agentName string) error {
 	sessionName := m.SessionName(agentName)
-	cmd := exec.Command("tmux", "switch-client", "-t", sessionName)
-	return cmd.Run()
+	return m.runner.Run("tmux", "switch-client", "-t", sessionName)
 }
