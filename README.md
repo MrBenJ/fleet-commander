@@ -10,8 +10,8 @@ Fleet Commander gives each Claude Code instance its own git worktree and tmux se
 ┌─────────────────────────────────────┐
 │      Fleet Commander (TUI)          │
 │  ┌─────────────────────────────┐    │
-│  │ Queue: [A1 ] [A2] [A3]     │    │
-│  │ Active: agent-2 (bug-42)   │    │
+│  │ Queue: [A1 ] [A2] [A3]      │    │
+│  │ Active: agent-2 (bug-42)    │    │
 │  └─────────────────────────────┘    │
 └─────────────┬───────────────────────┘
               │
@@ -35,6 +35,20 @@ go install ./cmd/fleet/
 fleet init ~/projects/my-app
 cd ~/projects/my-app
 
+# Start the interactive fleet launcher
+# to fire off multiple agents at once
+fleet launch
+
+# After launching your fleet of agents, you can
+# view the interactive queue to see which agents
+# need your input to continue working
+fleet queue
+
+```
+
+Additionally, there are more commands used under the hood for more granular control, or to have an agentic coordinator control the fleet in lieu of yourself.
+
+```bash
 # Add agents for different tasks
 fleet add feat-auth feature/user-authentication
 fleet add bug-login bugfix/login-redirect
