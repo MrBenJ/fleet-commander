@@ -110,3 +110,55 @@ func TestLoadMalformedJSON(t *testing.T) {
 		t.Fatal("expected error for malformed JSON, got nil")
 	}
 }
+
+func TestMultiAgentWorkflow(t *testing.T) {
+	dir := t.TempDir()
+
+	// User sets shared context
+	if err := fleetctx.WriteShared(dir, "API uses JWT. Base path /v2."); err != nil {
+		t.Fatalf("WriteShared failed: %v", err)
+	}
+
+	// auth-agent writes its section
+	if err := fleetctx.WriteAgent(dir, "auth-agent", "User model at internal/auth/user.go. @api-agent merge fleet/auth"); err != nil {
+		t.Fatalf("WriteAgent failed: %v", err)
+	}
+
+	// api-agent writes its section
+	if err := fleetctx.WriteAgent(dir, "api-agent", "Endpoints defined. Waiting on auth model."); err != nil {
+		t.Fatalf("WriteAgent failed: %v", err)
+	}
+
+	// Read full context
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	if ctx.Shared != "API uses JWT. Base path /v2." {
+		t.Errorf("shared: got %q", ctx.Shared)
+	}
+	if ctx.Agents["auth-agent"] != "User model at internal/auth/user.go. @api-agent merge fleet/auth" {
+		t.Errorf("auth-agent: got %q", ctx.Agents["auth-agent"])
+	}
+	if ctx.Agents["api-agent"] != "Endpoints defined. Waiting on auth model." {
+		t.Errorf("api-agent: got %q", ctx.Agents["api-agent"])
+	}
+
+	// auth-agent overwrites its section
+	if err := fleetctx.WriteAgent(dir, "auth-agent", "Auth complete. All tests passing."); err != nil {
+		t.Fatalf("WriteAgent failed: %v", err)
+	}
+
+	ctx, err = fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if ctx.Agents["auth-agent"] != "Auth complete. All tests passing." {
+		t.Errorf("auth-agent after overwrite: got %q", ctx.Agents["auth-agent"])
+	}
+	// api-agent should be untouched
+	if ctx.Agents["api-agent"] != "Endpoints defined. Waiting on auth model." {
+		t.Errorf("api-agent was clobbered: got %q", ctx.Agents["api-agent"])
+	}
+}
