@@ -49,6 +49,8 @@ func loadUnlocked(fleetDir string) (*Context, error) {
 }
 
 // Save writes the context to .fleet/context.json under an exclusive flock.
+// This replaces the entire file. For atomic read-modify-write of individual
+// sections, use WriteAgent or WriteShared instead.
 func Save(fleetDir string, ctx *Context) error {
 	lf, err := acquireLock(fleetDir)
 	if err != nil {
@@ -66,7 +68,10 @@ func saveUnlocked(fleetDir string, ctx *Context) error {
 		return fmt.Errorf("failed to marshal context: %w", err)
 	}
 	path := filepath.Join(fleetDir, contextFile)
-	return os.WriteFile(path, data, 0644)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write context: %w", err)
+	}
+	return nil
 }
 
 func acquireLock(fleetDir string) (*os.File, error) {

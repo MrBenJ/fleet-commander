@@ -101,7 +101,9 @@ func TestWriteShared(t *testing.T) {
 func TestLoadMalformedJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "context.json")
-	os.WriteFile(path, []byte("{invalid json"), 0644)
+	if err := os.WriteFile(path, []byte("{invalid json"), 0644); err != nil {
+		t.Fatalf("failed to write test fixture: %v", err)
+	}
 
 	_, err := fleetctx.Load(dir)
 	if err == nil {
