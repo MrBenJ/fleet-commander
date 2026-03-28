@@ -208,22 +208,6 @@ func getLastNonEmptyLines(lines []string, n int) []string {
 	return result
 }
 
-// isClaudeCodePrompt detects Claude Code's input prompt
-func isClaudeCodePrompt(line string) bool {
-	trimmed := strings.TrimSpace(line)
-
-	// Claude Code shows ">" as its prompt when waiting for input
-	// It may have ANSI escape codes around it
-	stripped := stripANSI(trimmed)
-	stripped = strings.TrimSpace(stripped)
-
-	if stripped == ">" || stripped == "❯" || stripped == "$" {
-		return true
-	}
-
-	return false
-}
-
 // stripANSI removes ANSI escape sequences from a string
 func stripANSI(s string) string {
 	var result strings.Builder

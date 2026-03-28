@@ -36,9 +36,10 @@ Fleet Commander is a CLI + TUI tool for managing parallel Claude Code sessions, 
 - `internal/tmux/` — Thin wrapper around tmux CLI commands. Sessions are named `fleet-<agentName>`. Sources `fleet.tmux.conf` after creating a session (best-effort).
 - `internal/monitor/` — Reads tmux pane content via `capture-pane` and classifies agent state as `working`, `waiting`, `stopped`, or `starting`. State detection inspects only the bottom 15 lines and checks for Claude Code-specific patterns: "esc to interrupt", spinner characters, "Esc to cancel", `❯` prompt, etc.
 - `internal/tui/` — Bubble Tea TUI for `fleet queue`. Lists all agents with live state indicators, refreshes every 2 seconds. Selecting an agent starts its session if stopped, then attaches. After detaching (Ctrl+B, Q), the TUI loop restarts automatically.
-- `internal/queue/` — In-memory `Queue` / `Request` data structure (currently unused by the TUI; state is derived live from tmux).
 - `internal/worktree/` — Git worktree creation helpers called by `fleet.AddAgent`.
-- `internal/agent/` — Process management helpers (start/kill Claude Code processes). Used for non-tmux flows; the main path uses `tmux` package directly.
+- `internal/context/` — Shared context store (`.fleet/context.json`). Agents can publish and read context from each other. Uses flock for concurrency safety.
+- `internal/state/` — State file read/write for agent state signaling between Claude Code hooks and the monitor.
+- `internal/hooks/` — Claude Code hook injection/removal. Injects fleet signal commands into `.claude/settings.json` in each worktree.
 
 **Key flow — `fleet queue`:**
 1. `tui.Run()` loops: show TUI → user selects agent → attach to tmux session → user detaches → reload fleet config → show TUI again.
