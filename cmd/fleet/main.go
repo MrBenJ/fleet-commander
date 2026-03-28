@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 
 	"github.com/spf13/cobra"
 	fleetctx "github.com/teknal/fleet-commander/internal/context"
@@ -484,9 +485,14 @@ var contextReadCmd = &cobra.Command{
 			fmt.Println(ctx.Shared)
 			fmt.Println()
 		}
-		for name, text := range ctx.Agents {
+		names := make([]string, 0, len(ctx.Agents))
+		for name := range ctx.Agents {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
 			fmt.Printf("== %s ==\n", name)
-			fmt.Println(text)
+			fmt.Println(ctx.Agents[name])
 			fmt.Println()
 		}
 		return nil
