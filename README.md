@@ -1,118 +1,127 @@
 # Fleet Commander
 
-A multi-agent orchestration system for managing parallel AI coding sessions.
+A CLI + TUI tool for managing parallel Claude Code sessions, each in its own git worktree. You stay in control -- there is no AI coordinator.
 
-## Core Concept
+## How It Works
 
-Fleet Commander lets you run multiple Claude Code (or other AI coding agents) instances in parallel, each working on different branches of the same or different repositories. When agents need user input, they queue up — you handle one, move to the next.
-
-## Key Patterns from Gastown (Simplified for MVP)
-
-| Gastown Concept | Fleet Commander Equivalent |
-|----------------|---------------------------|
-| Mayor | User (you are the coordinator) |
-| Rig | Fleet (a repo + its worktrees) |
-| Polecat | Agent (Claude Code instance) |
-| Hook | Worktree (git worktree for isolation) |
-| Convoy | Queue (pending user inputs) |
-| Beads | Task (ticket/branch description) |
-
-## Architecture
+Fleet Commander gives each Claude Code instance its own git worktree and tmux session. You switch between agents using a TUI queue that shows which agents are working and which need your input. The typical workflow is: launch agents, let them work, attend to the ones that need input, repeat.
 
 ```
 ┌─────────────────────────────────────┐
 │      Fleet Commander (TUI)          │
 │  ┌─────────────────────────────┐    │
-│  │ Queue: [A1↻] [A2] [A3]      │    │  ← Tab to switch
-│  │ Active: agent-2 (bug-42)    │    │
+│  │ Queue: [A1 ] [A2] [A3]     │    │
+│  │ Active: agent-2 (bug-42)   │    │
 │  └─────────────────────────────┘    │
 └─────────────┬───────────────────────┘
               │
     ┌─────────┼─────────┐
     ▼         ▼         ▼
 ┌────────┐ ┌────────┐ ┌────────┐
-│claude  │ │claude  │ │claude  │
-│code    │ │code    │ │code    │
-│--dir   │ │--dir   │ │--dir   │
-│/wt-1   │ │/wt-2   │ │/wt-3   │
-└────┬───┘ └────┬───┘ └────┬───┘
-     │          │          │
-┌────▼───┐ ┌────▼───┐ ┌────▼───┐
-│worktree│ │worktree│ │worktree│
-│/wt-1   │ │/wt-2   │ │/wt-3   │
-│branch: │ │branch: │ │branch: │
+│ claude │ │ claude │ │ claude │
+│  code  │ │  code  │ │  code  │
+│ /wt-1  │ │ /wt-2  │ │ /wt-3  │
 │feat-123│ │bug-456 │ │refactor│
 └────────┘ └────────┘ └────────┘
 ```
 
-## MVP Features
-
-1. **Fleet Management**
-   - `fleet init <repo>` — Initialize a fleet for a repo
-   - `fleet add <name> <branch>` — Add a new agent/workspace
-   - `fleet list` — Show all agents and their status
-
-2. **Queue System**
-   - `fleet queue` — Open TUI with pending inputs
-   - Auto-detect when Claude asks for user input
-   - Switch between agents with hotkeys
-
-3. **Agent Lifecycle**
-   - Spawn Claude Code in worktree
-   - Pause/resume agents
-   - Kill and cleanup
-
-## Directory Structure
-
-```
-~/code/fleet-commander/
-├── cmd/
-│   └── fleet/
-│       └── main.go
-├── internal/
-│   ├── fleet/
-│   │   └── fleet.go      # Fleet management
-│   ├── agent/
-│   │   └── agent.go      # Agent lifecycle
-│   ├── queue/
-│   │   └── queue.go      # Queue management
-│   ├── tui/
-│   │   └── tui.go        # Terminal UI
-│   └── worktree/
-│       └── worktree.go   # Git worktree ops
-├── go.mod
-├── go.sum
-└── README.md
-```
-
-## Usage
+## Quick Start
 
 ```bash
+# Build and install
+go install ./cmd/fleet/
+
 # Initialize fleet for a repo
 fleet init ~/projects/my-app
+cd ~/projects/my-app
 
 # Add agents for different tasks
-fleet add feat-auth "feature/user-authentication"
-fleet add bug-login "bugfix/login-redirect"
-fleet add refactor-db "refactor/database-models"
+fleet add feat-auth feature/user-authentication
+fleet add bug-login bugfix/login-redirect
+fleet add refactor-db refactor/database-models
 
-# Open queue TUI
+# Start agents
+fleet start feat-auth
+fleet start bug-login
+fleet start refactor-db
+
+# Open the queue TUI -- see all agents, jump to the ones that need input
 fleet queue
-
-# Inside TUI:
-#   [1] feat-auth: "Should I use JWT or sessions?"
-#   [2] bug-login: "Which redirect URL?"
-#   [3] refactor-db: (working...)
-#
-# Press 1 → drops into feat-auth's Claude session
-# Answer question, exit → back to queue
-# Press 2 → drops into bug-login's session
-# etc.
 ```
+
+## Commands
+
+### Fleet Management
+
+| Command | Description |
+|---------|-------------|
+| `fleet init <repo>` | Initialize a fleet for a repository |
+| `fleet add <name> <branch>` | Add a new agent with its own worktree and branch |
+| `fleet remove <name>` | Remove an agent, kill its session, clean up worktree |
+| `fleet rename <old> <new>` | Rename an agent and move its worktree |
+| `fleet list` | Show all agents with status, branch, hooks, and PID |
+
+### Session Management
+
+| Command | Description |
+|---------|-------------|
+| `fleet start <name>` | Start an agent's tmux session (spawns Claude Code) |
+| `fleet stop <name>` | Stop an agent's tmux session |
+| `fleet attach <name>` | Attach to an agent's tmux session |
+| `fleet queue` | Open the TUI queue -- see all agents, jump to ones needing input |
+
+### Batch Launch
+
+| Command | Description |
+|---------|-------------|
+| `fleet launch` | Enter tasks in a TUI, Claude generates agent names and branches, review and launch all at once |
+
+### Shared Context
+
+Agents work in isolated worktrees but can coordinate through a shared context store at `.fleet/context.json`. Each agent owns its own section and can read all others.
+
+| Command | Description |
+|---------|-------------|
+| `fleet context read` | Read all shared context (shared section + all agent sections) |
+| `fleet context read <name>` | Read a specific agent's context section |
+| `fleet context read --shared` | Read only the shared section |
+| `fleet context write <msg>` | Write to your agent's section (must be inside an agent session) |
+| `fleet context set-shared <msg>` | Set the shared section (must be outside agent sessions) |
+
+Agents can tag each other in their sections (e.g. `@api-agent merge fleet/auth`) to coordinate asynchronously. Writes are protected by file locking so concurrent agents don't step on each other.
+
+### Utilities
+
+| Command | Description |
+|---------|-------------|
+| `fleet hint` | Show keyboard shortcuts and workflow tips |
+
+## The Queue TUI
+
+`fleet queue` is the main interface. It shows all agents with live status indicators, refreshed every 2 seconds:
+
+- **NEEDS INPUT** -- Claude is waiting for you. Attend to this one.
+- **working** -- Claude is actively working. Leave it alone.
+- **starting** -- Session is spinning up.
+- **stopped** -- Session is not running.
+
+Select an agent to attach to its tmux session. When you're done, detach with `Ctrl+B, Q` and you're back in the queue.
+
+## Tmux Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+B, Q` | Detach and return to queue (agent keeps running) |
+| `Ctrl+B, D` | Detach (standard tmux) |
+| `Ctrl+B, L` | List all fleet sessions |
+
+## State Detection
+
+Fleet Commander injects hooks into each agent's Claude Code session. These hooks signal state changes (`working` / `waiting`) to `.fleet/states/<name>.json`. The monitor reads these state files to determine agent status. If a state file is stale (>10 minutes), it falls back to scraping the tmux pane for Claude Code-specific patterns.
 
 ## YOLO Mode
 
-For those who like to live dangerously — and we mean *dangerously* dangerously — Fleet Commander ships with YOLO mode.
+For those who like to live dangerously -- and we mean *dangerously* dangerously -- Fleet Commander ships with YOLO mode.
 
 ```bash
 fleet launch --ultra-dangerous-yolo-mode
@@ -123,14 +132,14 @@ This skips all review steps, passes `--dangerously-skip-permissions` to Claude, 
 When you hit `Ctrl+D` to submit your prompts, you'll be met with a sobering moment of reflection:
 
 ```
-⚠  ARE YOU ABSOLUTELY SURE THIS IS READY?  ⚠
+  ARE YOU ABSOLUTELY SURE THIS IS READY?
 
 This will run and you cannot stop it.
 Ensure you have enough usage in your account to make it through the end of this.
 Please don't destroy humanity.
 Please be sober.
 
-Ctrl+D: confirm and launch • Esc: go back
+Ctrl+D: confirm and launch / Esc: go back
 ```
 
 Hit `Ctrl+D` again to confirm you are, in fact, built different. Or hit `Esc` to return to the safety of rational decision-making.
@@ -147,30 +156,37 @@ This skips the confirmation entirely. No warning. No safety net. Just you, your 
 
 We are not responsible for what happens next. Godspeed.
 
+## Fleet Directory Structure
+
+Fleet Commander stores all its data in `.fleet/` inside the managed repo (automatically added to `.gitignore`):
+
+```
+.fleet/
+├── config.json      # Fleet config (agents, branches, status)
+├── config.lock      # Exclusive flock for concurrent access
+├── context.json     # Shared context store
+├── context.lock     # Exclusive flock for context writes
+├── states/          # Agent state files (working/waiting)
+│   └── <name>.json
+└── worktrees/       # Git worktrees (one per agent)
+    └── <name>/
+```
+
 ## Prerequisites
 
-Fleet Commander requires the following CLI tools to be installed and available on your `PATH`:
+- **[Go](https://go.dev/doc/install)** (1.21+) -- to build the binary
+- **[git](https://git-scm.com/)** -- worktree creation and branch management
+- **[tmux](https://github.com/tmux/tmux/wiki)** -- each agent runs in its own tmux session
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** -- the AI coding agent (`claude` must be on your `PATH`)
 
-- **[Go](https://go.dev/doc/install)** (1.21+) — required to build the binary
-- **[git](https://git-scm.com/)** — used for worktree creation and branch management
-- **[tmux](https://github.com/tmux/tmux/wiki)** — each agent runs in its own tmux session; Fleet Commander creates, attaches, and captures pane content via tmux commands
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — the AI coding agent spawned inside each worktree (`claude` must be on your `PATH`)
+## Building
 
-## Tech Stack
+```bash
+# Build the binary
+go build -o fleet ./cmd/fleet/
 
-- **Language:** Go (for single binary, fast startup)
-- **TUI:** [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lipgloss](https://github.com/charmbracelet/lipgloss)
-- **Git:** Native git worktrees for isolation
-- **Process Management:** OS process spawning/monitoring
+# Or install to your PATH
+go install ./cmd/fleet/
+```
 
-## Why Not Just Use Gastown?
-
-Gastown is powerful but opinionated:
-- Requires Dolt, Beads, specific workflow patterns
-- Heavyweight for simple parallel task management
-- Learning curve for the "Mayor" pattern
-
-Fleet Commander is:
-- Dead simple: worktrees + queue
-- Minimal dependencies: just git and Claude Code
-- You stay in control: no AI coordinator, you manage the fleet
+The binary should be placed alongside `fleet.tmux.conf` for the tmux config to be auto-sourced (it looks for the conf file relative to the executable path).
