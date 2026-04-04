@@ -114,16 +114,25 @@ func (m LaunchModel) viewReview() string {
 
 	b.WriteString(fmt.Sprintf("  %s  %s\n", labelStyle.Render("Agent: "), valueStyle.Render(item.AgentName)))
 	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Branch:"), valueStyle.Render(item.Branch)))
-	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Prompt:"), valueStyle.Render(item.Prompt)))
+
+	// Prompt section — scrollable viewport
+	b.WriteString(fmt.Sprintf("  %s\n", labelStyle.Render("Prompt:")))
+	b.WriteString(m.promptViewport.View() + "\n")
+
+	scrollInfo := ""
+	if m.promptViewport.TotalLineCount() > m.promptViewport.VisibleLineCount() {
+		scrollInfo = fmt.Sprintf(" (scroll: ↑↓/jk • %.0f%%)", m.promptViewport.ScrollPercent()*100)
+	}
 
 	b.WriteString("\n")
 
 	actionStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	b.WriteString(fmt.Sprintf("  %s Launch  %s Edit  %s Skip  %s Abort\n",
+	b.WriteString(fmt.Sprintf("  %s Launch  %s Edit  %s Skip  %s Abort%s\n",
 		actionStyle.Render("[L]"),
 		actionStyle.Render("[E]"),
 		actionStyle.Render("[S]"),
 		actionStyle.Render("[A]"),
+		helpStyle.Render(scrollInfo),
 	))
 
 	if m.statusMsg != "" {

@@ -3,7 +3,9 @@ package tui
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -85,7 +87,43 @@ func (m LaunchModel) updateGenerating(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// setupPromptViewport initializes or updates the prompt viewport for the current prompt.
+func (m *LaunchModel) setupPromptViewport() {
+	if m.promptViewportIdx == m.currentIdx && m.promptViewport.Width > 0 {
+		return // already set up for this prompt
+	}
+
+	// Reserve space: 2 indent + label lines above + actions below
+	contentWidth := m.width - 6
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
+	// Word-wrap the prompt text to fit
+	wrapped := lipgloss.NewStyle().Width(contentWidth).Render(m.prompts[m.currentIdx].Prompt)
+
+	// Calculate viewport height: use remaining space, capped
+	// Header(2) + agent(1) + branch(1) + "Prompt:" label(1) + blank(1) + actions(1) + status/launched(~4) = ~11 lines overhead
+	vpHeight := m.height - 11
+	if vpHeight < 3 {
+		vpHeight = 3
+	}
+	if vpHeight > 20 {
+		vpHeight = 20
+	}
+
+	vp := viewport.New(contentWidth, vpHeight)
+	vp.Style = lipgloss.NewStyle().PaddingLeft(4)
+	vp.SetContent(wrapped)
+
+	m.promptViewport = vp
+	m.promptViewportIdx = m.currentIdx
+}
+
 func (m LaunchModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Ensure viewport is set up for the current prompt
+	m.setupPromptViewport()
+
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "l", "L":
@@ -108,9 +146,23 @@ func (m LaunchModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.aborted = true
 			m.quitting = true
 			return m, tea.Quit
+
+		// Scroll the prompt viewport
+		case "j", "down":
+			m.promptViewport.LineDown(1)
+			return m, nil
+		case "k", "up":
+			m.promptViewport.LineUp(1)
+			return m, nil
+		case "h", "left":
+			// no-op for horizontal (content is wrapped)
+			return m, nil
 		}
 	}
-	return m, nil
+
+	var cmd tea.Cmd
+	m.promptViewport, cmd = m.promptViewport.Update(msg)
+	return m, cmd
 }
 
 func (m LaunchModel) updateEditName(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -181,6 +233,7 @@ func (m LaunchModel) updateEditPrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.prompts[m.currentIdx].Prompt = strings.TrimSpace(val)
+			m.promptViewportIdx = -1 // force viewport rebuild with new content
 			m.mode = launchModeReview
 			m.statusMsg = ""
 			return m, nil

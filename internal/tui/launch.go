@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/teknal/fleet-commander/internal/fleet"
@@ -54,6 +55,10 @@ type LaunchModel struct {
 	nameInput   textinput.Model
 	branchInput textinput.Model
 	promptEdit  textarea.Model
+
+	// Review phase — scrollable prompt viewport
+	promptViewport    viewport.Model
+	promptViewportIdx int // tracks which prompt index the viewport was built for
 
 	// Results
 	launched []string
@@ -104,20 +109,21 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) LaunchM
 	pe := textarea.New()
 	pe.ShowLineNumbers = false
 	pe.Prompt = ""
-	pe.SetWidth(60)
-	pe.SetHeight(4)
+	pe.SetWidth(80)
+	pe.SetHeight(10)
 
 	return LaunchModel{
-		fleet:           f,
-		tmux:            tm,
-		mode:            launchModeInput,
-		inputArea:       ta,
-		spinner:         sp,
-		nameInput:       ni,
-		branchInput:     bi,
-		promptEdit:      pe,
-		yoloMode:        yoloMode,
-		skipYoloConfirm: skipYoloConfirm,
+		fleet:             f,
+		tmux:              tm,
+		mode:              launchModeInput,
+		inputArea:         ta,
+		spinner:           sp,
+		nameInput:         ni,
+		branchInput:       bi,
+		promptEdit:        pe,
+		promptViewportIdx: -1,
+		yoloMode:          yoloMode,
+		skipYoloConfirm:   skipYoloConfirm,
 	}
 }
 
@@ -131,6 +137,10 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.inputArea.SetWidth(min(msg.Width-4, 80))
+		m.promptEdit.SetWidth(min(msg.Width-4, 80))
+		m.promptEdit.SetHeight(max(msg.Height-10, 5))
+		// Reset viewport so it gets rebuilt with new dimensions
+		m.promptViewportIdx = -1
 		return m, nil
 	}
 
