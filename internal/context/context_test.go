@@ -264,6 +264,114 @@ func TestAppendLogEmptyMessage(t *testing.T) {
 	}
 }
 
+func TestCreateChannelDM(t *testing.T) {
+	dir := t.TempDir()
+
+	name, err := fleetctx.CreateChannel(dir, "ignored", "auth discussion", []string{"alice", "bob"})
+	if err != nil {
+		t.Fatalf("CreateChannel failed: %v", err)
+	}
+	if name != "dm-[alice]-[bob]" {
+		t.Errorf("expected dm-[alice]-[bob], got %q", name)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	ch, ok := ctx.Channels["dm-[alice]-[bob]"]
+	if !ok {
+		t.Fatal("channel not found in context")
+	}
+	if ch.Description != "auth discussion" {
+		t.Errorf("description: got %q", ch.Description)
+	}
+	if len(ch.Members) != 2 || ch.Members[0] != "alice" || ch.Members[1] != "bob" {
+		t.Errorf("members: got %v", ch.Members)
+	}
+}
+
+func TestCreateChannelGroup(t *testing.T) {
+	dir := t.TempDir()
+
+	name, err := fleetctx.CreateChannel(dir, "backend-crew", "backend sync", []string{"alice", "bob", "charlie"})
+	if err != nil {
+		t.Fatalf("CreateChannel failed: %v", err)
+	}
+	if name != "backend-crew" {
+		t.Errorf("expected backend-crew, got %q", name)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	ch, ok := ctx.Channels["backend-crew"]
+	if !ok {
+		t.Fatal("channel not found")
+	}
+	if len(ch.Members) != 3 {
+		t.Errorf("expected 3 members, got %d", len(ch.Members))
+	}
+}
+
+func TestCreateChannelDuplicate(t *testing.T) {
+	dir := t.TempDir()
+
+	_, err := fleetctx.CreateChannel(dir, "backend-crew", "first", []string{"alice", "bob", "charlie"})
+	if err != nil {
+		t.Fatalf("first create failed: %v", err)
+	}
+
+	_, err = fleetctx.CreateChannel(dir, "backend-crew", "second", []string{"alice", "bob", "charlie"})
+	if err == nil {
+		t.Fatal("expected error for duplicate channel, got nil")
+	}
+}
+
+func TestCreateChannelTooFewMembers(t *testing.T) {
+	dir := t.TempDir()
+	_, err := fleetctx.CreateChannel(dir, "solo", "alone", []string{"alice"})
+	if err == nil {
+		t.Fatal("expected error for < 2 members, got nil")
+	}
+}
+
+func TestCreateChannelEmptyMember(t *testing.T) {
+	dir := t.TempDir()
+	_, err := fleetctx.CreateChannel(dir, "bad", "empty member", []string{"alice", ""})
+	if err == nil {
+		t.Fatal("expected error for empty member name, got nil")
+	}
+}
+
+func TestCreateChannelPreservesExistingData(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := fleetctx.WriteShared(dir, "shared stuff"); err != nil {
+		t.Fatalf("WriteShared failed: %v", err)
+	}
+	if err := fleetctx.AppendLog(dir, "agent", "log entry"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+
+	_, err := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"alice", "bob"})
+	if err != nil {
+		t.Fatalf("CreateChannel failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if ctx.Shared != "shared stuff" {
+		t.Errorf("shared clobbered: got %q", ctx.Shared)
+	}
+	if len(ctx.Log) != 1 {
+		t.Errorf("log clobbered: got %d entries", len(ctx.Log))
+	}
+}
+
 func TestMultiAgentWorkflow(t *testing.T) {
 	dir := t.TempDir()
 

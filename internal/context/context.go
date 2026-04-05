@@ -179,6 +179,52 @@ func TrimChannel(fleetDir, channelName string, keep int) error {
 	return fmt.Errorf("not implemented")
 }
 
+// CreateChannel creates a new named channel with fixed membership.
+// For 2-member channels, the name is auto-set to dm-[member1]-[member2] and
+// the provided name is ignored. Returns the resolved channel name.
+func CreateChannel(fleetDir, name, description string, members []string) (string, error) {
+	if len(members) < 2 {
+		return "", fmt.Errorf("channel requires at least 2 members")
+	}
+	for _, m := range members {
+		if m == "" {
+			return "", fmt.Errorf("member name cannot be empty")
+		}
+	}
+
+	// Auto-name DM channels
+	if len(members) == 2 {
+		name = fmt.Sprintf("dm-[%s]-[%s]", members[0], members[1])
+	}
+
+	lf, err := acquireLock(fleetDir)
+	if err != nil {
+		return "", err
+	}
+	defer releaseLock(lf)
+
+	ctx, err := loadUnlocked(fleetDir)
+	if err != nil {
+		return "", err
+	}
+	if ctx.Channels == nil {
+		ctx.Channels = map[string]*Channel{}
+	}
+	if _, exists := ctx.Channels[name]; exists {
+		return "", fmt.Errorf("channel already exists: %s", name)
+	}
+
+	ctx.Channels[name] = &Channel{
+		Name:        name,
+		Description: description,
+		Members:     members,
+	}
+	if err := saveUnlocked(fleetDir, ctx); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
 // WriteShared updates the shared section under lock. It reads the current
 // context from disk, updates the shared field, and writes back.
 func WriteShared(fleetDir, message string) error {
