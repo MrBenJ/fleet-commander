@@ -488,6 +488,57 @@ func TestLoadSystemPrompt_EmptyFileReturnsEmpty(t *testing.T) {
 	}
 }
 
+func TestInit_CreatesSystemPromptFile(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	f, err := Init(dir)
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	promptPath := filepath.Join(f.FleetDir, "FLEET_SYSTEM_PROMPT.md")
+	data, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatalf("FLEET_SYSTEM_PROMPT.md not created: %v", err)
+	}
+
+	if !strings.Contains(string(data), "Fleet Commander") {
+		t.Error("system prompt doesn't contain expected default content")
+	}
+}
+
+func TestInit_DoesNotOverwriteExistingSystemPrompt(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	// First init
+	f, err := Init(dir)
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// Modify the system prompt
+	promptPath := filepath.Join(f.FleetDir, "FLEET_SYSTEM_PROMPT.md")
+	custom := "# Custom prompt\nMy custom instructions"
+	if err := os.WriteFile(promptPath, []byte(custom), 0644); err != nil {
+		t.Fatalf("failed to write custom prompt: %v", err)
+	}
+
+	// Re-init
+	_, err = Init(dir)
+	if err != nil {
+		t.Fatalf("Re-init failed: %v", err)
+	}
+
+	// Custom content should be preserved
+	data, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatalf("failed to read prompt: %v", err)
+	}
+	if string(data) != custom {
+		t.Errorf("system prompt was overwritten: got %q, want %q", string(data), custom)
+	}
+}
+
 func TestConfigPersistence_RoundTrip(t *testing.T) {
 	dir := setupTestRepo(t)
 	f, err := Init(dir)

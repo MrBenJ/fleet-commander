@@ -61,6 +61,14 @@ func Init(repoPath string) (*Fleet, error) {
 		return nil, fmt.Errorf("failed to create worktrees directory: %w", err)
 	}
 	
+	// Write default system prompt (only if it doesn't already exist)
+	promptPath := filepath.Join(fleetDir, "FLEET_SYSTEM_PROMPT.md")
+	if _, err := os.Stat(promptPath); os.IsNotExist(err) {
+		if writeErr := os.WriteFile(promptPath, []byte(defaultSystemPrompt), 0644); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not write default system prompt: %v\n", writeErr)
+		}
+	}
+
 	// Add .fleet to .gitignore if not already there
 	addToGitignore(absPath, ".fleet")
 	addToGitignore(absPath, ".fleet/config.lock")
