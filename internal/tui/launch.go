@@ -84,9 +84,12 @@ type LaunchModel struct {
 	// System prompt
 	systemPrompt       string
 	systemPromptLoaded bool
+
+	// Jump.sh integration
+	useJumpSh bool
 }
 
-func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool) LaunchModel {
+func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool, useJumpSh bool) LaunchModel {
 	tm := tmux.NewManager("fleet")
 
 	// Main input textarea
@@ -131,6 +134,7 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoM
 		yoloMode:        yoloMode,
 		skipYoloConfirm: skipYoloConfirm,
 		noAutoMerge:     noAutoMerge,
+		useJumpSh:       useJumpSh,
 	}
 }
 
@@ -255,6 +259,10 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 			fmt.Fprintf(os.Stderr, "Warning: could not load system prompt: %v\n", err)
 		}
 		m.systemPrompt = sp
+
+		if m.useJumpSh {
+			m.systemPrompt += "\n\nYour workbranch will be able to be accessed via a local dev instance via a tool called 'https://jump.sh/' - Jump SH. Fetch this web URL to see what it does and how it works. Upon initialization, use this locally hosted web server as a way to access a local development environment for yourself"
+		}
 	}
 
 	item := m.prompts[m.currentIdx]
@@ -335,8 +343,8 @@ func (m LaunchModel) advance() (tea.Model, tea.Cmd) {
 }
 
 // RunLaunch starts the launch TUI flow.
-func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool) error {
-	m := newLaunchModel(f, yoloMode, skipYoloConfirm, noAutoMerge)
+func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool, useJumpSh bool) error {
+	m := newLaunchModel(f, yoloMode, skipYoloConfirm, noAutoMerge, useJumpSh)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	_, err := p.Run()

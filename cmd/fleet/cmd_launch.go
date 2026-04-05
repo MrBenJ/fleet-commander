@@ -24,12 +24,13 @@ Each prompt becomes a separate agent with its own git worktree.`,
 		yoloMode, _ := cmd.Flags().GetBool("ultra-dangerous-yolo-mode")
 		skipYoloConfirm, _ := cmd.Flags().GetBool("i-know-what-im-doing")
 		noAutoMerge, _ := cmd.Flags().GetBool("no-auto-merge")
+		useJumpSh, _ := cmd.Flags().GetBool("use-jump-sh")
 		if skipYoloConfirm && !yoloMode {
 			return fmt.Errorf("--i-know-what-im-doing requires --ultra-dangerous-yolo-mode")
 		}
 		if noAutoMerge && !yoloMode {
 			return fmt.Errorf("--no-auto-merge requires --ultra-dangerous-yolo-mode")
 		}
-		return tui.RunLaunch(f, yoloMode, skipYoloConfirm, noAutoMerge)
+		return tui.RunLaunch(f, yoloMode, skipYoloConfirm, noAutoMerge, useJumpSh)
 	},
 }
