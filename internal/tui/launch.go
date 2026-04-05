@@ -80,6 +80,10 @@ type LaunchModel struct {
 	noAutoMerge      bool   // --no-auto-merge flag
 	targetBranch     string // root repo's current branch, resolved at launch time
 	pendingYoloInput string // input saved from first CTRL+D, waiting for confirmation
+
+	// System prompt
+	systemPrompt       string
+	systemPromptLoaded bool
 }
 
 func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool) LaunchModel {
@@ -243,6 +247,16 @@ func buildFullPrompt(systemPrompt string, allItems []LaunchItem, currentItem Lau
 
 // launchCurrent creates the agent and tmux session for the current prompt.
 func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
+	// Load system prompt once (lazily on first launch)
+	if !m.systemPromptLoaded {
+		m.systemPromptLoaded = true
+		sp, err := fleet.LoadSystemPrompt(m.fleet.FleetDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not load system prompt: %v\n", err)
+		}
+		m.systemPrompt = sp
+	}
+
 	item := m.prompts[m.currentIdx]
 
 	// In YOLO mode, append auto-merge instructions to the prompt (unless suppressed)
@@ -283,12 +297,15 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 		m.fleet.UpdateAgentHooks(agent.Name, true)
 	}
 
+	// Assemble full prompt with system prompt and roster
+	fullPrompt := buildFullPrompt(m.systemPrompt, m.prompts, item)
+
 	// Create tmux session with the prompt passed to Claude
 	command := []string{"claude"}
 	if m.yoloMode {
 		command = append(command, "--dangerously-skip-permissions")
 	}
-	command = append(command, item.Prompt)
+	command = append(command, fullPrompt)
 	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, command, stateFilePath); err != nil {
 		m.statusMsg = fmt.Sprintf("Failed to create session: %s", err)
 		return m, nil

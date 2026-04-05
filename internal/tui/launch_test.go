@@ -393,6 +393,25 @@ func TestBuildFullPrompt_EmptySystemPrompt(t *testing.T) {
 	}
 }
 
+func TestLaunchModel_SystemPromptField(t *testing.T) {
+	m := LaunchModel{}
+
+	// Default state
+	if m.systemPromptLoaded {
+		t.Error("systemPromptLoaded should be false by default")
+	}
+	if m.systemPrompt != "" {
+		t.Error("systemPrompt should be empty by default")
+	}
+
+	// After setting
+	m.systemPrompt = "test prompt"
+	m.systemPromptLoaded = true
+	if m.systemPrompt != "test prompt" {
+		t.Errorf("systemPrompt = %q, want %q", m.systemPrompt, "test prompt")
+	}
+}
+
 func TestBuildFullPrompt_SingleAgent(t *testing.T) {
 	systemPrompt := "# Prompt"
 	allItems := []LaunchItem{
