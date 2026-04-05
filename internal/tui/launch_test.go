@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -331,5 +332,80 @@ func TestEditPrompt_EmptyRejected(t *testing.T) {
 	}
 	if updated.statusMsg == "" {
 		t.Error("expected a status message about empty prompt")
+	}
+}
+
+func TestBuildFullPrompt_AllParts(t *testing.T) {
+	systemPrompt := "# Fleet System Prompt\nYou are a fleet agent."
+	allItems := []LaunchItem{
+		{AgentName: "auth-agent", Branch: "fleet/auth-agent", Prompt: "Fix login bug"},
+		{AgentName: "api-agent", Branch: "fleet/api-agent", Prompt: "Add OAuth"},
+	}
+	current := allItems[0]
+
+	result := buildFullPrompt(systemPrompt, allItems, current)
+
+	// System prompt comes first
+	if !strings.Contains(result, "# Fleet System Prompt") {
+		t.Error("missing system prompt")
+	}
+
+	// Identity line
+	if !strings.Contains(result, "You are: auth-agent (branch: fleet/auth-agent)") {
+		t.Error("missing identity line")
+	}
+
+	// Roster table
+	if !strings.Contains(result, "| auth-agent") {
+		t.Error("missing auth-agent in roster")
+	}
+	if !strings.Contains(result, "| api-agent") {
+		t.Error("missing api-agent in roster")
+	}
+
+	// Original task at end
+	if !strings.HasSuffix(strings.TrimSpace(result), "Fix login bug") {
+		t.Error("task prompt should be at the end")
+	}
+}
+
+func TestBuildFullPrompt_EmptySystemPrompt(t *testing.T) {
+	allItems := []LaunchItem{
+		{AgentName: "solo", Branch: "fleet/solo", Prompt: "Do the thing"},
+	}
+	current := allItems[0]
+
+	result := buildFullPrompt("", allItems, current)
+
+	// Should NOT start with blank lines when system prompt is empty
+	if strings.HasPrefix(result, "\n") {
+		t.Error("prompt should not start with blank lines when system prompt is empty")
+	}
+
+	// Roster should still be present
+	if !strings.Contains(result, "## Active Fleet Agents") {
+		t.Error("missing roster section")
+	}
+
+	// Task should still be present
+	if !strings.Contains(result, "Do the thing") {
+		t.Error("missing task prompt")
+	}
+}
+
+func TestBuildFullPrompt_SingleAgent(t *testing.T) {
+	systemPrompt := "# Prompt"
+	allItems := []LaunchItem{
+		{AgentName: "only-one", Branch: "fleet/only-one", Prompt: "Solo task"},
+	}
+	current := allItems[0]
+
+	result := buildFullPrompt(systemPrompt, allItems, current)
+
+	if !strings.Contains(result, "You are: only-one") {
+		t.Error("missing identity for single agent")
+	}
+	if !strings.Contains(result, "| only-one") {
+		t.Error("roster should show the single agent")
 	}
 }

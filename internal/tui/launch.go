@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -212,6 +213,32 @@ func (m LaunchModel) launchAll() (tea.Model, tea.Cmd) {
 
 	m.quitting = true
 	return m, tea.Quit
+}
+
+// buildFullPrompt assembles the full prompt: system prompt + agent roster + task.
+func buildFullPrompt(systemPrompt string, allItems []LaunchItem, currentItem LaunchItem) string {
+	var b strings.Builder
+
+	// 1. System prompt preamble (if present)
+	if strings.TrimSpace(systemPrompt) != "" {
+		b.WriteString(systemPrompt)
+		b.WriteString("\n\n")
+	}
+
+	// 2. Agent roster
+	b.WriteString("## Active Fleet Agents\n\n")
+	b.WriteString(fmt.Sprintf("You are: %s (branch: %s)\n\n", currentItem.AgentName, currentItem.Branch))
+	b.WriteString("| Agent | Branch | Task |\n")
+	b.WriteString("|-------|--------|------|\n")
+	for _, item := range allItems {
+		b.WriteString(fmt.Sprintf("| %s | %s | %s |\n", item.AgentName, item.Branch, item.Prompt))
+	}
+	b.WriteString("\n---\n\n")
+
+	// 3. Original task
+	b.WriteString(currentItem.Prompt)
+
+	return b.String()
 }
 
 // launchCurrent creates the agent and tmux session for the current prompt.
