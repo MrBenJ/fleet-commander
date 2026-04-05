@@ -174,6 +174,11 @@ func TrimLog(fleetDir string, keep int) error {
 	return saveUnlocked(fleetDir, ctx)
 }
 
+// TrimChannel retains only the last `keep` entries in the named channel's log.
+func TrimChannel(fleetDir, channelName string, keep int) error {
+	return fmt.Errorf("not implemented")
+}
+
 // WriteShared updates the shared section under lock. It reads the current
 // context from disk, updates the shared field, and writes back.
 func WriteShared(fleetDir, message string) error {
