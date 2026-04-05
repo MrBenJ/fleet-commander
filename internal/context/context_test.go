@@ -372,6 +372,63 @@ func TestCreateChannelPreservesExistingData(t *testing.T) {
 	}
 }
 
+func TestSendToChannel(t *testing.T) {
+	dir := t.TempDir()
+
+	name, err := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"alice", "bob"})
+	if err != nil {
+		t.Fatalf("CreateChannel failed: %v", err)
+	}
+
+	if err := fleetctx.SendToChannel(dir, name, "alice", "hey bob"); err != nil {
+		t.Fatalf("SendToChannel failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	ch := ctx.Channels[name]
+	if len(ch.Log) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(ch.Log))
+	}
+	if ch.Log[0].Agent != "alice" {
+		t.Errorf("agent: got %q", ch.Log[0].Agent)
+	}
+	if ch.Log[0].Message != "hey bob" {
+		t.Errorf("message: got %q", ch.Log[0].Message)
+	}
+}
+
+func TestSendToChannelNonMember(t *testing.T) {
+	dir := t.TempDir()
+
+	name, _ := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"alice", "bob"})
+
+	err := fleetctx.SendToChannel(dir, name, "charlie", "let me in")
+	if err == nil {
+		t.Fatal("expected error for non-member, got nil")
+	}
+}
+
+func TestSendToChannelNotExists(t *testing.T) {
+	dir := t.TempDir()
+	err := fleetctx.SendToChannel(dir, "no-such-channel", "alice", "hello")
+	if err == nil {
+		t.Fatal("expected error for missing channel, got nil")
+	}
+}
+
+func TestSendToChannelEmptyMessage(t *testing.T) {
+	dir := t.TempDir()
+	name, _ := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"alice", "bob"})
+
+	err := fleetctx.SendToChannel(dir, name, "alice", "")
+	if err == nil {
+		t.Fatal("expected error for empty message, got nil")
+	}
+}
+
 func TestMultiAgentWorkflow(t *testing.T) {
 	dir := t.TempDir()
 

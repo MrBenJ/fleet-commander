@@ -225,6 +225,46 @@ func CreateChannel(fleetDir, name, description string, members []string) (string
 	return name, nil
 }
 
+// SendToChannel appends a message to a channel's log. The sender must be a member.
+func SendToChannel(fleetDir, channelName, agentName, message string) error {
+	if message == "" {
+		return fmt.Errorf("message cannot be empty")
+	}
+
+	lf, err := acquireLock(fleetDir)
+	if err != nil {
+		return err
+	}
+	defer releaseLock(lf)
+
+	ctx, err := loadUnlocked(fleetDir)
+	if err != nil {
+		return err
+	}
+	ch, ok := ctx.Channels[channelName]
+	if !ok {
+		return fmt.Errorf("channel not found: %s", channelName)
+	}
+
+	isMember := false
+	for _, m := range ch.Members {
+		if m == agentName {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		return fmt.Errorf("agent is not a member of this channel: %s", agentName)
+	}
+
+	ch.Log = append(ch.Log, LogEntry{
+		Agent:     agentName,
+		Timestamp: time.Now().UTC(),
+		Message:   message,
+	})
+	return saveUnlocked(fleetDir, ctx)
+}
+
 // WriteShared updates the shared section under lock. It reads the current
 // context from disk, updates the shared field, and writes back.
 func WriteShared(fleetDir, message string) error {
