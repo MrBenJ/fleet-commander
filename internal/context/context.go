@@ -176,7 +176,25 @@ func TrimLog(fleetDir string, keep int) error {
 
 // TrimChannel retains only the last `keep` entries in the named channel's log.
 func TrimChannel(fleetDir, channelName string, keep int) error {
-	return fmt.Errorf("not implemented")
+	lf, err := acquireLock(fleetDir)
+	if err != nil {
+		return err
+	}
+	defer releaseLock(lf)
+
+	ctx, err := loadUnlocked(fleetDir)
+	if err != nil {
+		return err
+	}
+	ch, ok := ctx.Channels[channelName]
+	if !ok {
+		return fmt.Errorf("channel not found: %s", channelName)
+	}
+	if len(ch.Log) <= keep {
+		return nil
+	}
+	ch.Log = ch.Log[len(ch.Log)-keep:]
+	return saveUnlocked(fleetDir, ctx)
 }
 
 // CreateChannel creates a new named channel with fixed membership.

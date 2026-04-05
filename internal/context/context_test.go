@@ -429,6 +429,41 @@ func TestSendToChannelEmptyMessage(t *testing.T) {
 	}
 }
 
+func TestTrimChannel(t *testing.T) {
+	dir := t.TempDir()
+
+	name, _ := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"alice", "bob"})
+	for i := 0; i < 10; i++ {
+		if err := fleetctx.SendToChannel(dir, name, "alice", fmt.Sprintf("msg-%d", i)); err != nil {
+			t.Fatalf("SendToChannel failed: %v", err)
+		}
+	}
+
+	if err := fleetctx.TrimChannel(dir, name, 3); err != nil {
+		t.Fatalf("TrimChannel failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	ch := ctx.Channels[name]
+	if len(ch.Log) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(ch.Log))
+	}
+	if ch.Log[0].Message != "msg-7" {
+		t.Errorf("first kept: got %q", ch.Log[0].Message)
+	}
+}
+
+func TestTrimChannelNotExists(t *testing.T) {
+	dir := t.TempDir()
+	err := fleetctx.TrimChannel(dir, "no-such-channel", 10)
+	if err == nil {
+		t.Fatal("expected error for missing channel, got nil")
+	}
+}
+
 func TestMultiAgentWorkflow(t *testing.T) {
 	dir := t.TempDir()
 
