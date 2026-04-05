@@ -111,6 +111,87 @@ func TestLoadMalformedJSON(t *testing.T) {
 	}
 }
 
+func TestAppendLog(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := fleetctx.AppendLog(dir, "auth-agent", "found auth bug"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Log) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(ctx.Log))
+	}
+	if ctx.Log[0].Agent != "auth-agent" {
+		t.Errorf("agent mismatch: got %q", ctx.Log[0].Agent)
+	}
+	if ctx.Log[0].Message != "found auth bug" {
+		t.Errorf("message mismatch: got %q", ctx.Log[0].Message)
+	}
+	if ctx.Log[0].Timestamp.IsZero() {
+		t.Error("timestamp should not be zero")
+	}
+}
+
+func TestAppendLogPreservesExistingData(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := fleetctx.WriteAgent(dir, "auth-agent", "working on auth"); err != nil {
+		t.Fatalf("WriteAgent failed: %v", err)
+	}
+
+	if err := fleetctx.AppendLog(dir, "api-agent", "endpoints ready"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if ctx.Agents["auth-agent"] != "working on auth" {
+		t.Errorf("agent data clobbered: got %q", ctx.Agents["auth-agent"])
+	}
+	if len(ctx.Log) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(ctx.Log))
+	}
+}
+
+func TestAppendLogMultipleEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := fleetctx.AppendLog(dir, "agent-a", "first"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+	if err := fleetctx.AppendLog(dir, "agent-b", "second"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Log) != 2 {
+		t.Fatalf("expected 2 log entries, got %d", len(ctx.Log))
+	}
+	if ctx.Log[0].Message != "first" {
+		t.Errorf("first entry: got %q", ctx.Log[0].Message)
+	}
+	if ctx.Log[1].Message != "second" {
+		t.Errorf("second entry: got %q", ctx.Log[1].Message)
+	}
+}
+
+func TestAppendLogEmptyMessage(t *testing.T) {
+	dir := t.TempDir()
+	err := fleetctx.AppendLog(dir, "agent-a", "")
+	if err == nil {
+		t.Fatal("expected error for empty message, got nil")
+	}
+}
+
 func TestMultiAgentWorkflow(t *testing.T) {
 	dir := t.TempDir()
 

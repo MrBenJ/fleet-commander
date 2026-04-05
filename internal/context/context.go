@@ -9,12 +9,30 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 )
+
+// LogEntry is a single attributed entry in the shared agent log.
+type LogEntry struct {
+	Agent     string    `json:"agent"`
+	Timestamp time.Time `json:"timestamp"`
+	Message   string    `json:"message"`
+}
 
 // Context is the shared context store for fleet agents.
 type Context struct {
-	Shared string            `json:"shared"`
-	Agents map[string]string `json:"agents"`
+	Shared   string              `json:"shared"`
+	Agents   map[string]string   `json:"agents"`
+	Log      []LogEntry          `json:"log,omitempty"`
+	Channels map[string]*Channel `json:"channels,omitempty"`
+}
+
+// Channel is a private named space where a fixed set of agents can communicate.
+type Channel struct {
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Members     []string   `json:"members"`
+	Log         []LogEntry `json:"log,omitempty"`
 }
 
 const contextFile = "context.json"
@@ -44,6 +62,9 @@ func loadUnlocked(fleetDir string) (*Context, error) {
 	}
 	if ctx.Agents == nil {
 		ctx.Agents = map[string]string{}
+	}
+	if ctx.Channels == nil {
+		ctx.Channels = map[string]*Channel{}
 	}
 	return &ctx, nil
 }
@@ -105,6 +126,30 @@ func WriteAgent(fleetDir, agentName, message string) error {
 		return err
 	}
 	ctx.Agents[agentName] = message
+	return saveUnlocked(fleetDir, ctx)
+}
+
+// AppendLog adds an attributed entry to the shared agent log under lock.
+func AppendLog(fleetDir, agentName, message string) error {
+	if message == "" {
+		return fmt.Errorf("message cannot be empty")
+	}
+
+	lf, err := acquireLock(fleetDir)
+	if err != nil {
+		return err
+	}
+	defer releaseLock(lf)
+
+	ctx, err := loadUnlocked(fleetDir)
+	if err != nil {
+		return err
+	}
+	ctx.Log = append(ctx.Log, LogEntry{
+		Agent:     agentName,
+		Timestamp: time.Now().UTC(),
+		Message:   message,
+	})
 	return saveUnlocked(fleetDir, ctx)
 }
 
