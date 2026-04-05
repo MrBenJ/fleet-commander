@@ -50,9 +50,12 @@ func (m LaunchModel) submitInput(input string) (tea.Model, tea.Cmd) {
 	m.mode = launchModeGenerating
 	m.statusMsg = ""
 
+	m.log.Log("submitInput: input_len=%d existing_agents=%d", len(input), len(existingNames))
+
 	// Launch async Claude CLI call alongside the spinner
+	log := m.log // capture for closure
 	claudeCmd := func() tea.Msg {
-		items, err := GenerateWithClaude(input, existingNames)
+		items, err := GenerateWithClaude(input, existingNames, log)
 		return claudeResultMsg{items: items, err: err}
 	}
 	return m, tea.Batch(m.spinner.Tick, claudeCmd)

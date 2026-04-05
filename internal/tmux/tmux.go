@@ -142,8 +142,18 @@ func (m *Manager) CreateSession(agentName, worktreePath string, command []string
 		args = append(args, "claude")
 	}
 
+	// Log the tmux command for debugging (redact long prompt args)
+	debugArgs := make([]string, len(args))
+	copy(debugArgs, args)
+	for i, a := range debugArgs {
+		if len(a) > 200 {
+			debugArgs[i] = fmt.Sprintf("[%d bytes]", len(a))
+		}
+	}
+	fmt.Fprintf(os.Stderr, "DEBUG tmux: tmux %v\n", debugArgs)
+
 	if err := m.runner.Run("tmux", args...); err != nil {
-		return fmt.Errorf("failed to create tmux session: %w", err)
+		return fmt.Errorf("failed to create tmux session (args=%v): %w", debugArgs, err)
 	}
 
 	// Source the fleet tmux config if available

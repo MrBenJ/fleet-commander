@@ -87,6 +87,9 @@ type LaunchModel struct {
 
 	// Jump.sh integration
 	useJumpSh bool
+
+	// Debug logger
+	log *LaunchLogger
 }
 
 func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool, useJumpSh bool) LaunchModel {
@@ -121,6 +124,9 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoM
 	pe.SetWidth(80)
 	pe.SetHeight(10)
 
+	log := NewLaunchLogger(f.FleetDir)
+	log.Log("Mode: yolo=%v, skipConfirm=%v, noAutoMerge=%v, useJumpSh=%v", yoloMode, skipYoloConfirm, noAutoMerge, useJumpSh)
+
 	return LaunchModel{
 		fleet:             f,
 		tmux:              tm,
@@ -135,6 +141,7 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoM
 		skipYoloConfirm: skipYoloConfirm,
 		noAutoMerge:     noAutoMerge,
 		useJumpSh:       useJumpSh,
+		log:             log,
 	}
 }
 
@@ -148,6 +155,7 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.inputArea.SetWidth(min(msg.Width-4, 80))
+		m.inputArea.SetHeight(max(msg.Height-10, 5))
 		m.promptEdit.SetWidth(min(msg.Width-4, 80))
 		m.promptEdit.SetHeight(max(msg.Height-10, 5))
 		// Reset viewport so it gets rebuilt with new dimensions
@@ -158,16 +166,22 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle Claude CLI result regardless of mode
 	if result, ok := msg.(claudeResultMsg); ok {
 		if result.err != nil {
+			m.log.Log("ERROR: Claude generation failed: %s", result.err)
 			m.mode = launchModeInput
 			m.statusMsg = fmt.Sprintf("Claude generation failed: %s", result.err)
 			m.inputArea.Focus()
 			return m, nil
+		}
+		m.log.Log("Claude generated %d prompt(s)", len(result.items))
+		for i, item := range result.items {
+			m.log.Log("  [%d] agent=%q branch=%q prompt_len=%d", i, item.AgentName, item.Branch, len(item.Prompt))
 		}
 		m.prompts = result.items
 		m.currentIdx = 0
 
 		// In YOLO mode, skip review and launch everything immediately
 		if m.yoloMode {
+			m.log.Log("YOLO mode: launching all %d agents", len(result.items))
 			return m.launchAll()
 		}
 
@@ -202,23 +216,30 @@ func (m LaunchModel) launchAll() (tea.Model, tea.Cmd) {
 	if !m.noAutoMerge {
 		targetBranch, err := m.fleet.CurrentBranch()
 		if err != nil {
+			m.log.Log("ERROR: Failed to detect current branch: %s", err)
 			m.statusMsg = fmt.Sprintf("Failed to detect current branch: %s", err)
 			m.mode = launchModeInput
 			m.inputArea.Focus()
 			return m, nil
 		}
 		m.targetBranch = targetBranch
+		m.log.Log("Target branch for auto-merge: %s", targetBranch)
 	}
 
 	for m.currentIdx < len(m.prompts) {
+		m.log.Log("Launching agent %d/%d: %q", m.currentIdx+1, len(m.prompts), m.prompts[m.currentIdx].AgentName)
 		model, _ := m.launchCurrent()
 		m = model.(LaunchModel)
 		if m.statusMsg != "" {
 			// Hit an error — stop launching, show the error
+			m.log.Log("ERROR: Launch failed at agent %d: %s", m.currentIdx+1, m.statusMsg)
+			m.quitting = true
 			return m, tea.Quit
 		}
+		m.log.Log("Successfully launched agent: %q", m.prompts[m.currentIdx-1].AgentName)
 	}
 
+	m.log.Log("All %d agents launched successfully", len(m.prompts))
 	m.quitting = true
 	return m, tea.Quit
 }
@@ -256,7 +277,10 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 		m.systemPromptLoaded = true
 		sp, err := fleet.LoadSystemPrompt(m.fleet.FleetDir)
 		if err != nil {
+			m.log.Log("WARNING: could not load system prompt: %v", err)
 			fmt.Fprintf(os.Stderr, "Warning: could not load system prompt: %v\n", err)
+		} else {
+			m.log.Log("System prompt loaded (%d bytes)", len(sp))
 		}
 		m.systemPrompt = sp
 
@@ -266,6 +290,7 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	}
 
 	item := m.prompts[m.currentIdx]
+	m.log.Log("launchCurrent: agent=%q branch=%q prompt_len=%d", item.AgentName, item.Branch, len(item.Prompt))
 
 	// In YOLO mode, append auto-merge instructions to the prompt (unless suppressed)
 	if m.yoloMode && !m.noAutoMerge && m.targetBranch != "" {
@@ -282,15 +307,19 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	}
 
 	// Create the agent (worktree + config registration)
+	m.log.Log("Creating agent: name=%q branch=%q worktree=%q", item.AgentName, item.Branch, filepath.Join(m.fleet.FleetDir, "worktrees", item.AgentName))
 	agent, err := m.fleet.AddAgent(item.AgentName, item.Branch)
 	if err != nil {
+		m.log.Log("ERROR: AddAgent failed: %s", err)
 		m.statusMsg = fmt.Sprintf("Failed to create agent: %s", err)
 		return m, nil
 	}
+	m.log.Log("Agent created: worktree=%q", agent.WorktreePath)
 
 	// Set up state tracking
 	statesDir := filepath.Join(m.fleet.FleetDir, "states")
 	if err := os.MkdirAll(statesDir, 0755); err != nil {
+		m.log.Log("ERROR: Failed to create states dir: %s", err)
 		m.statusMsg = fmt.Sprintf("Failed to create states dir: %s", err)
 		return m, nil
 	}
@@ -298,32 +327,69 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 
 	// Inject hooks for state signaling
 	if err := hooks.Inject(agent.WorktreePath); err != nil {
+		m.log.Log("WARNING: Hook injection failed for %q: %v", agent.Name, err)
 		fmt.Fprintf(os.Stderr, "Warning: could not inject hooks for agent '%s' (.claude/settings.json may be malformed): %v\n", agent.Name, err)
 		stateFilePath = ""
 		m.fleet.UpdateAgentHooks(agent.Name, false)
 	} else {
+		m.log.Log("Hooks injected for %q", agent.Name)
 		m.fleet.UpdateAgentHooks(agent.Name, true)
 	}
 
 	// Assemble full prompt with system prompt and roster
 	fullPrompt := buildFullPrompt(m.systemPrompt, m.prompts, item)
+	m.log.Log("Full prompt assembled: %d bytes", len(fullPrompt))
 
-	// Create tmux session with the prompt passed to Claude
-	command := []string{"claude"}
-	if m.yoloMode {
-		command = append(command, "--dangerously-skip-permissions")
+	// Write prompt to file to avoid shell metacharacter issues in tmux.
+	// tmux concatenates command args and runs them through the shell, so
+	// $PORT, ${...}, backticks, quotes etc. in the prompt would be expanded.
+	promptsDir := filepath.Join(m.fleet.FleetDir, "prompts")
+	if err := os.MkdirAll(promptsDir, 0755); err != nil {
+		m.log.Log("ERROR: Failed to create prompts dir: %s", err)
+		m.statusMsg = fmt.Sprintf("Failed to create prompts dir: %s", err)
+		return m, nil
 	}
-	command = append(command, fullPrompt)
+	promptFile := filepath.Join(promptsDir, agent.Name+".txt")
+	if err := os.WriteFile(promptFile, []byte(fullPrompt), 0644); err != nil {
+		m.log.Log("ERROR: Failed to write prompt file: %s", err)
+		m.statusMsg = fmt.Sprintf("Failed to write prompt file: %s", err)
+		return m, nil
+	}
+	m.log.Log("Prompt written to file: %s (%d bytes)", promptFile, len(fullPrompt))
+
+	// Create a launcher script that reads the prompt from file.
+	// Variable expansion in "$prompt" does NOT re-interpret shell metacharacters,
+	// so the prompt content is passed to claude verbatim.
+	launcherFile := filepath.Join(promptsDir, agent.Name+".sh")
+	claudeArgs := ""
+	if m.yoloMode {
+		claudeArgs = " --dangerously-skip-permissions"
+	}
+	launcherScript := fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec claude%s -- \"$prompt\"\n", promptFile, claudeArgs)
+	if err := os.WriteFile(launcherFile, []byte(launcherScript), 0755); err != nil {
+		m.log.Log("ERROR: Failed to write launcher script: %s", err)
+		m.statusMsg = fmt.Sprintf("Failed to write launcher script: %s", err)
+		return m, nil
+	}
+	m.log.Log("Launcher script written: %s", launcherFile)
+
+	command := []string{launcherFile}
+	m.log.Log("Creating tmux session: name=%q launcher=%q prompt_bytes=%d", agent.Name, launcherFile, len(fullPrompt))
 	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, command, stateFilePath); err != nil {
+		m.log.Log("ERROR: CreateSession failed: %s", err)
 		m.statusMsg = fmt.Sprintf("Failed to create session: %s", err)
 		return m, nil
 	}
+	m.log.Log("Tmux session created for %q", agent.Name)
 
 	// Update state
 	m.fleet.UpdateAgentStateFile(agent.Name, stateFilePath)
 	pid, err := m.tmux.GetPID(agent.Name)
 	if err != nil {
+		m.log.Log("WARNING: Could not get PID for %q: %v", agent.Name, err)
 		fmt.Fprintf(os.Stderr, "Warning: launched agent '%s' but could not get PID: %v\n", agent.Name, err)
+	} else {
+		m.log.Log("Agent %q PID: %d", agent.Name, pid)
 	}
 	m.fleet.UpdateAgent(agent.Name, "running", pid)
 	m.launched = append(m.launched, agent.Name)
@@ -347,9 +413,21 @@ func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge 
 	m := newLaunchModel(f, yoloMode, skipYoloConfirm, noAutoMerge, useJumpSh)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
-	_, err := p.Run()
+	finalModel, err := p.Run()
+	if m.log != nil {
+		logPath := m.log.Path()
+		m.log.Close()
+		if logPath != "" {
+			fmt.Fprintf(os.Stderr, "Launch log: %s\n", logPath)
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("failed to run launch TUI: %w", err)
+	}
+
+	// Show error from the model if launch failed
+	if fm, ok := finalModel.(LaunchModel); ok && fm.statusMsg != "" {
+		fmt.Fprintf(os.Stderr, "Launch error: %s\n", fm.statusMsg)
 	}
 
 	return nil

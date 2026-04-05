@@ -412,6 +412,111 @@ func TestLaunchModel_SystemPromptField(t *testing.T) {
 	}
 }
 
+func TestParseStructuredMarkdown_FiveAgents(t *testing.T) {
+	input := `## Prompt 1 — Stripe Checkout
+
+### 🤖 Your Agent Identity
+| Field | Value |
+|---|---|
+| **Agent Name** | Stripe Checkout MoneyBot |
+| **Agent ID** | ` + "`stripe-checkout`" + ` |
+| **Git Branch** | ` + "`feature/stripe-checkout`" + ` |
+
+Do the stripe work.
+
+---
+
+## Prompt 2 — E2E Tests
+
+### 🤖 Your Agent Identity
+| Field | Value |
+|---|---|
+| **Agent Name** | End-to-end Testing QABot |
+| **Agent ID** | ` + "`e2e-testing`" + ` |
+| **Git Branch** | ` + "`feature/e2e-testing`" + ` |
+
+Do the e2e work.
+
+---
+
+## Prompt 3 — Discord
+
+### 🤖 Your Agent Identity
+| Field | Value |
+|---|---|
+| **Agent Name** | Discord CommsBot |
+| **Agent ID** | ` + "`discord-integration`" + ` |
+| **Git Branch** | ` + "`feature/discord-integration`" + ` |
+
+Do the discord work.
+
+---
+
+## Prompt 4 — Email
+
+### 🤖 Your Agent Identity
+| Field | Value |
+|---|---|
+| **Agent Name** | Email NotifyBot |
+| **Agent ID** | ` + "`email-integration`" + ` |
+| **Git Branch** | ` + "`feature/email-integration`" + ` |
+
+Do the email work.
+
+---
+
+## Prompt 5 — Docker
+
+### 🤖 Your Agent Identity
+| Field | Value |
+|---|---|
+| **Agent Name** | Docker DevExBot |
+| **Agent ID** | ` + "`docker-dev-environment`" + ` |
+| **Git Branch** | ` + "`dx-ops/docker-dev-environment`" + ` |
+
+Do the docker work.
+`
+	log := &LaunchLogger{} // no-op logger
+	items := parseStructuredMarkdown(input, log)
+
+	if len(items) != 5 {
+		t.Fatalf("expected 5 items, got %d", len(items))
+	}
+
+	expected := []struct {
+		name   string
+		branch string
+	}{
+		{"stripe-checkout", "feature/stripe-checkout"},
+		{"e2e-testing", "feature/e2e-testing"},
+		{"discord-integration", "feature/discord-integration"},
+		{"email-integration", "feature/email-integration"},
+		{"docker-dev-environment", "dx-ops/docker-dev-environment"},
+	}
+
+	for i, exp := range expected {
+		if items[i].AgentName != exp.name {
+			t.Errorf("item[%d] agent_name=%q, want %q", i, items[i].AgentName, exp.name)
+		}
+		if items[i].Branch != exp.branch {
+			t.Errorf("item[%d] branch=%q, want %q", i, items[i].Branch, exp.branch)
+		}
+		if items[i].Prompt == "" {
+			t.Errorf("item[%d] prompt is empty", i)
+		}
+	}
+}
+
+func TestParseStructuredMarkdown_FallsBackForUnstructured(t *testing.T) {
+	input := "Fix the login bug\nAdd OAuth support\nRefactor database"
+	log := &LaunchLogger{}
+	items := parseStructuredMarkdown(input, log)
+
+	if items != nil {
+		t.Errorf("expected nil for unstructured input, got %d items", len(items))
+	}
+}
+
 func TestBuildFullPrompt_SingleAgent(t *testing.T) {
 	systemPrompt := "# Prompt"
 	allItems := []LaunchItem{

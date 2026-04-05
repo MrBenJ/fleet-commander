@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -16,16 +17,45 @@ type ClaudeGeneratedItem struct {
 
 // GenerateWithClaude sends the user's raw task list to `claude -p` and gets back
 // structured prompts, agent names, and branch names for each item.
-func GenerateWithClaude(userInput string, existingAgents []string) ([]LaunchItem, error) {
+// If the input contains structured markdown with agent identity tables, it parses
+// them directly without calling Claude.
+func GenerateWithClaude(userInput string, existingAgents []string, log *LaunchLogger) ([]LaunchItem, error) {
+	log.Log("GenerateWithClaude: input_len=%d existing_agents=%d", len(userInput), len(existingAgents))
+
+	// Try structured markdown parsing first (deterministic, no LLM needed)
+	if items := parseStructuredMarkdown(userInput, log); len(items) > 0 {
+		log.Log("Parse method: structured markdown (no LLM call)")
+		log.Log("Parsed %d agents from structured markdown", len(items))
+		return items, nil
+	}
+
+	log.Log("Parse method: Claude LLM meta-prompt (structured markdown not detected)")
 	metaPrompt := buildMetaPrompt(userInput, existingAgents)
+	log.Log("Meta-prompt length: %d bytes", len(metaPrompt))
 
 	cmd := exec.Command("claude", "-p", metaPrompt)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Log("ERROR: claude -p failed: %v\noutput_len=%d\nfirst_500_bytes=%s", err, len(output), truncate(string(output), 500))
 		return nil, fmt.Errorf("claude command failed: %w\noutput: %s", err, string(output))
 	}
+	log.Log("Claude response: %d bytes", len(output))
+	log.Log("Claude raw output (first 1000 chars): %s", truncate(string(output), 1000))
 
-	return parseClaudeResponse(string(output))
+	items, err := parseClaudeResponse(string(output))
+	if err != nil {
+		log.Log("ERROR: parseClaudeResponse failed: %v", err)
+		return nil, err
+	}
+	log.Log("Parsed %d items from Claude response", len(items))
+	return items, nil
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func buildMetaPrompt(userInput string, existingAgents []string) string {
@@ -36,7 +66,10 @@ func buildMetaPrompt(userInput string, existingAgents []string) string {
 Given the following list of tasks, generate a JSON array where each element has:
 - "prompt": A detailed, actionable prompt to send to Claude Code for this task. Expand the user's brief description into a clear, specific instruction that Claude Code can act on immediately.
 - "agent_name": A short kebab-case name for the agent (max 30 chars, lowercase, no special chars except hyphens)
-- "branch": A git branch name in the format "fleet/<agent_name>"
+- "branch": A git branch name in the format "fleet/<agent_name>", or explicitly named in the listed prompt itself
+
+You may see in the prompts that agent names and and git branches already provided. If this is the case, follow what the prompts are saying for agent name and git branch.
+This means that the entire fleet is self coordinating
 
 `)
 
@@ -94,4 +127,66 @@ func parseClaudeResponse(raw string) ([]LaunchItem, error) {
 	}
 
 	return items, nil
+}
+
+// Regex patterns for structured markdown parsing
+var (
+	// Matches ## Prompt N headers
+	promptHeaderRe = regexp.MustCompile(`(?m)^##\s+Prompt\s+\d+`)
+	// Extracts Agent ID from markdown table: | **Agent ID** | `value` |
+	agentIDRe = regexp.MustCompile("\\|\\s*\\*{0,2}Agent ID\\*{0,2}\\s*\\|\\s*`([^`]+)`\\s*\\|")
+	// Extracts Git Branch from markdown table: | **Git Branch** | `value` |
+	gitBranchRe = regexp.MustCompile("\\|\\s*\\*{0,2}Git Branch\\*{0,2}\\s*\\|\\s*`([^`]+)`\\s*\\|")
+)
+
+// parseStructuredMarkdown detects and parses markdown with ## Prompt N headers
+// and agent identity tables. Returns nil if the input doesn't match this format.
+func parseStructuredMarkdown(input string, log *LaunchLogger) []LaunchItem {
+	locs := promptHeaderRe.FindAllStringIndex(input, -1)
+	if len(locs) < 2 {
+		log.Log("Structured markdown check: found %d '## Prompt N' headers (need >= 2), skipping", len(locs))
+		return nil
+	}
+	log.Log("Structured markdown check: found %d '## Prompt N' headers", len(locs))
+
+	// Split input into sections at each ## Prompt N header
+	var sections []string
+	for i, loc := range locs {
+		start := loc[0]
+		var end int
+		if i+1 < len(locs) {
+			end = locs[i+1][0]
+		} else {
+			end = len(input)
+		}
+		sections = append(sections, input[start:end])
+	}
+
+	var items []LaunchItem
+	for i, section := range sections {
+		agentID := extractMatch(agentIDRe, section)
+		branch := extractMatch(gitBranchRe, section)
+
+		if agentID == "" || branch == "" {
+			log.Log("Section %d missing agent_id=%q or branch=%q, falling back to Claude", i, agentID, branch)
+			return nil
+		}
+
+		items = append(items, LaunchItem{
+			Prompt:    strings.TrimSpace(section),
+			AgentName: agentID,
+			Branch:    branch,
+		})
+		log.Log("  [%d] agent=%q branch=%q prompt_len=%d", i, agentID, branch, len(section))
+	}
+
+	return items
+}
+
+func extractMatch(re *regexp.Regexp, s string) string {
+	m := re.FindStringSubmatch(s)
+	if len(m) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(m[1])
 }

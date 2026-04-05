@@ -190,11 +190,17 @@ func (m LaunchModel) viewEditPrompt() string {
 func (m LaunchModel) renderSummary(header string) string {
 	var b strings.Builder
 	b.WriteString(header + "\n")
+	if m.statusMsg != "" {
+		b.WriteString(fmt.Sprintf("Error: %s\n", m.statusMsg))
+	}
 	if len(m.launched) > 0 {
 		b.WriteString(fmt.Sprintf("Launched %d agent(s): %s\n", len(m.launched), strings.Join(m.launched, ", ")))
 	}
 	if m.skipped > 0 {
 		b.WriteString(fmt.Sprintf("Skipped %d prompt(s)\n", m.skipped))
+	}
+	if m.log != nil && m.log.Path() != "" {
+		b.WriteString(fmt.Sprintf("Debug log: %s\n", m.log.Path()))
 	}
 	return b.String()
 }
