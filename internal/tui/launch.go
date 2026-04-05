@@ -405,6 +405,9 @@ func (m LaunchModel) advance() (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	m.mode = launchModeReview
+	// Rebuild viewport immediately so View() shows the new prompt content
+	m.promptViewportIdx = -1
+	m.setupPromptViewport()
 	return m, nil
 }
 

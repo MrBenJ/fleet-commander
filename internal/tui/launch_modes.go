@@ -111,9 +111,7 @@ func (m *LaunchModel) setupPromptViewport() {
 	if vpHeight < 3 {
 		vpHeight = 3
 	}
-	if vpHeight > 20 {
-		vpHeight = 20
-	}
+	// No upper cap — use all available terminal height
 
 	vp := viewport.New(contentWidth, vpHeight)
 	vp.Style = lipgloss.NewStyle().PaddingLeft(4)
