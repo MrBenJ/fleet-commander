@@ -74,6 +74,11 @@ func init() {
 	contextTrimCmd.Flags().Int("keep", 500, "Number of entries to keep")
 	contextTrimCmd.Flags().String("channel", "", "Trim a specific channel's log instead of the shared log")
 	contextCmd.AddCommand(contextTrimCmd)
+	channelCreateCmd.Flags().String("description", "", "Channel description")
+	contextCmd.AddCommand(channelCreateCmd)
+	contextCmd.AddCommand(channelSendCmd)
+	contextCmd.AddCommand(channelReadCmd)
+	contextCmd.AddCommand(channelListCmd)
 	rootCmd.AddCommand(contextCmd)
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
