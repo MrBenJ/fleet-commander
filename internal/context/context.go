@@ -153,6 +153,27 @@ func AppendLog(fleetDir, agentName, message string) error {
 	return saveUnlocked(fleetDir, ctx)
 }
 
+// TrimLog retains only the last `keep` entries in the shared log.
+// No-op if the log already has keep or fewer entries.
+// Pass keep=0 to clear the log entirely.
+func TrimLog(fleetDir string, keep int) error {
+	lf, err := acquireLock(fleetDir)
+	if err != nil {
+		return err
+	}
+	defer releaseLock(lf)
+
+	ctx, err := loadUnlocked(fleetDir)
+	if err != nil {
+		return err
+	}
+	if len(ctx.Log) <= keep {
+		return nil
+	}
+	ctx.Log = ctx.Log[len(ctx.Log)-keep:]
+	return saveUnlocked(fleetDir, ctx)
+}
+
 // WriteShared updates the shared section under lock. It reads the current
 // context from disk, updates the shared field, and writes back.
 func WriteShared(fleetDir, message string) error {

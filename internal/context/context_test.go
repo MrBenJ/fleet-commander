@@ -3,6 +3,7 @@
 package context_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -181,6 +182,77 @@ func TestAppendLogMultipleEntries(t *testing.T) {
 	}
 	if ctx.Log[1].Message != "second" {
 		t.Errorf("second entry: got %q", ctx.Log[1].Message)
+	}
+}
+
+func TestTrimLog(t *testing.T) {
+	dir := t.TempDir()
+
+	for i := 0; i < 10; i++ {
+		if err := fleetctx.AppendLog(dir, "agent", fmt.Sprintf("msg-%d", i)); err != nil {
+			t.Fatalf("AppendLog failed: %v", err)
+		}
+	}
+
+	if err := fleetctx.TrimLog(dir, 3); err != nil {
+		t.Fatalf("TrimLog failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Log) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(ctx.Log))
+	}
+	// Should keep the last 3
+	if ctx.Log[0].Message != "msg-7" {
+		t.Errorf("first kept: got %q", ctx.Log[0].Message)
+	}
+	if ctx.Log[2].Message != "msg-9" {
+		t.Errorf("last kept: got %q", ctx.Log[2].Message)
+	}
+}
+
+func TestTrimLogNoOp(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := fleetctx.AppendLog(dir, "agent", "only one"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+
+	if err := fleetctx.TrimLog(dir, 500); err != nil {
+		t.Fatalf("TrimLog failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Log) != 1 {
+		t.Fatalf("expected 1 entry (no-op), got %d", len(ctx.Log))
+	}
+}
+
+func TestTrimLogClearAll(t *testing.T) {
+	dir := t.TempDir()
+
+	for i := 0; i < 5; i++ {
+		if err := fleetctx.AppendLog(dir, "agent", fmt.Sprintf("msg-%d", i)); err != nil {
+			t.Fatalf("AppendLog failed: %v", err)
+		}
+	}
+
+	if err := fleetctx.TrimLog(dir, 0); err != nil {
+		t.Fatalf("TrimLog failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Log) != 0 {
+		t.Fatalf("expected 0 entries, got %d", len(ctx.Log))
 	}
 }
 
