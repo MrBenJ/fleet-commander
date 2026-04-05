@@ -74,13 +74,14 @@ type LaunchModel struct {
 	statusMsg string
 
 	// YOLO mode
-	yoloMode          bool
-	skipYoloConfirm   bool // --i-know-what-im-doing flag
-	targetBranch      string // root repo's current branch, resolved at launch time
-	pendingYoloInput  string // input saved from first CTRL+D, waiting for confirmation
+	yoloMode         bool
+	skipYoloConfirm  bool   // --i-know-what-im-doing flag
+	noAutoMerge      bool   // --no-auto-merge flag
+	targetBranch     string // root repo's current branch, resolved at launch time
+	pendingYoloInput string // input saved from first CTRL+D, waiting for confirmation
 }
 
-func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) LaunchModel {
+func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool) LaunchModel {
 	tm := tmux.NewManager("fleet")
 
 	// Main input textarea
@@ -122,8 +123,9 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) LaunchM
 		branchInput:       bi,
 		promptEdit:        pe,
 		promptViewportIdx: -1,
-		yoloMode:          yoloMode,
-		skipYoloConfirm:   skipYoloConfirm,
+		yoloMode:        yoloMode,
+		skipYoloConfirm: skipYoloConfirm,
+		noAutoMerge:     noAutoMerge,
 	}
 }
 
@@ -187,15 +189,17 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // launchAll launches every prompt without review (YOLO mode).
 func (m LaunchModel) launchAll() (tea.Model, tea.Cmd) {
-	// Resolve target branch once for merge instructions
-	targetBranch, err := m.fleet.CurrentBranch()
-	if err != nil {
-		m.statusMsg = fmt.Sprintf("Failed to detect current branch: %s", err)
-		m.mode = launchModeInput
-		m.inputArea.Focus()
-		return m, nil
+	// Resolve target branch once for merge instructions (skip when auto-merge is disabled)
+	if !m.noAutoMerge {
+		targetBranch, err := m.fleet.CurrentBranch()
+		if err != nil {
+			m.statusMsg = fmt.Sprintf("Failed to detect current branch: %s", err)
+			m.mode = launchModeInput
+			m.inputArea.Focus()
+			return m, nil
+		}
+		m.targetBranch = targetBranch
 	}
-	m.targetBranch = targetBranch
 
 	for m.currentIdx < len(m.prompts) {
 		model, _ := m.launchCurrent()
@@ -214,8 +218,8 @@ func (m LaunchModel) launchAll() (tea.Model, tea.Cmd) {
 func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	item := m.prompts[m.currentIdx]
 
-	// In YOLO mode, append auto-merge instructions to the prompt
-	if m.yoloMode && m.targetBranch != "" {
+	// In YOLO mode, append auto-merge instructions to the prompt (unless suppressed)
+	if m.yoloMode && !m.noAutoMerge && m.targetBranch != "" {
 		item.Prompt = item.Prompt + fmt.Sprintf(`
 
 IMPORTANT — AUTOMATIC MERGE INSTRUCTIONS:
@@ -287,8 +291,8 @@ func (m LaunchModel) advance() (tea.Model, tea.Cmd) {
 }
 
 // RunLaunch starts the launch TUI flow.
-func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool) error {
-	m := newLaunchModel(f, yoloMode, skipYoloConfirm)
+func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool) error {
+	m := newLaunchModel(f, yoloMode, skipYoloConfirm, noAutoMerge)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	_, err := p.Run()

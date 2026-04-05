@@ -75,6 +75,7 @@ func init() {
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
 	launchCmd.Flags().Bool("ultra-dangerous-yolo-mode", false, "Skip all reviews, pass --dangerously-skip-permissions to Claude, and instruct agents to merge on completion")
 	launchCmd.Flags().Bool("i-know-what-im-doing", false, "Skip the yolo mode confirmation prompt")
+	launchCmd.Flags().Bool("no-auto-merge", false, "Disable auto-merge instructions; agents stop when done and leave worktrees intact for review")
 }
 
 func main() {
