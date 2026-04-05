@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,9 @@ import (
 
 	"github.com/teknal/fleet-commander/internal/worktree"
 )
+
+//go:embed system_prompt.md
+var defaultSystemPrompt string
 
 // Fleet represents a managed repository with multiple agent workspaces
 type Fleet struct {
@@ -342,4 +346,18 @@ func addToGitignore(repoPath, entry string) {
 		f.WriteString("\n")
 	}
 	f.WriteString(entry + "\n")
+}
+
+// LoadSystemPrompt reads the fleet system prompt from .fleet/FLEET_SYSTEM_PROMPT.md.
+// Returns empty string if the file is missing or empty.
+func LoadSystemPrompt(fleetDir string) (string, error) {
+	path := filepath.Join(fleetDir, "FLEET_SYSTEM_PROMPT.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to read system prompt: %w", err)
+	}
+	return string(data), nil
 }

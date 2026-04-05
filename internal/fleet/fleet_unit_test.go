@@ -433,6 +433,61 @@ func TestRenameAgent_TargetExists(t *testing.T) {
 	}
 }
 
+func TestLoadSystemPrompt_ReturnsContent(t *testing.T) {
+	dir := t.TempDir()
+	fleetDir := filepath.Join(dir, ".fleet")
+	if err := os.MkdirAll(fleetDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	content := "# Test System Prompt\nHello agents"
+	if err := os.WriteFile(filepath.Join(fleetDir, "FLEET_SYSTEM_PROMPT.md"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := LoadSystemPrompt(fleetDir)
+	if err != nil {
+		t.Fatalf("LoadSystemPrompt failed: %v", err)
+	}
+	if got != content {
+		t.Errorf("got %q, want %q", got, content)
+	}
+}
+
+func TestLoadSystemPrompt_MissingFileReturnsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	fleetDir := filepath.Join(dir, ".fleet")
+	if err := os.MkdirAll(fleetDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := LoadSystemPrompt(fleetDir)
+	if err != nil {
+		t.Fatalf("LoadSystemPrompt failed: %v", err)
+	}
+	if got != "" {
+		t.Errorf("expected empty string, got %q", got)
+	}
+}
+
+func TestLoadSystemPrompt_EmptyFileReturnsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	fleetDir := filepath.Join(dir, ".fleet")
+	if err := os.MkdirAll(fleetDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fleetDir, "FLEET_SYSTEM_PROMPT.md"), []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := LoadSystemPrompt(fleetDir)
+	if err != nil {
+		t.Fatalf("LoadSystemPrompt failed: %v", err)
+	}
+	if got != "" {
+		t.Errorf("expected empty string, got %q", got)
+	}
+}
+
 func TestConfigPersistence_RoundTrip(t *testing.T) {
 	dir := setupTestRepo(t)
 	f, err := Init(dir)
