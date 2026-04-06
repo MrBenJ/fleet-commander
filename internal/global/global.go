@@ -1,3 +1,5 @@
+//go:build !windows
+
 package global
 
 import (
@@ -7,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"syscall"
 	"time"
 )
 
@@ -43,9 +46,31 @@ func ensureGlobalDir() (string, error) {
 	return dir, nil
 }
 
-// LoadIndex reads ~/.fleet/repos.json. Returns an empty Index if the file
-// does not exist.
-func LoadIndex() (*Index, error) {
+const indexLockFile = "repos.lock"
+
+func acquireIndexLock() (*os.File, error) {
+	dir, err := ensureGlobalDir()
+	if err != nil {
+		return nil, err
+	}
+	lf, err := os.OpenFile(filepath.Join(dir, indexLockFile), os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open index lock: %w", err)
+	}
+	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX); err != nil {
+		lf.Close()
+		return nil, fmt.Errorf("failed to acquire index lock: %w", err)
+	}
+	return lf, nil
+}
+
+func releaseIndexLock(lf *os.File) {
+	syscall.Flock(int(lf.Fd()), syscall.LOCK_UN) //nolint:errcheck
+	lf.Close()
+}
+
+// loadIndex reads ~/.fleet/repos.json without locking.
+func loadIndex() (*Index, error) {
 	dir, err := GlobalDir()
 	if err != nil {
 		return nil, err
@@ -65,8 +90,8 @@ func LoadIndex() (*Index, error) {
 	return &idx, nil
 }
 
-// SaveIndex writes the index to ~/.fleet/repos.json.
-func SaveIndex(idx *Index) error {
+// saveIndex writes the index to ~/.fleet/repos.json without locking.
+func saveIndex(idx *Index) error {
 	dir, err := ensureGlobalDir()
 	if err != nil {
 		return err
@@ -94,16 +119,21 @@ func Register(repoPath, shortName string) (string, error) {
 		shortName = filepath.Base(absPath)
 	}
 
-	idx, err := LoadIndex()
+	lf, err := acquireIndexLock()
+	if err != nil {
+		return "", err
+	}
+	defer releaseIndexLock(lf)
+
+	idx, err := loadIndex()
 	if err != nil {
 		return "", err
 	}
 
-	// Check for duplicate short name pointing to a different repo
 	for i, r := range idx.Repos {
 		if r.Path == absPath {
 			idx.Repos[i].ShortName = shortName
-			return shortName, SaveIndex(idx)
+			return shortName, saveIndex(idx)
 		}
 		if r.ShortName == shortName && r.Path != absPath {
 			return "", fmt.Errorf("short name '%s' already used by %s", shortName, r.Path)
@@ -115,14 +145,20 @@ func Register(repoPath, shortName string) (string, error) {
 		ShortName: shortName,
 		AddedAt:   time.Now().UTC(),
 	})
-	return shortName, SaveIndex(idx)
+	return shortName, saveIndex(idx)
 }
 
 // Unregister removes a repo from the global index by path or short name.
 func Unregister(pathOrName string) error {
 	absPath, _ := filepath.Abs(pathOrName)
 
-	idx, err := LoadIndex()
+	lf, err := acquireIndexLock()
+	if err != nil {
+		return err
+	}
+	defer releaseIndexLock(lf)
+
+	idx, err := loadIndex()
 	if err != nil {
 		return err
 	}
@@ -130,7 +166,7 @@ func Unregister(pathOrName string) error {
 	for i, r := range idx.Repos {
 		if r.Path == absPath || r.ShortName == pathOrName {
 			idx.Repos = append(idx.Repos[:i], idx.Repos[i+1:]...)
-			return SaveIndex(idx)
+			return saveIndex(idx)
 		}
 	}
 	return fmt.Errorf("repo not found in global index: %s", pathOrName)
@@ -138,7 +174,7 @@ func Unregister(pathOrName string) error {
 
 // List returns all registered repos sorted by short name.
 func List() ([]RepoEntry, error) {
-	idx, err := LoadIndex()
+	idx, err := loadIndex()
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +188,7 @@ func List() ([]RepoEntry, error) {
 func Lookup(pathOrName string) (*RepoEntry, error) {
 	absPath, _ := filepath.Abs(pathOrName)
 
-	idx, err := LoadIndex()
+	idx, err := loadIndex()
 	if err != nil {
 		return nil, err
 	}
@@ -162,22 +198,4 @@ func Lookup(pathOrName string) (*RepoEntry, error) {
 		}
 	}
 	return nil, fmt.Errorf("repo not found in global index: %s", pathOrName)
-}
-
-// LookupByPath finds a repo entry by its absolute path.
-func LookupByPath(repoPath string) (*RepoEntry, error) {
-	absPath, err := filepath.Abs(repoPath)
-	if err != nil {
-		return nil, err
-	}
-	idx, err := LoadIndex()
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range idx.Repos {
-		if r.Path == absPath {
-			return &r, nil
-		}
-	}
-	return nil, fmt.Errorf("repo not registered in global index: %s", absPath)
 }

@@ -116,11 +116,6 @@ func AppendGlobalLog(repoShortName, agentName, message string) error {
 	return saveGlobalContext(dir, ctx)
 }
 
-// ReadGlobalLog returns the global context for display.
-func ReadGlobalLog() (*GlobalContext, error) {
-	return LoadGlobalContext()
-}
-
 // TrimGlobalLog keeps only the last N entries.
 func TrimGlobalLog(keep int) error {
 	lf, err := acquireGlobalLock()

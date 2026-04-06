@@ -34,53 +34,7 @@ func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 		return
 	}
 
-	agent := i.Agent
-
-	// Status indicator based on monitor state
-	var indicator string
-	switch i.State {
-	case monitor.StateWaiting:
-		indicator = waitingStyle.Render("⏳ NEEDS INPUT")
-	case monitor.StateWorking:
-		indicator = runningStyle.Render("● working")
-	case monitor.StateStarting:
-		indicator = runningStyle.Render("◐ starting")
-	default:
-		indicator = stoppedStyle.Render("○ stopped")
-	}
-
-	// Add hooks warning if monitoring is degraded
-	if !agent.HooksOK && agent.Status != "stopped" {
-		hooksWarnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6666"))
-		indicator += " " + hooksWarnStyle.Render("⚠ hooks")
-	}
-
-	// Agent name
-	name := agent.Name
-	if index == m.Index() {
-		name = selectedItemStyle.Render("> " + name)
-	} else {
-		name = itemStyle.Render("  " + name)
-	}
-
-	// Branch + status line
-	desc := statusStyle.Render(fmt.Sprintf("    %s  %s", agent.Branch, indicator))
-
-	// Last line preview (truncated)
-	preview := ""
-	if i.LastLine != "" && (i.State == monitor.StateWaiting || i.State == monitor.StateWorking) {
-		line := i.LastLine
-		if len(line) > 60 {
-			line = line[:57] + "..."
-		}
-		if i.State == monitor.StateWaiting {
-			preview = waitingStyle.Render(fmt.Sprintf("    💬 %s", line))
-		} else {
-			preview = statusStyle.Render(fmt.Sprintf("    … %s", line))
-		}
-	}
-
-	fmt.Fprint(w, name+"\n"+desc+"\n"+preview)
+	fmt.Fprint(w, renderAgentItem(i.Agent, i.State, i.LastLine, "", index, m.Index()))
 }
 
 // View renders the TUI

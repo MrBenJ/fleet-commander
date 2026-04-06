@@ -72,14 +72,14 @@ func (f *Fleet) withLock(fn func() error) error {
 	defer releaseLock(lf)
 
 	// Re-read from disk inside the lock so we always have the latest state.
+	// Preserve FleetDir which is derived at load time, not stored in config.
 	fresh, err := readConfig(filepath.Join(f.FleetDir, "config.json"))
 	if err != nil {
 		return fmt.Errorf("failed to re-read config: %w", err)
 	}
-	f.Agents = fresh.Agents
-	if fresh.ShortName != "" {
-		f.ShortName = fresh.ShortName
-	}
+	fleetDir := f.FleetDir
+	*f = *fresh
+	f.FleetDir = fleetDir
 
 	if err := fn(); err != nil {
 		return err

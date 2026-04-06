@@ -333,7 +333,7 @@ var contextGlobalReadCmd = &cobra.Command{
 	Use:   "global-read",
 	Short: "Read the cross-repo global log",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, err := global.ReadGlobalLog()
+		ctx, err := global.LoadGlobalContext()
 		if err != nil {
 			return fmt.Errorf("failed to read global context: %w", err)
 		}

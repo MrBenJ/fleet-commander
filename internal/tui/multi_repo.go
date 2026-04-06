@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -43,79 +44,42 @@ func (d MultiRepoDelegate) Height() int                             { return 3 }
 func (d MultiRepoDelegate) Spacing() int                            { return 0 }
 func (d MultiRepoDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 
+var repoTagStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+
 func (d MultiRepoDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
-	// Repo header
 	if h, ok := item.(RepoHeaderItem); ok {
 		headerStyle := lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			Underline(true)
-		countStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
 
 		title := headerStyle.Render(fmt.Sprintf("  ⚓ %s", h.ShortName))
-		desc := countStyle.Render(fmt.Sprintf("    %s  (%d agents)", h.RepoPath, h.Count))
+		desc := statusStyle.Render(fmt.Sprintf("    %s  (%d agents)", h.RepoPath, h.Count))
 		fmt.Fprint(w, title+"\n"+desc+"\n")
 		return
 	}
 
-	// Agent item (reuse existing rendering logic)
 	i, ok := item.(MultiRepoAgentItem)
 	if !ok || i.Agent == nil {
 		return
 	}
 
-	agent := i.Agent
+	repoTag := repoTagStyle.Render("[" + i.RepoShortName + "] ")
+	fmt.Fprint(w, renderAgentItem(i.Agent, i.State, i.LastLine, repoTag, index, m.Index()))
+}
 
-	var indicator string
-	switch i.State {
-	case monitor.StateWaiting:
-		indicator = waitingStyle.Render("⏳ NEEDS INPUT")
-	case monitor.StateWorking:
-		indicator = runningStyle.Render("● working")
-	case monitor.StateStarting:
-		indicator = runningStyle.Render("◐ starting")
-	default:
-		indicator = stoppedStyle.Render("○ stopped")
-	}
-
-	if !agent.HooksOK && agent.Status != "stopped" {
-		hooksWarnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6666"))
-		indicator += " " + hooksWarnStyle.Render("⚠ hooks")
-	}
-
-	repoTag := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render("[" + i.RepoShortName + "] ")
-	name := repoTag + agent.Name
-	if index == m.Index() {
-		name = selectedItemStyle.Render("> " + name)
-	} else {
-		name = itemStyle.Render("  " + name)
-	}
-
-	desc := statusStyle.Render(fmt.Sprintf("    %s  %s", agent.Branch, indicator))
-
-	preview := ""
-	if i.LastLine != "" && (i.State == monitor.StateWaiting || i.State == monitor.StateWorking) {
-		line := i.LastLine
-		if len(line) > 60 {
-			line = line[:57] + "..."
-		}
-		if i.State == monitor.StateWaiting {
-			preview = waitingStyle.Render(fmt.Sprintf("    💬 %s", line))
-		} else {
-			preview = statusStyle.Render(fmt.Sprintf("    … %s", line))
-		}
-	}
-
-	fmt.Fprint(w, name+"\n"+desc+"\n"+preview)
+// repoFleetPair bundles a global registry entry with its loaded fleet state.
+type repoFleetPair struct {
+	entry global.RepoEntry
+	fleet *fleet.Fleet
+	tmux  *tmux.Manager
+	mon   *monitor.Monitor
 }
 
 // multiRepoModel is the TUI model for multi-repo view.
 type multiRepoModel struct {
 	list        list.Model
-	fleets      []*fleet.Fleet
-	repoEntries []global.RepoEntry
-	tmuxMgrs    map[string]*tmux.Manager  // keyed by repo short name
-	monitors    map[string]*monitor.Monitor
+	repos       []repoFleetPair
 	width       int
 	height      int
 	quitting    bool
@@ -125,64 +89,25 @@ type multiRepoModel struct {
 	statusTimer time.Time
 }
 
-type repoFleetPair struct {
-	entry global.RepoEntry
-	fleet *fleet.Fleet
-	tmux  *tmux.Manager
-	mon   *monitor.Monitor
-}
-
 func newMultiRepoModel() (multiRepoModel, error) {
-	repos, err := global.List()
+	entries, err := global.List()
 	if err != nil {
 		return multiRepoModel{}, fmt.Errorf("failed to list repos: %w", err)
 	}
 
-	var pairs []repoFleetPair
-	for _, r := range repos {
+	var repos []repoFleetPair
+	for _, r := range entries {
 		f, err := fleet.Load(r.Path)
 		if err != nil {
 			continue
 		}
 		tm := tmux.NewManager(f.TmuxPrefix())
 		mon := monitor.NewMonitor(tm)
-		pairs = append(pairs, repoFleetPair{entry: r, fleet: f, tmux: tm, mon: mon})
+		repos = append(repos, repoFleetPair{entry: r, fleet: f, tmux: tm, mon: mon})
 	}
 
-	m := multiRepoModel{
-		tmuxMgrs: make(map[string]*tmux.Manager),
-		monitors: make(map[string]*monitor.Monitor),
-	}
-
-	var items []list.Item
-	for _, p := range pairs {
-		m.fleets = append(m.fleets, p.fleet)
-		m.repoEntries = append(m.repoEntries, p.entry)
-		m.tmuxMgrs[p.entry.ShortName] = p.tmux
-		m.monitors[p.entry.ShortName] = p.mon
-
-		// Add repo header
-		items = append(items, RepoHeaderItem{
-			ShortName: p.entry.ShortName,
-			RepoPath:  p.entry.Path,
-			Count:     len(p.fleet.Agents),
-		})
-
-		// Add agent items
-		for _, a := range p.fleet.Agents {
-			snap := p.mon.CheckWithStateFile(a.Name, a.StateFilePath)
-			items = append(items, MultiRepoAgentItem{
-				AgentItem: AgentItem{
-					Agent:    a,
-					State:    snap.State,
-					LastLine: snap.LastLine,
-				},
-				RepoShortName: p.entry.ShortName,
-				Fleet:         p.fleet,
-				Tmux:          p.tmux,
-			})
-		}
-	}
+	m := multiRepoModel{repos: repos}
+	items := m.rebuildItems()
 
 	delegate := MultiRepoDelegate{}
 	l := list.New(items, delegate, 0, 0)
@@ -202,28 +127,24 @@ func (m multiRepoModel) Init() tea.Cmd {
 
 func (m multiRepoModel) rebuildItems() []list.Item {
 	var items []list.Item
-	for idx, f := range m.fleets {
-		entry := m.repoEntries[idx]
-		tm := m.tmuxMgrs[entry.ShortName]
-		mon := m.monitors[entry.ShortName]
-
+	for _, p := range m.repos {
 		items = append(items, RepoHeaderItem{
-			ShortName: entry.ShortName,
-			RepoPath:  entry.Path,
-			Count:     len(f.Agents),
+			ShortName: p.entry.ShortName,
+			RepoPath:  p.entry.Path,
+			Count:     len(p.fleet.Agents),
 		})
 
-		for _, a := range f.Agents {
-			snap := mon.CheckWithStateFile(a.Name, a.StateFilePath)
+		for _, a := range p.fleet.Agents {
+			snap := p.mon.CheckWithStateFile(a.Name, a.StateFilePath)
 			items = append(items, MultiRepoAgentItem{
 				AgentItem: AgentItem{
 					Agent:    a,
 					State:    snap.State,
 					LastLine: snap.LastLine,
 				},
-				RepoShortName: entry.ShortName,
-				Fleet:         f,
-				Tmux:          tm,
+				RepoShortName: p.entry.ShortName,
+				Fleet:         p.fleet,
+				Tmux:          p.tmux,
 			})
 		}
 	}
@@ -238,15 +159,13 @@ func (m multiRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list.SetSize(msg.Width, msg.Height-4)
 
 	case refreshMsg:
-		// Reload fleets in case config changed
-		for i, entry := range m.repoEntries {
-			reloaded, err := fleet.Load(entry.Path)
+		for i, p := range m.repos {
+			reloaded, err := fleet.Load(p.entry.Path)
 			if err == nil {
-				m.fleets[i] = reloaded
+				m.repos[i].fleet = reloaded
 			}
 		}
-		items := m.rebuildItems()
-		m.list.SetItems(items)
+		m.list.SetItems(m.rebuildItems())
 		if !m.statusTimer.IsZero() && time.Since(m.statusTimer) >= 5*time.Second {
 			m.statusMsg = ""
 			m.statusTimer = time.Time{}
@@ -262,7 +181,6 @@ func (m multiRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "enter":
-			// Skip repo headers
 			if _, ok := m.list.SelectedItem().(RepoHeaderItem); ok {
 				return m, nil
 			}
@@ -302,8 +220,7 @@ func (m multiRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err == nil {
 					item.Fleet.UpdateAgent(item.Agent.Name, "running", pid)
 				}
-				items := m.rebuildItems()
-				m.list.SetItems(items)
+				m.list.SetItems(m.rebuildItems())
 			}
 
 		case "k":
@@ -313,13 +230,11 @@ func (m multiRepoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				item.Tmux.KillSession(item.Agent.Name)
 				item.Fleet.UpdateAgent(item.Agent.Name, "stopped", 0)
-				items := m.rebuildItems()
-				m.list.SetItems(items)
+				m.list.SetItems(m.rebuildItems())
 			}
 
 		case "r":
-			items := m.rebuildItems()
-			m.list.SetItems(items)
+			m.list.SetItems(m.rebuildItems())
 		}
 	}
 
@@ -336,7 +251,6 @@ func (m multiRepoModel) View() string {
 		return "Loading..."
 	}
 
-	// Count states across all repos
 	var waiting, working, stopped int
 	for _, item := range m.list.Items() {
 		if ai, ok := item.(MultiRepoAgentItem); ok {
@@ -353,7 +267,7 @@ func (m multiRepoModel) View() string {
 
 	summary := statusStyle.Render(fmt.Sprintf(
 		"%d repos  │  %s  %s  %s",
-		len(m.fleets),
+		len(m.repos),
 		waitingStyle.Render(fmt.Sprintf("⏳ %d waiting", waiting)),
 		runningStyle.Render(fmt.Sprintf("● %d working", working)),
 		stoppedStyle.Render(fmt.Sprintf("○ %d stopped", stopped)),
@@ -363,33 +277,26 @@ func (m multiRepoModel) View() string {
 
 	view := fmt.Sprintf("%s\n%s\n%s", m.list.View(), summary, help)
 	if m.statusMsg != "" {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6666"))
-		view += "\n" + errorStyle.Render(m.statusMsg)
+		view += "\n" + hooksWarnStyle.Render(m.statusMsg)
 	}
 	return view
 }
 
-// startMultiRepoAgent starts a tmux session for an agent in the multi-repo view.
 func startMultiRepoAgent(item MultiRepoAgentItem) error {
 	agent := item.Agent
 	f := item.Fleet
-	tm := item.Tmux
 
-	statesDir := fmt.Sprintf("%s/states", f.FleetDir)
-	if err := makeDir(statesDir); err != nil {
+	statesDir := filepath.Join(f.FleetDir, "states")
+	if err := os.MkdirAll(statesDir, 0755); err != nil {
 		return err
 	}
-	stateFilePath := fmt.Sprintf("%s/%s.json", statesDir, agent.Name)
+	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
 
-	if err := tm.CreateSession(agent.Name, agent.WorktreePath, nil, stateFilePath); err != nil {
+	if err := item.Tmux.CreateSession(agent.Name, agent.WorktreePath, nil, stateFilePath); err != nil {
 		return err
 	}
 	f.UpdateAgentStateFile(agent.Name, stateFilePath)
 	return nil
-}
-
-func makeDir(path string) error {
-	return os.MkdirAll(path, 0755)
 }
 
 // RunMultiRepo starts the multi-repo TUI loop.
@@ -415,14 +322,11 @@ func RunMultiRepo() error {
 			return nil
 		}
 
-		// Attach to the selected agent
 		tm := tmux.NewManager(fm.attachFleet.TmuxPrefix())
 		if tmux.IsInsideTmux() {
 			tm.SwitchClient(fm.attachAgent)
 		} else {
 			tm.Attach(fm.attachAgent)
 		}
-
-		// Loop back after detach
 	}
 }

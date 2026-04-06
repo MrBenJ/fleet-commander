@@ -38,8 +38,8 @@ type Agent struct {
 const configFile = ".fleet/config.json"
 
 // Init initializes a new fleet for the given repository.
-// shortName is optional — if empty, it defaults to the directory basename.
-func Init(repoPath string, shortName ...string) (*Fleet, error) {
+// If shortName is empty, it defaults to the directory basename.
+func Init(repoPath, shortName string) (*Fleet, error) {
 	// Resolve absolute path
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
@@ -76,20 +76,14 @@ func Init(repoPath string, shortName ...string) (*Fleet, error) {
 	addToGitignore(absPath, ".fleet")
 	addToGitignore(absPath, ".fleet/config.lock")
 
-	// Resolve short name
-	sn := ""
-	if len(shortName) > 0 && shortName[0] != "" {
-		sn = shortName[0]
-	}
-
 	// Register in global index (best-effort — don't fail init if global dir is broken)
-	resolvedName, regErr := global.Register(absPath, sn)
+	resolvedName, regErr := global.Register(absPath, shortName)
 	if regErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not register in global index: %v\n", regErr)
-		if sn == "" {
+		if shortName == "" {
 			resolvedName = filepath.Base(absPath)
 		} else {
-			resolvedName = sn
+			resolvedName = shortName
 		}
 	}
 
@@ -346,7 +340,6 @@ func (f *Fleet) CurrentBranch() (string, error) {
 }
 
 // TmuxPrefix returns the tmux session prefix for this fleet.
-// If ShortName is set, returns "fleet-{shortName}", otherwise "fleet".
 func (f *Fleet) TmuxPrefix() string {
 	if f.ShortName != "" {
 		return "fleet-" + f.ShortName
