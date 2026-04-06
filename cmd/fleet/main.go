@@ -9,9 +9,16 @@ import (
 	"github.com/teknal/fleet-commander/internal/tui"
 )
 
+// Set via -ldflags at build time. Falls back to "dev" if unset.
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
 var rootCmd = &cobra.Command{
-	Use:   "fleet",
-	Short: "Fleet Commander - Multi-agent orchestration for AI coding",
+	Use:     "fleet",
+	Short:   "Fleet Commander - Multi-agent orchestration for AI coding",
+	Version: version + " (" + commit + ")",
 	Long: `Fleet Commander lets you run multiple Claude Code instances in parallel,
 each on different branches. When agents need input, they queue up.
 
@@ -52,6 +59,7 @@ var queueCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(listCmd)
