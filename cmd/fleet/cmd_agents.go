@@ -253,19 +253,21 @@ Use --branch to also delete the branch.`,
 			}
 		}
 
-		// Remove git worktree
+		// Remove git worktree — best effort. The directory may exist but not
+		// be a valid worktree (e.g. already pruned with leftover files).
 		fmt.Printf("Removing worktree at %s...\n", agent.WorktreePath)
 		removeWorktree := exec.Command("git", "worktree", "remove", agent.WorktreePath)
 		removeWorktree.Dir = f.RepoPath
-		if out, err := removeWorktree.CombinedOutput(); err != nil {
+		if _, err := removeWorktree.CombinedOutput(); err != nil {
 			// Try force remove
 			forceRemove := exec.Command("git", "worktree", "remove", "--force", agent.WorktreePath)
 			forceRemove.Dir = f.RepoPath
-			if out2, err2 := forceRemove.CombinedOutput(); err2 != nil {
-				return fmt.Errorf("failed to remove worktree: %s\n%s", string(out), string(out2))
+			if _, err2 := forceRemove.CombinedOutput(); err2 != nil {
+				// Git doesn't recognize it as a worktree — just remove the leftover directory
+				if removeErr := os.RemoveAll(agent.WorktreePath); removeErr != nil {
+					fmt.Printf("Warning: could not clean up %s: %v\n", agent.WorktreePath, removeErr)
+				}
 			}
-		} else {
-			_ = out
 		}
 
 		// Optionally delete branch

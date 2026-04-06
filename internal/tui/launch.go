@@ -190,6 +190,12 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// After all agents launch (e.g. yolo mode), Bubble Tea may deliver one
+	// more message before the quit takes effect. Bail out early.
+	if m.quitting {
+		return m, nil
+	}
+
 	switch m.mode {
 	case launchModeInput:
 		return m.updateInput(msg)
@@ -310,9 +316,20 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	m.log.Log("Creating agent: name=%q branch=%q worktree=%q", item.AgentName, item.Branch, filepath.Join(m.fleet.FleetDir, "worktrees", item.AgentName))
 	agent, err := m.fleet.AddAgent(item.AgentName, item.Branch)
 	if err != nil {
-		m.log.Log("ERROR: AddAgent failed: %s", err)
-		m.statusMsg = fmt.Sprintf("Failed to create agent: %s", err)
-		return m, nil
+		// If the agent already exists, reuse it instead of failing
+		if strings.Contains(err.Error(), "already exists") {
+			m.log.Log("Agent %q already exists, reusing", item.AgentName)
+			agent, err = m.fleet.GetAgent(item.AgentName)
+			if err != nil {
+				m.log.Log("ERROR: GetAgent failed: %s", err)
+				m.statusMsg = fmt.Sprintf("Failed to get existing agent: %s", err)
+				return m, nil
+			}
+		} else {
+			m.log.Log("ERROR: AddAgent failed: %s", err)
+			m.statusMsg = fmt.Sprintf("Failed to create agent: %s", err)
+			return m, nil
+		}
 	}
 	m.log.Log("Agent created: worktree=%q", agent.WorktreePath)
 
