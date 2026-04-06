@@ -67,7 +67,7 @@ type Model struct {
 
 // New creates a new TUI model
 func New(f *fleet.Fleet) Model {
-	tm := tmux.NewManager("fleet")
+	tm := tmux.NewManager(f.TmuxPrefix())
 	mon := monitor.NewMonitor(tm)
 
 	items := buildItems(f, tm, mon)
@@ -291,7 +291,7 @@ func Run(f *fleet.Fleet) error {
 		}
 
 		// Attach to the selected agent's tmux session
-		tm := tmux.NewManager("fleet")
+		tm := tmux.NewManager(f.TmuxPrefix())
 
 		if tmux.IsInsideTmux() {
 			tm.SwitchClient(fm.attachAgent)

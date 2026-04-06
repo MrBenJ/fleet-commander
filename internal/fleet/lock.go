@@ -77,6 +77,9 @@ func (f *Fleet) withLock(fn func() error) error {
 		return fmt.Errorf("failed to re-read config: %w", err)
 	}
 	f.Agents = fresh.Agents
+	if fresh.ShortName != "" {
+		f.ShortName = fresh.ShortName
+	}
 
 	if err := fn(); err != nil {
 		return err

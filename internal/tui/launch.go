@@ -93,7 +93,7 @@ type LaunchModel struct {
 }
 
 func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool, useJumpSh bool) LaunchModel {
-	tm := tmux.NewManager("fleet")
+	tm := tmux.NewManager(f.TmuxPrefix())
 
 	// Main input textarea
 	ta := textarea.New()

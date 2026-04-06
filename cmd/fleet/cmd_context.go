@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	fleetctx "github.com/teknal/fleet-commander/internal/context"
 	"github.com/teknal/fleet-commander/internal/fleet"
+	"github.com/teknal/fleet-commander/internal/global"
 )
 
 var contextCmd = &cobra.Command{
@@ -297,6 +298,58 @@ var channelListCmd = &cobra.Command{
 				desc = "(no description)"
 			}
 			fmt.Printf("%-30s  %d members  %d messages  %s\n", ch.Name, len(ch.Members), len(ch.Log), desc)
+		}
+		return nil
+	},
+}
+
+var contextGlobalLogCmd = &cobra.Command{
+	Use:   "global-log [message]",
+	Short: "Append a message to the cross-repo global log",
+	Long:  "Adds an entry to the global fleet log at ~/.fleet/context.json. Includes repo and agent attribution.",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		agentName := os.Getenv("FLEET_AGENT_NAME")
+		if agentName == "" {
+			agentName = "operator"
+		}
+
+		// Determine repo short name
+		repoName := "unknown"
+		f, err := fleet.Load(".")
+		if err == nil && f.ShortName != "" {
+			repoName = f.ShortName
+		}
+
+		if err := global.AppendGlobalLog(repoName, agentName, args[0]); err != nil {
+			return fmt.Errorf("failed to append global log: %w", err)
+		}
+		fmt.Printf("Global log entry added by %s/%s\n", repoName, agentName)
+		return nil
+	},
+}
+
+var contextGlobalReadCmd = &cobra.Command{
+	Use:   "global-read",
+	Short: "Read the cross-repo global log",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, err := global.ReadGlobalLog()
+		if err != nil {
+			return fmt.Errorf("failed to read global context: %w", err)
+		}
+
+		if len(ctx.Log) == 0 {
+			fmt.Println("(no global log entries)")
+			return nil
+		}
+
+		fmt.Println("== Global Log ==")
+		for _, entry := range ctx.Log {
+			fmt.Printf("[%s] [%s/%s] %s\n",
+				entry.Timestamp.Format(time.RFC3339),
+				entry.Repo,
+				entry.Agent,
+				entry.Message)
 		}
 		return nil
 	},

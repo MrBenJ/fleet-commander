@@ -35,12 +35,14 @@ var initCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
-		f, err := fleet.Init(repoPath)
+		shortName, _ := cmd.Flags().GetString("name")
+		f, err := fleet.Init(repoPath, shortName)
 		if err != nil {
 			return fmt.Errorf("failed to initialize fleet: %w", err)
 		}
 		fmt.Printf("Fleet initialized for %s\n", f.RepoPath)
 		fmt.Printf("Fleet directory: %s\n", f.FleetDir)
+		fmt.Printf("Short name: %s\n", f.ShortName)
 		return nil
 	},
 }
@@ -49,6 +51,12 @@ var queueCmd = &cobra.Command{
 	Use:   "queue",
 	Short: "Open the queue TUI",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		allRepos, _ := cmd.Flags().GetBool("all")
+
+		if allRepos {
+			return tui.RunMultiRepo()
+		}
+
 		f, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
@@ -60,6 +68,7 @@ var queueCmd = &cobra.Command{
 
 func init() {
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
+	initCmd.Flags().String("name", "", "Short name for this repo (defaults to directory name)")
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(listCmd)
@@ -87,7 +96,18 @@ func init() {
 	contextCmd.AddCommand(channelSendCmd)
 	contextCmd.AddCommand(channelReadCmd)
 	contextCmd.AddCommand(channelListCmd)
+	contextCmd.AddCommand(contextGlobalLogCmd)
+	contextCmd.AddCommand(contextGlobalReadCmd)
 	rootCmd.AddCommand(contextCmd)
+
+	reposAddCmd.Flags().String("name", "", "Short name for the repo (defaults to directory name)")
+	reposCmd.AddCommand(reposListCmd)
+	reposCmd.AddCommand(reposAddCmd)
+	reposCmd.AddCommand(reposRemoveCmd)
+	rootCmd.AddCommand(reposCmd)
+
+	listCmd.Flags().Bool("all", false, "List agents across all registered repositories")
+	queueCmd.Flags().Bool("all", false, "Show agents from all registered repositories")
 
 	removeCmd.Flags().Bool("branch", false, "Also delete the git branch")
 	launchCmd.Flags().Bool("ultra-dangerous-yolo-mode", false, "Skip all reviews, pass --dangerously-skip-permissions to Claude, and instruct agents to merge on completion")

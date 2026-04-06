@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/teknal/fleet-commander/internal/global"
 	"github.com/teknal/fleet-commander/internal/worktree"
 )
 
@@ -17,9 +18,10 @@ var defaultSystemPrompt string
 
 // Fleet represents a managed repository with multiple agent workspaces
 type Fleet struct {
-	RepoPath string   `json:"repo_path"`
-	FleetDir string   `json:"fleet_dir"`
-	Agents   []*Agent `json:"agents"`
+	RepoPath  string   `json:"repo_path"`
+	FleetDir  string   `json:"fleet_dir"`
+	ShortName string   `json:"short_name,omitempty"`
+	Agents    []*Agent `json:"agents"`
 }
 
 // Agent represents a single agent workspace
@@ -35,8 +37,9 @@ type Agent struct {
 
 const configFile = ".fleet/config.json"
 
-// Init initializes a new fleet for the given repository
-func Init(repoPath string) (*Fleet, error) {
+// Init initializes a new fleet for the given repository.
+// shortName is optional — if empty, it defaults to the directory basename.
+func Init(repoPath string, shortName ...string) (*Fleet, error) {
 	// Resolve absolute path
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
@@ -73,16 +76,34 @@ func Init(repoPath string) (*Fleet, error) {
 	addToGitignore(absPath, ".fleet")
 	addToGitignore(absPath, ".fleet/config.lock")
 
-	f := &Fleet{
-		RepoPath: absPath,
-		FleetDir: fleetDir,
-		Agents:   []*Agent{},
+	// Resolve short name
+	sn := ""
+	if len(shortName) > 0 && shortName[0] != "" {
+		sn = shortName[0]
 	}
-	
+
+	// Register in global index (best-effort — don't fail init if global dir is broken)
+	resolvedName, regErr := global.Register(absPath, sn)
+	if regErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not register in global index: %v\n", regErr)
+		if sn == "" {
+			resolvedName = filepath.Base(absPath)
+		} else {
+			resolvedName = sn
+		}
+	}
+
+	f := &Fleet{
+		RepoPath:  absPath,
+		FleetDir:  fleetDir,
+		ShortName: resolvedName,
+		Agents:    []*Agent{},
+	}
+
 	if err := f.writeConfig(); err != nil {
 		return nil, fmt.Errorf("failed to save fleet config: %w", err)
 	}
-	
+
 	return f, nil
 }
 
@@ -322,6 +343,15 @@ func (f *Fleet) CurrentBranch() (string, error) {
 		return "", fmt.Errorf("failed to get current branch: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// TmuxPrefix returns the tmux session prefix for this fleet.
+// If ShortName is set, returns "fleet-{shortName}", otherwise "fleet".
+func (f *Fleet) TmuxPrefix() string {
+	if f.ShortName != "" {
+		return "fleet-" + f.ShortName
+	}
+	return "fleet"
 }
 
 // addToGitignore adds an entry to .gitignore if it's not already present

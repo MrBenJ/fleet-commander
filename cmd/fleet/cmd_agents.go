@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teknal/fleet-commander/internal/fleet"
+	"github.com/teknal/fleet-commander/internal/global"
 	"github.com/teknal/fleet-commander/internal/hooks"
 	"github.com/teknal/fleet-commander/internal/tmux"
 )
@@ -40,6 +41,13 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all agents in the fleet",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		allRepos, _ := cmd.Flags().GetBool("all")
+		agentList, _ := cmd.Flags().GetBool("agent-list")
+
+		if allRepos {
+			return listAllRepos(agentList)
+		}
+
 		f, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
@@ -50,7 +58,6 @@ var listCmd = &cobra.Command{
 			return nil
 		}
 
-		agentList, _ := cmd.Flags().GetBool("agent-list")
 		if agentList {
 			for _, a := range f.Agents {
 				fmt.Println(a.Name)
@@ -75,6 +82,59 @@ var listCmd = &cobra.Command{
 	},
 }
 
+func listAllRepos(agentListOnly bool) error {
+	repos, err := global.List()
+	if err != nil {
+		return fmt.Errorf("failed to list repos: %w", err)
+	}
+
+	if len(repos) == 0 {
+		fmt.Println("No repositories registered. Use 'fleet init' to initialize a fleet.")
+		return nil
+	}
+
+	totalAgents := 0
+	for _, r := range repos {
+		f, err := fleet.Load(r.Path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not load fleet at %s: %v\n", r.Path, err)
+			continue
+		}
+
+		if agentListOnly {
+			for _, a := range f.Agents {
+				fmt.Printf("%s/%s\n", r.ShortName, a.Name)
+			}
+			continue
+		}
+
+		fmt.Printf("── %s (%s) ──\n", r.ShortName, r.Path)
+		if len(f.Agents) == 0 {
+			fmt.Println("  (no agents)")
+		} else {
+			fmt.Println("  AGENT\t\t\tBRANCH\t\t\tSTATUS\t\tHOOKS\tPID")
+			for _, a := range f.Agents {
+				pid := "-"
+				if a.PID != 0 {
+					pid = fmt.Sprintf("%d", a.PID)
+				}
+				hooksStatus := "✗"
+				if a.HooksOK {
+					hooksStatus = "✓"
+				}
+				fmt.Printf("  %-15s %-23s %-10s %-7s %s\n", a.Name, a.Branch, a.Status, hooksStatus, pid)
+			}
+		}
+		totalAgents += len(f.Agents)
+		fmt.Println()
+	}
+
+	if !agentListOnly {
+		fmt.Printf("Total: %d repos, %d agents\n", len(repos), totalAgents)
+	}
+	return nil
+}
+
 var startCmd = &cobra.Command{
 	Use:   "start [agent-name]",
 	Short: "Start an agent's tmux session",
@@ -92,7 +152,7 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		tm := tmux.NewManager("fleet")
+		tm := tmux.NewManager(f.TmuxPrefix())
 		if !tm.IsAvailable() {
 			return fmt.Errorf("tmux is not installed")
 		}
@@ -142,12 +202,12 @@ var attachCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agentName := args[0]
 
-		_, err := fleet.Load(".")
+		f, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
 
-		tm := tmux.NewManager("fleet")
+		tm := tmux.NewManager(f.TmuxPrefix())
 		if !tm.IsAvailable() {
 			return fmt.Errorf("tmux is not installed")
 		}
@@ -178,7 +238,7 @@ var stopCmd = &cobra.Command{
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
 
-		tm := tmux.NewManager("fleet")
+		tm := tmux.NewManager(f.TmuxPrefix())
 		if !tm.IsAvailable() {
 			return fmt.Errorf("tmux is not installed")
 		}
@@ -235,7 +295,7 @@ Use --branch to also delete the branch.`,
 		}
 
 		// Kill tmux session if running
-		tm := tmux.NewManager("fleet")
+		tm := tmux.NewManager(f.TmuxPrefix())
 		if tm.SessionExists(agentName) {
 			fmt.Printf("Killing tmux session for '%s'...\n", agentName)
 			tm.KillSession(agentName)
@@ -308,7 +368,7 @@ var renameCmd = &cobra.Command{
 		}
 
 		// Require the agent to be stopped (no active tmux session)
-		tm := tmux.NewManager("fleet")
+		tm := tmux.NewManager(f.TmuxPrefix())
 		if tm.SessionExists(oldName) {
 			return fmt.Errorf("agent '%s' has a running tmux session — stop it first with 'fleet stop %s'", oldName, oldName)
 		}
