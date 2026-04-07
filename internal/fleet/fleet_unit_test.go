@@ -32,7 +32,7 @@ func setupTestRepo(t *testing.T) string {
 func TestInit_CreatesFleetDir(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestInit_CreatesFleetDir(t *testing.T) {
 
 func TestInit_NotAGitRepo(t *testing.T) {
 	dir := t.TempDir() // plain directory, no git init
-	_, err := Init(dir)
+	_, err := Init(dir, "")
 	if err == nil {
 		t.Fatal("expected error for non-git directory, got nil")
 	}
@@ -86,7 +86,7 @@ func TestInit_NotAGitRepo(t *testing.T) {
 
 func TestLoad_FindsConfig(t *testing.T) {
 	dir := setupTestRepo(t)
-	_, err := Init(dir)
+	_, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestLoad_FindsConfig(t *testing.T) {
 
 func TestLoad_WalksUp(t *testing.T) {
 	dir := setupTestRepo(t)
-	_, err := Init(dir)
+	_, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestLoad_NoFleet(t *testing.T) {
 
 func TestAddAgent_CreatesWorktreeAndConfig(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestAddAgent_CreatesWorktreeAndConfig(t *testing.T) {
 
 func TestAddAgent_DuplicateNameFails(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestAddAgent_DuplicateNameFails(t *testing.T) {
 
 func TestGetAgent_Found(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestGetAgent_Found(t *testing.T) {
 
 func TestGetAgent_NotFound(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestGetAgent_NotFound(t *testing.T) {
 
 func TestRemoveAgent(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestRemoveAgent(t *testing.T) {
 
 func TestRemoveAgent_NotFound(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestRemoveAgent_NotFound(t *testing.T) {
 
 func TestUpdateAgent_PersistsStatusAndPID(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestUpdateAgent_PersistsStatusAndPID(t *testing.T) {
 
 func TestUpdateAgentHooks(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -342,7 +342,7 @@ func TestUpdateAgentHooks(t *testing.T) {
 
 func TestRenameAgent(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -392,7 +392,7 @@ func TestRenameAgent(t *testing.T) {
 
 func TestRenameAgent_SameName(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -412,7 +412,7 @@ func TestRenameAgent_SameName(t *testing.T) {
 
 func TestRenameAgent_TargetExists(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -491,7 +491,7 @@ func TestLoadSystemPrompt_EmptyFileReturnsEmpty(t *testing.T) {
 func TestInit_CreatesSystemPromptFile(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestInit_DoesNotOverwriteExistingSystemPrompt(t *testing.T) {
 	dir := setupTestRepo(t)
 
 	// First init
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
@@ -524,7 +524,7 @@ func TestInit_DoesNotOverwriteExistingSystemPrompt(t *testing.T) {
 	}
 
 	// Re-init
-	_, err = Init(dir)
+	_, err = Init(dir, "")
 	if err != nil {
 		t.Fatalf("Re-init failed: %v", err)
 	}
@@ -541,7 +541,7 @@ func TestInit_DoesNotOverwriteExistingSystemPrompt(t *testing.T) {
 
 func TestConfigPersistence_RoundTrip(t *testing.T) {
 	dir := setupTestRepo(t)
-	f, err := Init(dir)
+	f, err := Init(dir, "")
 	if err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
