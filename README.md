@@ -1,19 +1,21 @@
 # Fleet Commander
 
-A CLI + TUI tool for managing parallel Claude Code sessions, each in its own git worktree. You stay in control -- there is no AI coordinator.
+A CLI + TUI tool for managing parallel Claude Code sessions across multiple repositories, each agent in its own git worktree. You stay in control -- there is no AI coordinator.
 
 ## How It Works
 
-Fleet Commander gives each Claude Code instance its own git worktree and tmux session. You switch between agents using a TUI queue that shows which agents are working and which need your input. The typical workflow is: launch agents, let them work, attend to the ones that need input, repeat.
+Fleet Commander gives each Claude Code instance its own git worktree and tmux session. You switch between agents using a TUI queue that shows which agents are working and which need your input. With multi-repo support, you can manage fleets across different repositories from a single interface.
 
 ```
-┌─────────────────────────────────────┐
-│      Fleet Commander (TUI)          │
-│  ┌─────────────────────────────────┐│
-│  │ Queue: [A1 ] [A2] [A3]         ││
-│  │ Active: agent-2 (bug-42)       ││
-│  └─────────────────────────────────┘│
-└─────────────┬───────────────────────┘
+┌─────────────────────────────────────────────┐
+│         Fleet Commander (TUI)               │
+│  ┌─────────────────────────────────────────┐│
+│  │ my-app (3 agents)                       ││
+│  │   [A1 feat-auth] [A2 bug-login] [A3]   ││
+│  │ api-service (2 agents)                  ││
+│  │   [A4 endpoints] [A5 caching]           ││
+│  └─────────────────────────────────────────┘│
+└─────────────┬───────────────────────────────┘
               │
     ┌─────────┼─────────┐
     ▼         ▼         ▼
@@ -31,18 +33,22 @@ Fleet Commander gives each Claude Code instance its own git worktree and tmux se
 # Build and install
 go install ./cmd/fleet/
 
-# Initialize fleet for a repo
+# Initialize fleet for a repo (registers it globally)
 fleet init ~/projects/my-app
+fleet init ~/projects/api-service --name api
+
+# Work within a single repo
 cd ~/projects/my-app
 
 # Start the interactive fleet launcher
 # to fire off multiple agents at once
 fleet launch
 
-# After launching your fleet of agents, you can
-# view the interactive queue to see which agents
-# need your input to continue working
+# View the interactive queue for this repo
 fleet queue
+
+# Or view agents across ALL registered repos
+fleet queue --all
 ```
 
 Additionally, there are more commands used under the hood for more granular control, or to have an agentic coordinator control the fleet in lieu of yourself.
@@ -69,11 +75,23 @@ fleet queue
 | Command | Description |
 |---------|-------------|
 | `fleet init <repo>` | Initialize a fleet for a repository (also creates `.fleet/FLEET_SYSTEM_PROMPT.md`) |
+| `fleet init <repo> --name <short>` | Initialize with a custom short name (defaults to directory basename) |
 | `fleet add <name> <branch>` | Add a new agent with its own worktree and branch |
 | `fleet remove <name>` | Remove an agent, kill its session, clean up worktree |
 | `fleet rename <old> <new>` | Rename an agent and move its worktree (agent must be stopped) |
 | `fleet list` | Show all agents with status, branch, hooks, and PID |
 | `fleet list --agent-list` | Print only agent names, one per line (useful for piping to `xargs`) |
+| `fleet list --all` | List agents across all registered repos (format: `repo/agent`) |
+
+### Multi-Repo Management
+
+Fleet Commander maintains a global index at `~/.fleet/repos.json` that tracks all registered repositories. Each repo gets a short name for easy identification.
+
+| Command | Description |
+|---------|-------------|
+| `fleet repos list` | List all registered repositories |
+| `fleet repos add <path>` | Register an existing fleet repo in the global index |
+| `fleet repos remove <name>` | Unregister a repo from the global index |
 
 ### Session Management
 
@@ -83,6 +101,7 @@ fleet queue
 | `fleet stop <name>` | Stop an agent's tmux session (also cleans up hooks and state files) |
 | `fleet attach <name>` | Attach to an agent's tmux session |
 | `fleet queue` | Open the TUI queue -- see all agents, jump to ones needing input |
+| `fleet queue --all` | Open the multi-repo TUI -- agents grouped by repository |
 
 ### Batch Launch
 
@@ -136,6 +155,30 @@ Named channels with fixed membership for private agent-to-agent communication:
 
 Agents can tag each other in their sections (e.g. `@api-agent merge fleet/auth`) to coordinate asynchronously. All writes are protected by file locking so concurrent agents don't step on each other.
 
+#### Cross-Repo Communication
+
+For coordination across repositories, Fleet Commander provides a global log at `~/.fleet/context.json`:
+
+| Command | Description |
+|---------|-------------|
+| `fleet context global-log <msg>` | Append a message to the cross-repo shared log |
+| `fleet context global-read` | Read all cross-repo log entries |
+
+Global log entries are automatically attributed with the repo short name and agent name.
+
+#### Export & Clear
+
+| Command | Description |
+|---------|-------------|
+| `fleet context export` | Export context to stdout (text format) |
+| `fleet context export --format json` | Export context as JSON |
+| `fleet context export -o file.txt` | Export context to a file |
+| `fleet context export --log-only` | Export only the shared log |
+| `fleet context clear [--yes]` | Clear log entries (prompts for confirmation) |
+| `fleet context clear --all` | Clear everything: shared context, agent sections, log, and channels |
+| `fleet context clear --all-channels` | Clear all channel logs |
+| `fleet context clear --channel <name>` | Clear a specific channel's log |
+
 ### Utilities
 
 | Command | Description |
@@ -152,6 +195,10 @@ Agents can tag each other in their sections (e.g. `@api-agent merge fleet/auth`)
 - **stopped** -- Session is not running.
 
 Select an agent to attach to its tmux session. You can also add new agents directly from the queue. When you're done, detach with `Ctrl+B, Q` and you're back in the queue.
+
+### Multi-Repo Queue
+
+`fleet queue --all` shows agents grouped by repository. Each repo appears as a header with its agents listed below. You can start, stop, and attach to agents across all your repos from one place.
 
 ## Tmux Shortcuts
 
@@ -234,11 +281,13 @@ This includes jump.sh instructions in the system prompt so agents can spin up lo
 
 ## Fleet Directory Structure
 
-Fleet Commander stores all its data in `.fleet/` inside the managed repo (automatically added to `.gitignore`):
+### Per-Repository (`.fleet/`)
+
+Fleet Commander stores per-repo data in `.fleet/` inside the managed repo (automatically added to `.gitignore`):
 
 ```
 .fleet/
-├── config.json              # Fleet config (agents, branches, status)
+├── config.json              # Fleet config (agents, branches, short name)
 ├── config.lock              # Exclusive flock for concurrent access
 ├── context.json             # Shared context store (sections, log, channels)
 ├── context.lock             # Exclusive flock for context writes
@@ -248,6 +297,18 @@ Fleet Commander stores all its data in `.fleet/` inside the managed repo (automa
 │   └── <name>.json
 └── worktrees/               # Git worktrees (one per agent)
     └── <name>/
+```
+
+### Global (`~/.fleet/`)
+
+The global directory stores the multi-repo index and cross-repo communication:
+
+```
+~/.fleet/
+├── repos.json               # Global index of all registered repos
+├── repos.lock               # Exclusive flock for index writes
+├── context.json             # Cross-repo shared log
+└── context.lock             # Exclusive flock for global context
 ```
 
 ## Prerequisites
