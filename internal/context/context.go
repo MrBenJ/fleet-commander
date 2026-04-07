@@ -283,6 +283,71 @@ func SendToChannel(fleetDir, channelName, agentName, message string) error {
 	return saveUnlocked(fleetDir, ctx)
 }
 
+// ClearOptions controls what ClearContext removes.
+type ClearOptions struct {
+	All         bool     // clear Shared and Agents in addition to Log
+	Channels    []string // specific channel names to clear
+	AllChannels bool     // clear all channel logs
+}
+
+// ClearResult reports what was cleared.
+type ClearResult struct {
+	LogCleared      int
+	SharedCleared   bool
+	AgentsCleared   int
+	ChannelsCleared []string
+}
+
+// ClearContext clears parts of the context under a single flock.
+// By default only ctx.Log is cleared. Use ClearOptions to clear more.
+func ClearContext(fleetDir string, opts ClearOptions) (ClearResult, error) {
+	lf, err := acquireLock(fleetDir)
+	if err != nil {
+		return ClearResult{}, err
+	}
+	defer releaseLock(lf)
+
+	ctx, err := loadUnlocked(fleetDir)
+	if err != nil {
+		return ClearResult{}, err
+	}
+
+	var result ClearResult
+
+	result.LogCleared = len(ctx.Log)
+	ctx.Log = nil
+
+	if opts.All {
+		result.SharedCleared = ctx.Shared != ""
+		result.AgentsCleared = len(ctx.Agents)
+		ctx.Shared = ""
+		ctx.Agents = map[string]string{}
+	}
+
+	if opts.AllChannels {
+		for name, ch := range ctx.Channels {
+			if len(ch.Log) > 0 {
+				result.ChannelsCleared = append(result.ChannelsCleared, name)
+				ch.Log = nil
+			}
+		}
+	} else {
+		for _, name := range opts.Channels {
+			ch, ok := ctx.Channels[name]
+			if !ok {
+				return ClearResult{}, fmt.Errorf("channel not found: %s", name)
+			}
+			result.ChannelsCleared = append(result.ChannelsCleared, name)
+			ch.Log = nil
+		}
+	}
+
+	if err := saveUnlocked(fleetDir, ctx); err != nil {
+		return ClearResult{}, err
+	}
+	return result, nil
+}
+
 // WriteShared updates the shared section under lock. It reads the current
 // context from disk, updates the shared field, and writes back.
 func WriteShared(fleetDir, message string) error {

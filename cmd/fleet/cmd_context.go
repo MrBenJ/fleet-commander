@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -350,6 +353,197 @@ var contextGlobalReadCmd = &cobra.Command{
 				entry.Repo,
 				entry.Agent,
 				entry.Message)
+		}
+		return nil
+	},
+}
+
+// exportEnvelope wraps context output with metadata.
+type exportEnvelope struct {
+	ExportedAt string            `json:"exported_at"`
+	FleetPath  string            `json:"fleet_path"`
+	Context    *fleetctx.Context `json:"context"`
+}
+
+var contextExportCmd = &cobra.Command{
+	Use:   "export",
+	Short: "Export the full context to JSON or human-readable text",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		f, err := fleet.Load(".")
+		if err != nil {
+			return fmt.Errorf("failed to load fleet: %w", err)
+		}
+
+		ctx, err := fleetctx.Load(f.FleetDir)
+		if err != nil {
+			return fmt.Errorf("failed to load context: %w", err)
+		}
+
+		logOnly, _ := cmd.Flags().GetBool("log-only")
+		format, _ := cmd.Flags().GetString("format")
+		outputFile, _ := cmd.Flags().GetString("output")
+
+		var out *os.File
+		if outputFile != "" {
+			out, err = os.Create(outputFile)
+			if err != nil {
+				return fmt.Errorf("failed to create output file: %w", err)
+			}
+			defer out.Close()
+		} else {
+			out = os.Stdout
+		}
+
+		if logOnly {
+			if format == "text" {
+				fmt.Fprintf(out, "# Agent Log (exported %s)\n", time.Now().UTC().Format(time.RFC3339))
+				fmt.Fprintf(out, "# Fleet: %s\n\n", f.RepoPath)
+				for _, entry := range ctx.Log {
+					fmt.Fprintf(out, "[%s] [%s] %s\n", entry.Timestamp.Format(time.RFC3339), entry.Agent, entry.Message)
+				}
+			} else {
+				env := struct {
+					ExportedAt string           `json:"exported_at"`
+					FleetPath  string           `json:"fleet_path"`
+					Log        []fleetctx.LogEntry `json:"log"`
+				}{
+					ExportedAt: time.Now().UTC().Format(time.RFC3339),
+					FleetPath:  f.RepoPath,
+					Log:        ctx.Log,
+				}
+				enc := json.NewEncoder(out)
+				enc.SetIndent("", "  ")
+				if err := enc.Encode(env); err != nil {
+					return fmt.Errorf("failed to encode: %w", err)
+				}
+			}
+			return nil
+		}
+
+		if format == "text" {
+			fmt.Fprintf(out, "# Fleet Context Export\n")
+			fmt.Fprintf(out, "# Exported: %s\n", time.Now().UTC().Format(time.RFC3339))
+			fmt.Fprintf(out, "# Fleet: %s\n\n", f.RepoPath)
+			if ctx.Shared != "" {
+				fmt.Fprintf(out, "== Shared Context ==\n%s\n\n", ctx.Shared)
+			}
+			names := make([]string, 0, len(ctx.Agents))
+			for name := range ctx.Agents {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				fmt.Fprintf(out, "== %s ==\n%s\n\n", name, ctx.Agents[name])
+			}
+			if len(ctx.Log) > 0 {
+				fmt.Fprintf(out, "== Agent Log ==\n")
+				for _, entry := range ctx.Log {
+					fmt.Fprintf(out, "[%s] [%s] %s\n", entry.Timestamp.Format(time.RFC3339), entry.Agent, entry.Message)
+				}
+				fmt.Fprintln(out)
+			}
+			chNames := make([]string, 0, len(ctx.Channels))
+			for name := range ctx.Channels {
+				chNames = append(chNames, name)
+			}
+			sort.Strings(chNames)
+			for _, name := range chNames {
+				ch := ctx.Channels[name]
+				fmt.Fprintf(out, "== Channel: %s ==\n", name)
+				if ch.Description != "" {
+					fmt.Fprintf(out, "Description: %s\n", ch.Description)
+				}
+				fmt.Fprintf(out, "Members: %s\n", strings.Join(ch.Members, ", "))
+				for _, entry := range ch.Log {
+					fmt.Fprintf(out, "[%s] [%s] %s\n", entry.Timestamp.Format(time.RFC3339), entry.Agent, entry.Message)
+				}
+				fmt.Fprintln(out)
+			}
+			return nil
+		}
+
+		// JSON (default)
+		env := exportEnvelope{
+			ExportedAt: time.Now().UTC().Format(time.RFC3339),
+			FleetPath:  f.RepoPath,
+			Context:    ctx,
+		}
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(env)
+	},
+}
+
+var contextClearCmd = &cobra.Command{
+	Use:   "clear",
+	Short: "Clear log entries (and optionally more) from the context store",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		f, err := fleet.Load(".")
+		if err != nil {
+			return fmt.Errorf("failed to load fleet: %w", err)
+		}
+
+		clearAll, _ := cmd.Flags().GetBool("all")
+		channels, _ := cmd.Flags().GetStringArray("channel")
+		allChannels, _ := cmd.Flags().GetBool("all-channels")
+		yes, _ := cmd.Flags().GetBool("yes")
+
+		if !yes {
+			// Build a summary of what will be deleted
+			ctx, err := fleetctx.Load(f.FleetDir)
+			if err != nil {
+				return fmt.Errorf("failed to load context: %w", err)
+			}
+
+			fmt.Println("The following will be cleared:")
+			fmt.Printf("  - Log: %d entries\n", len(ctx.Log))
+			if clearAll {
+				fmt.Printf("  - Shared context: %q\n", ctx.Shared)
+				fmt.Printf("  - Agent sections: %d agents\n", len(ctx.Agents))
+			}
+			if allChannels {
+				for name, ch := range ctx.Channels {
+					fmt.Printf("  - Channel %q log: %d entries\n", name, len(ch.Log))
+				}
+			} else {
+				for _, name := range channels {
+					ch, ok := ctx.Channels[name]
+					if !ok {
+						return fmt.Errorf("channel not found: %s", name)
+					}
+					fmt.Printf("  - Channel %q log: %d entries\n", name, len(ch.Log))
+				}
+			}
+
+			fmt.Print("Proceed? [y/N] ")
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			answer := strings.TrimSpace(scanner.Text())
+			if !strings.EqualFold(answer, "y") && !strings.EqualFold(answer, "yes") {
+				fmt.Println("Aborted.")
+				return nil
+			}
+		}
+
+		opts := fleetctx.ClearOptions{
+			All:         clearAll,
+			Channels:    channels,
+			AllChannels: allChannels,
+		}
+		result, err := fleetctx.ClearContext(f.FleetDir, opts)
+		if err != nil {
+			return fmt.Errorf("failed to clear context: %w", err)
+		}
+
+		fmt.Printf("Cleared %d log entries\n", result.LogCleared)
+		if result.SharedCleared {
+			fmt.Println("Cleared shared context")
+		}
+		if result.AgentsCleared > 0 {
+			fmt.Printf("Cleared %d agent sections\n", result.AgentsCleared)
+		}
+		for _, name := range result.ChannelsCleared {
+			fmt.Printf("Cleared channel %q log\n", name)
 		}
 		return nil
 	},

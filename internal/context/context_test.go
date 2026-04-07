@@ -464,6 +464,198 @@ func TestTrimChannelNotExists(t *testing.T) {
 	}
 }
 
+func TestClearContextDefaultClearsLog(t *testing.T) {
+	dir := t.TempDir()
+
+	for i := 0; i < 5; i++ {
+		if err := fleetctx.AppendLog(dir, "agent", fmt.Sprintf("msg-%d", i)); err != nil {
+			t.Fatalf("AppendLog failed: %v", err)
+		}
+	}
+	if err := fleetctx.WriteShared(dir, "stay"); err != nil {
+		t.Fatalf("WriteShared failed: %v", err)
+	}
+	if err := fleetctx.WriteAgent(dir, "a", "keep me"); err != nil {
+		t.Fatalf("WriteAgent failed: %v", err)
+	}
+
+	result, err := fleetctx.ClearContext(dir, fleetctx.ClearOptions{})
+	if err != nil {
+		t.Fatalf("ClearContext failed: %v", err)
+	}
+	if result.LogCleared != 5 {
+		t.Errorf("expected LogCleared=5, got %d", result.LogCleared)
+	}
+	if result.SharedCleared {
+		t.Error("SharedCleared should be false")
+	}
+	if result.AgentsCleared != 0 {
+		t.Errorf("expected AgentsCleared=0, got %d", result.AgentsCleared)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Log) != 0 {
+		t.Errorf("expected empty log, got %d entries", len(ctx.Log))
+	}
+	if ctx.Shared != "stay" {
+		t.Errorf("shared was clobbered: got %q", ctx.Shared)
+	}
+	if ctx.Agents["a"] != "keep me" {
+		t.Errorf("agent was clobbered: got %q", ctx.Agents["a"])
+	}
+}
+
+func TestClearContextAll(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := fleetctx.WriteShared(dir, "clear me"); err != nil {
+		t.Fatalf("WriteShared failed: %v", err)
+	}
+	if err := fleetctx.WriteAgent(dir, "a", "also clear"); err != nil {
+		t.Fatalf("WriteAgent failed: %v", err)
+	}
+	if err := fleetctx.WriteAgent(dir, "b", "also clear"); err != nil {
+		t.Fatalf("WriteAgent failed: %v", err)
+	}
+	if err := fleetctx.AppendLog(dir, "a", "log entry"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+
+	result, err := fleetctx.ClearContext(dir, fleetctx.ClearOptions{All: true})
+	if err != nil {
+		t.Fatalf("ClearContext failed: %v", err)
+	}
+	if !result.SharedCleared {
+		t.Error("expected SharedCleared=true")
+	}
+	if result.AgentsCleared != 2 {
+		t.Errorf("expected AgentsCleared=2, got %d", result.AgentsCleared)
+	}
+	if result.LogCleared != 1 {
+		t.Errorf("expected LogCleared=1, got %d", result.LogCleared)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if ctx.Shared != "" {
+		t.Errorf("shared not cleared: got %q", ctx.Shared)
+	}
+	if len(ctx.Agents) != 0 {
+		t.Errorf("agents not cleared: got %v", ctx.Agents)
+	}
+	if len(ctx.Log) != 0 {
+		t.Errorf("log not cleared: got %d entries", len(ctx.Log))
+	}
+}
+
+func TestClearContextChannel(t *testing.T) {
+	dir := t.TempDir()
+
+	chName, err := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"alice", "bob"})
+	if err != nil {
+		t.Fatalf("CreateChannel failed: %v", err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := fleetctx.SendToChannel(dir, chName, "alice", fmt.Sprintf("msg-%d", i)); err != nil {
+			t.Fatalf("SendToChannel failed: %v", err)
+		}
+	}
+	if err := fleetctx.AppendLog(dir, "agent", "shared log"); err != nil {
+		t.Fatalf("AppendLog failed: %v", err)
+	}
+
+	result, err := fleetctx.ClearContext(dir, fleetctx.ClearOptions{Channels: []string{chName}})
+	if err != nil {
+		t.Fatalf("ClearContext failed: %v", err)
+	}
+	if len(result.ChannelsCleared) != 1 || result.ChannelsCleared[0] != chName {
+		t.Errorf("expected channel cleared, got %v", result.ChannelsCleared)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Channels[chName].Log) != 0 {
+		t.Errorf("channel log not cleared: got %d entries", len(ctx.Channels[chName].Log))
+	}
+	// Default behavior also clears ctx.Log
+	if len(ctx.Log) != 0 {
+		t.Errorf("shared log should also be cleared: got %d entries", len(ctx.Log))
+	}
+}
+
+func TestClearContextAllChannels(t *testing.T) {
+	dir := t.TempDir()
+
+	ch1, _ := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"a", "b"})
+	ch2, _ := fleetctx.CreateChannel(dir, "group", "group chat", []string{"a", "b", "c"})
+	if err := fleetctx.SendToChannel(dir, ch1, "a", "hello"); err != nil {
+		t.Fatalf("SendToChannel failed: %v", err)
+	}
+	if err := fleetctx.SendToChannel(dir, ch2, "a", "hi"); err != nil {
+		t.Fatalf("SendToChannel failed: %v", err)
+	}
+
+	result, err := fleetctx.ClearContext(dir, fleetctx.ClearOptions{AllChannels: true})
+	if err != nil {
+		t.Fatalf("ClearContext failed: %v", err)
+	}
+	if len(result.ChannelsCleared) != 2 {
+		t.Errorf("expected 2 channels cleared, got %d", len(result.ChannelsCleared))
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(ctx.Channels[ch1].Log) != 0 {
+		t.Errorf("ch1 log not cleared")
+	}
+	if len(ctx.Channels[ch2].Log) != 0 {
+		t.Errorf("ch2 log not cleared")
+	}
+}
+
+func TestClearContextChannelNotFound(t *testing.T) {
+	dir := t.TempDir()
+	_, err := fleetctx.ClearContext(dir, fleetctx.ClearOptions{Channels: []string{"no-such-channel"}})
+	if err == nil {
+		t.Fatal("expected error for missing channel, got nil")
+	}
+}
+
+func TestClearContextPreservesChannelStructure(t *testing.T) {
+	dir := t.TempDir()
+
+	chName, _ := fleetctx.CreateChannel(dir, "ignored", "dm", []string{"alice", "bob"})
+	if err := fleetctx.SendToChannel(dir, chName, "alice", "msg"); err != nil {
+		t.Fatalf("SendToChannel failed: %v", err)
+	}
+
+	_, err := fleetctx.ClearContext(dir, fleetctx.ClearOptions{Channels: []string{chName}})
+	if err != nil {
+		t.Fatalf("ClearContext failed: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(dir)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	ch, ok := ctx.Channels[chName]
+	if !ok {
+		t.Fatal("channel was deleted, expected only log cleared")
+	}
+	if len(ch.Members) != 2 {
+		t.Errorf("members cleared unexpectedly: got %v", ch.Members)
+	}
+}
+
 func TestMultiAgentWorkflow(t *testing.T) {
 	dir := t.TempDir()
 
