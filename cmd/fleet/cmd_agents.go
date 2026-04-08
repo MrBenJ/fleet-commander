@@ -10,6 +10,7 @@ import (
 	"github.com/MrBenJ/fleet-commander/internal/global"
 	"github.com/MrBenJ/fleet-commander/internal/hooks"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
+	"github.com/MrBenJ/fleet-commander/internal/worktree"
 	"github.com/spf13/cobra"
 )
 
@@ -315,21 +316,11 @@ Use --branch to also delete the branch.`,
 			}
 		}
 
-		// Remove git worktree — best effort. The directory may exist but not
-		// be a valid worktree (e.g. already pruned with leftover files).
+		// Remove git worktree
 		fmt.Printf("Removing worktree at %s...\n", agent.WorktreePath)
-		removeWorktree := exec.Command("git", "worktree", "remove", agent.WorktreePath)
-		removeWorktree.Dir = f.RepoPath
-		if _, err := removeWorktree.CombinedOutput(); err != nil {
-			// Try force remove
-			forceRemove := exec.Command("git", "worktree", "remove", "--force", agent.WorktreePath)
-			forceRemove.Dir = f.RepoPath
-			if _, err2 := forceRemove.CombinedOutput(); err2 != nil {
-				// Git doesn't recognize it as a worktree — just remove the leftover directory
-				if removeErr := os.RemoveAll(agent.WorktreePath); removeErr != nil {
-					fmt.Fprintf(os.Stderr, "warning: could not clean up %s: %v\n", agent.WorktreePath, removeErr)
-				}
-			}
+		wt := worktree.NewManager(f.RepoPath)
+		if err := wt.Remove(agent.WorktreePath); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not clean up worktree: %v\n", err)
 		}
 
 		// Optionally delete branch

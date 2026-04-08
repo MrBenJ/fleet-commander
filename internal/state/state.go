@@ -62,7 +62,11 @@ func Write(path, agentName, stateStr string) error {
 	}
 
 	// Atomic rename
-	return os.Rename(tmpFile.Name(), path)
+	if err := os.Rename(tmpFile.Name(), path); err != nil {
+		os.Remove(tmpFile.Name())
+		return err
+	}
+	return nil
 }
 
 // Read reads and parses the state file at path.

@@ -111,22 +111,24 @@ func Load(dir string) (*Fleet, error) {
 			return nil, fmt.Errorf("failed to get working directory: %w", err)
 		}
 	}
-	
+
+	startDir := dir
+
 	// Walk up to find .fleet directory
 	for {
 		configPath := filepath.Join(dir, configFile)
 		if _, err := os.Stat(configPath); err == nil {
 			return loadFromPath(configPath)
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break
 		}
 		dir = parent
 	}
-	
-	return nil, fmt.Errorf("no fleet found (looked for %s)", configFile)
+
+	return nil, fmt.Errorf("no fleet found (searched from %s up to /)", startDir)
 }
 
 func loadFromPath(path string) (*Fleet, error) {
@@ -281,7 +283,9 @@ func (f *Fleet) RenameAgent(oldName, newName string) error {
 		}
 		// Rollback: move state file back
 		if newStateFilePath != "" && agent.StateFilePath != "" {
-			os.Rename(newStateFilePath, agent.StateFilePath)
+			if renameErr := os.Rename(newStateFilePath, agent.StateFilePath); renameErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not roll back state file rename: %v\n", renameErr)
+			}
 		}
 		return err
 	}

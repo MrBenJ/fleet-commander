@@ -48,6 +48,8 @@ func ensureGlobalDir() (string, error) {
 
 const indexLockFile = "repos.lock"
 
+const lockTimeout = 5 * time.Second
+
 func acquireIndexLock() (*os.File, error) {
 	dir, err := ensureGlobalDir()
 	if err != nil {
@@ -57,11 +59,19 @@ func acquireIndexLock() (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open index lock: %w", err)
 	}
-	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX); err != nil {
-		lf.Close()
-		return nil, fmt.Errorf("failed to acquire index lock: %w", err)
+
+	deadline := time.Now().Add(lockTimeout)
+	for {
+		err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return lf, nil
+		}
+		if time.Now().After(deadline) {
+			lf.Close()
+			return nil, fmt.Errorf("timed out waiting for global index lock")
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	return lf, nil
 }
 
 func releaseIndexLock(lf *os.File) {

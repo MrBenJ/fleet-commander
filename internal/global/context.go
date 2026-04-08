@@ -63,11 +63,19 @@ func acquireGlobalLock() (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open global context lock: %w", err)
 	}
-	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX); err != nil {
-		lf.Close()
-		return nil, fmt.Errorf("failed to acquire global context lock: %w", err)
+
+	deadline := time.Now().Add(lockTimeout)
+	for {
+		err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return lf, nil
+		}
+		if time.Now().After(deadline) {
+			lf.Close()
+			return nil, fmt.Errorf("timed out waiting for global context lock")
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	return lf, nil
 }
 
 func releaseGlobalLock(lf *os.File) {

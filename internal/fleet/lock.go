@@ -8,21 +8,43 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
+const lockTimeout = 5 * time.Second
+
 // acquireLock opens .fleet/config.lock and acquires an exclusive flock.
+// It retries with LOCK_NB for up to lockTimeout before giving up, so a
+// crashed process holding a stale lock won't hang fleet indefinitely.
 // The caller must call releaseLock when the critical section is done.
-// Requires fleetDir to already exist.
 func acquireLock(fleetDir string) (*os.File, error) {
 	lf, err := os.OpenFile(filepath.Join(fleetDir, "config.lock"), os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
-	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX); err != nil {
-		lf.Close()
-		return nil, fmt.Errorf("failed to acquire config lock: %w", err)
+
+	deadline := time.Now().Add(lockTimeout)
+	for {
+		err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return lf, nil
+		}
+		if time.Now().After(deadline) {
+			lf.Close()
+			return nil, fmt.Errorf("timed out waiting for config lock (another fleet command may be stuck — run 'fleet unlock' to force-release)")
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	return lf, nil
+}
+
+// ForceUnlock removes the config lock file. Use only as an escape hatch
+// when a crashed process left a stale lock.
+func ForceUnlock(fleetDir string) error {
+	lockPath := filepath.Join(fleetDir, "config.lock")
+	if err := os.Remove(lockPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove lock file: %w", err)
+	}
+	return nil
 }
 
 // releaseLock releases the flock and closes the file.

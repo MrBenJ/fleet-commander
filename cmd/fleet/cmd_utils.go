@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/state"
+	"github.com/spf13/cobra"
 )
 
 var hintCmd = &cobra.Command{
@@ -36,6 +37,23 @@ Fleet Commander - Quick Reference
   4. fleet queue       → pick another agent
   5. Repeat!
 `)
+	},
+}
+
+var unlockCmd = &cobra.Command{
+	Use:   "unlock",
+	Short: "Force-release a stuck config lock",
+	Long:  "Removes the .fleet/config.lock file. Use when a crashed fleet command left a stale lock and other commands time out.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		f, err := fleet.Load(".")
+		if err != nil {
+			return err
+		}
+		if err := fleet.ForceUnlock(f.FleetDir); err != nil {
+			return err
+		}
+		fmt.Println("Lock released.")
+		return nil
 	},
 }
 

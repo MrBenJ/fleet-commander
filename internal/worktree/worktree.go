@@ -75,15 +75,26 @@ func (m *Manager) CreateFromExisting(worktreePath, branch string) error {
 	return nil
 }
 
-// Remove removes a worktree
+// Remove removes a worktree. It escalates through three strategies:
+// normal remove → force remove → os.RemoveAll (for leftover directories
+// that git no longer recognizes as worktrees).
 func (m *Manager) Remove(worktreePath string) error {
 	cmd := exec.Command("git", "worktree", "remove", worktreePath)
 	cmd.Dir = m.RepoPath
-	
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to remove worktree: %w", err)
+	if err := cmd.Run(); err == nil {
+		return nil
 	}
-	
+
+	forceCmd := exec.Command("git", "worktree", "remove", "--force", worktreePath)
+	forceCmd.Dir = m.RepoPath
+	if err := forceCmd.Run(); err == nil {
+		return nil
+	}
+
+	// Git doesn't recognize it as a worktree — just remove the leftover directory
+	if err := os.RemoveAll(worktreePath); err != nil {
+		return fmt.Errorf("failed to remove worktree directory: %w", err)
+	}
 	return nil
 }
 

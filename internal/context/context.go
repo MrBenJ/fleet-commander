@@ -95,16 +95,26 @@ func saveUnlocked(fleetDir string, ctx *Context) error {
 	return nil
 }
 
+const lockTimeout = 5 * time.Second
+
 func acquireLock(fleetDir string) (*os.File, error) {
 	lf, err := os.OpenFile(filepath.Join(fleetDir, lockFile), os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open context lock: %w", err)
 	}
-	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX); err != nil {
-		lf.Close()
-		return nil, fmt.Errorf("failed to acquire context lock: %w", err)
+
+	deadline := time.Now().Add(lockTimeout)
+	for {
+		err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return lf, nil
+		}
+		if time.Now().After(deadline) {
+			lf.Close()
+			return nil, fmt.Errorf("timed out waiting for context lock (another fleet command may be stuck — run 'fleet unlock' to force-release)")
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	return lf, nil
 }
 
 func releaseLock(lf *os.File) {

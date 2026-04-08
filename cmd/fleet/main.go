@@ -82,6 +82,7 @@ func init() {
 	rootCmd.AddCommand(renameCmd)
 	rootCmd.AddCommand(hintCmd)
 	rootCmd.AddCommand(signalCmd)
+	rootCmd.AddCommand(unlockCmd)
 
 	contextReadCmd.Flags().Bool("shared", false, "Read only the shared context section")
 	contextCmd.AddCommand(contextReadCmd)
