@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/monitor"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/monitor"
 )
 
 func TestRenderAgentItem_WaitingState(t *testing.T) {

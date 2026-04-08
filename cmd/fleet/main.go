@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/tui"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/tui"
 )
 
 // Set via -ldflags at build time. Falls back to "dev" if unset.

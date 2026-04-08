@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teknal/fleet-commander/internal/state"
-	"github.com/teknal/fleet-commander/internal/tmux"
+	"github.com/MrBenJ/fleet-commander/internal/state"
+	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
 // AgentState represents what the agent is currently doing
@@ -73,6 +73,10 @@ func (m *Monitor) Check(agentName string) *Snapshot {
 
 const stateFileTTL = 10 * time.Minute
 
+// Number of non-empty lines from the bottom of the pane to inspect for state detection.
+// Higher values risk matching stale prompts; lower values risk missing the current prompt.
+const paneBottomLines = 15
+
 // CheckWithStateFile checks agent state, preferring the state file over
 // tmux pane scraping. Falls back to tmux scraping if the file is absent or stale.
 // If m.tmux is nil, returns StateStopped rather than panicking (used in tests).
@@ -127,7 +131,7 @@ func detectState(lastLine, fullContent string) AgentState {
 	// Only look at the BOTTOM of the pane (last 15 non-empty lines)
 	// Old prompts may still be visible higher up — ignore them
 	allLines := strings.Split(stripped, "\n")
-	bottom := getLastNonEmptyLines(allLines, 15)
+	bottom := getLastNonEmptyLines(allLines, paneBottomLines)
 	bottomText := strings.Join(bottom, "\n")
 
 	// WAITING PATTERNS — check these FIRST because Claude Code's status bar

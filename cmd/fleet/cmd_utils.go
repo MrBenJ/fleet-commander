@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/teknal/fleet-commander/internal/state"
+	"github.com/MrBenJ/fleet-commander/internal/state"
 )
 
 var hintCmd = &cobra.Command{

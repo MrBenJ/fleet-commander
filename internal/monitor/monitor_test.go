@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teknal/fleet-commander/internal/monitor"
-	"github.com/teknal/fleet-commander/internal/state"
+	"github.com/MrBenJ/fleet-commander/internal/monitor"
+	"github.com/MrBenJ/fleet-commander/internal/state"
 )
 
 func TestCheckPrefersStateFile(t *testing.T) {

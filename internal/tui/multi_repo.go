@@ -10,10 +10,10 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/global"
-	"github.com/teknal/fleet-commander/internal/monitor"
-	"github.com/teknal/fleet-commander/internal/tmux"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/global"
+	"github.com/MrBenJ/fleet-commander/internal/monitor"
+	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
 // RepoHeaderItem is a visual separator/header for a repo group in the multi-repo TUI.

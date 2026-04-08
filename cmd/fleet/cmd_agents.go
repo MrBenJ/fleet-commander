@@ -6,11 +6,11 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/global"
+	"github.com/MrBenJ/fleet-commander/internal/hooks"
+	"github.com/MrBenJ/fleet-commander/internal/tmux"
 	"github.com/spf13/cobra"
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/global"
-	"github.com/teknal/fleet-commander/internal/hooks"
-	"github.com/teknal/fleet-commander/internal/tmux"
 )
 
 var addCmd = &cobra.Command{
@@ -167,7 +167,7 @@ var startCmd = &cobra.Command{
 
 			if err := hooks.Inject(agent.WorktreePath); err != nil {
 				// Non-fatal: common cause is malformed existing .claude/settings.json — check that file first.
-				fmt.Printf("Warning: could not inject hooks into %s (.claude/settings.json may be malformed): %v\n", agent.WorktreePath, err)
+				fmt.Fprintf(os.Stderr, "warning: could not inject hooks into %s (.claude/settings.json may be malformed): %v\n", agent.WorktreePath, err)
 				stateFilePath = ""
 				f.UpdateAgentHooks(agentName, false)
 			} else {
@@ -185,7 +185,7 @@ var startCmd = &cobra.Command{
 		// Update agent status
 		pid, err := tm.GetPID(agentName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: could not get PID for agent '%s': %v\n", agentName, err)
+			fmt.Fprintf(os.Stderr, "warning: could not get PID for agent '%s': %v\n", agentName, err)
 		}
 		f.UpdateAgent(agentName, "running", pid)
 
@@ -255,14 +255,14 @@ var stopCmd = &cobra.Command{
 		agent, err := f.GetAgent(agentName)
 		if err == nil && agent.StateFilePath != "" {
 			if err := os.Remove(agent.StateFilePath); err != nil {
-				fmt.Printf("Warning: could not remove state file: %v\n", err)
+				fmt.Fprintf(os.Stderr, "warning: could not remove state file: %v\n", err)
 			}
 			f.UpdateAgentStateFile(agentName, "")
 		}
 
 		// Remove fleet hooks so they don't fire after the session ends
 		if err := hooks.Remove(agent.WorktreePath); err != nil {
-			fmt.Printf("Warning: could not remove hooks: %v\n", err)
+			fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
 		}
 		f.UpdateAgentHooks(agentName, false)
 
@@ -298,18 +298,20 @@ Use --branch to also delete the branch.`,
 		tm := tmux.NewManager(f.TmuxPrefix())
 		if tm.SessionExists(agentName) {
 			fmt.Printf("Killing tmux session for '%s'...\n", agentName)
-			tm.KillSession(agentName)
+			if err := tm.KillSession(agentName); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not kill tmux session for '%s': %v\n", agentName, err)
+			}
 		}
 
 		// Remove fleet hooks from the worktree
 		if err := hooks.Remove(agent.WorktreePath); err != nil {
-			fmt.Printf("Warning: could not remove hooks: %v\n", err)
+			fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
 		}
 
 		// Remove state file if present
 		if agent.StateFilePath != "" {
 			if err := os.Remove(agent.StateFilePath); err != nil {
-				fmt.Printf("Warning: could not remove state file: %v\n", err)
+				fmt.Fprintf(os.Stderr, "warning: could not remove state file: %v\n", err)
 			}
 		}
 
@@ -325,7 +327,7 @@ Use --branch to also delete the branch.`,
 			if _, err2 := forceRemove.CombinedOutput(); err2 != nil {
 				// Git doesn't recognize it as a worktree — just remove the leftover directory
 				if removeErr := os.RemoveAll(agent.WorktreePath); removeErr != nil {
-					fmt.Printf("Warning: could not clean up %s: %v\n", agent.WorktreePath, removeErr)
+					fmt.Fprintf(os.Stderr, "warning: could not clean up %s: %v\n", agent.WorktreePath, removeErr)
 				}
 			}
 		}
@@ -336,7 +338,7 @@ Use --branch to also delete the branch.`,
 			deleteBr := exec.Command("git", "branch", "-D", agent.Branch)
 			deleteBr.Dir = f.RepoPath
 			if out, err := deleteBr.CombinedOutput(); err != nil {
-				fmt.Printf("Warning: could not delete branch: %s\n", string(out))
+				fmt.Fprintf(os.Stderr, "warning: could not delete branch: %s\n", string(out))
 			}
 		}
 

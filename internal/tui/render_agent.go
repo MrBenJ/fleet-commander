@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/monitor"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/monitor"
 )
 
 var hooksWarnStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6666"))

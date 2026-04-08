@@ -9,10 +9,10 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/hooks"
-	"github.com/teknal/fleet-commander/internal/monitor"
-	"github.com/teknal/fleet-commander/internal/tmux"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/hooks"
+	"github.com/MrBenJ/fleet-commander/internal/monitor"
+	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
 // AddNewItem is the "add new agent" entry at the top of the list

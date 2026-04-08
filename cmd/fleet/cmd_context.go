@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	fleetctx "github.com/teknal/fleet-commander/internal/context"
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/global"
+	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/global"
 )
 
 var contextCmd = &cobra.Command{

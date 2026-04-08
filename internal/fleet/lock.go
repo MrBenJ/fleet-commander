@@ -27,6 +27,8 @@ func acquireLock(fleetDir string) (*os.File, error) {
 
 // releaseLock releases the flock and closes the file.
 func releaseLock(lf *os.File) {
+	// Error ignored intentionally: unlock is best-effort in a defer path.
+	// If unlock fails, the OS releases the flock when the process exits.
 	syscall.Flock(int(lf.Fd()), syscall.LOCK_UN) //nolint:errcheck
 	lf.Close()
 }

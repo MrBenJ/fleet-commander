@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/teknal/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
 )
 
 // helper to create a LaunchModel with minimal state for state-machine tests.

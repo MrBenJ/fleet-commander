@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teknal/fleet-commander/internal/state"
+	"github.com/MrBenJ/fleet-commander/internal/state"
 )
 
 func TestWriteAndRead(t *testing.T) {

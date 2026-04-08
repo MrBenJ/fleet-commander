@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/teknal/fleet-commander/internal/monitor"
+	"github.com/MrBenJ/fleet-commander/internal/monitor"
 )
 
 func (d AgentDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {

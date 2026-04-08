@@ -1,4 +1,4 @@
-module github.com/teknal/fleet-commander
+module github.com/MrBenJ/fleet-commander
 
 go 1.25.0
 

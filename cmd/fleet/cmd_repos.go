@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/teknal/fleet-commander/internal/global"
+	"github.com/MrBenJ/fleet-commander/internal/global"
 )
 
 var reposCmd = &cobra.Command{

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teknal/fleet-commander/internal/hooks"
+	"github.com/MrBenJ/fleet-commander/internal/hooks"
 )
 
 func settingsPath(dir string) string {

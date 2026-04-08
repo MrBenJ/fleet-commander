@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/teknal/fleet-commander/internal/worktree"
+	"github.com/MrBenJ/fleet-commander/internal/worktree"
 )
 
 func TestListReturnsMainWorktree(t *testing.T) {

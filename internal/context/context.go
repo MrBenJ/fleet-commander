@@ -108,6 +108,7 @@ func acquireLock(fleetDir string) (*os.File, error) {
 }
 
 func releaseLock(lf *os.File) {
+	// Error ignored intentionally: unlock is best-effort in a defer path.
 	syscall.Flock(int(lf.Fd()), syscall.LOCK_UN) //nolint:errcheck
 	lf.Close()
 }

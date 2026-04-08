@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/teknal/fleet-commander/internal/global"
-	"github.com/teknal/fleet-commander/internal/worktree"
+	"github.com/MrBenJ/fleet-commander/internal/global"
+	"github.com/MrBenJ/fleet-commander/internal/worktree"
 )
 
 //go:embed system_prompt.md
@@ -35,7 +35,8 @@ type Agent struct {
 	HooksOK       bool   `json:"hooks_ok"`
 }
 
-const configFile = ".fleet/config.json"
+const fleetDirName = ".fleet"
+const configFile = fleetDirName + "/config.json"
 
 // Init initializes a new fleet for the given repository.
 // If shortName is empty, it defaults to the directory basename.
@@ -53,7 +54,7 @@ func Init(repoPath, shortName string) (*Fleet, error) {
 	}
 	
 	// Create fleet directory
-	fleetDir := filepath.Join(absPath, ".fleet")
+	fleetDir := filepath.Join(absPath, fleetDirName)
 	if err := os.MkdirAll(fleetDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create fleet directory: %w", err)
 	}
@@ -73,8 +74,8 @@ func Init(repoPath, shortName string) (*Fleet, error) {
 	}
 
 	// Add .fleet to .gitignore if not already there
-	addToGitignore(absPath, ".fleet")
-	addToGitignore(absPath, ".fleet/config.lock")
+	addToGitignore(absPath, fleetDirName)
+	addToGitignore(absPath, fleetDirName+"/config.lock")
 
 	// Register in global index (best-effort — don't fail init if global dir is broken)
 	resolvedName, regErr := global.Register(absPath, shortName)

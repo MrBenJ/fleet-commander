@@ -12,9 +12,9 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/teknal/fleet-commander/internal/fleet"
-	"github.com/teknal/fleet-commander/internal/hooks"
-	"github.com/teknal/fleet-commander/internal/tmux"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/hooks"
+	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
 type launchMode int
@@ -284,7 +284,7 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 		sp, err := fleet.LoadSystemPrompt(m.fleet.FleetDir)
 		if err != nil {
 			m.log.Log("WARNING: could not load system prompt: %v", err)
-			fmt.Fprintf(os.Stderr, "Warning: could not load system prompt: %v\n", err)
+			fmt.Fprintf(os.Stderr, "warning: could not load system prompt: %v\n", err)
 		} else {
 			m.log.Log("System prompt loaded (%d bytes)", len(sp))
 		}
@@ -345,7 +345,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	// Inject hooks for state signaling
 	if err := hooks.Inject(agent.WorktreePath); err != nil {
 		m.log.Log("WARNING: Hook injection failed for %q: %v", agent.Name, err)
-		fmt.Fprintf(os.Stderr, "Warning: could not inject hooks for agent '%s' (.claude/settings.json may be malformed): %v\n", agent.Name, err)
+		fmt.Fprintf(os.Stderr, "warning: could not inject hooks for agent '%s' (.claude/settings.json may be malformed): %v\n", agent.Name, err)
 		stateFilePath = ""
 		m.fleet.UpdateAgentHooks(agent.Name, false)
 	} else {
@@ -404,7 +404,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	pid, err := m.tmux.GetPID(agent.Name)
 	if err != nil {
 		m.log.Log("WARNING: Could not get PID for %q: %v", agent.Name, err)
-		fmt.Fprintf(os.Stderr, "Warning: launched agent '%s' but could not get PID: %v\n", agent.Name, err)
+		fmt.Fprintf(os.Stderr, "warning: launched agent '%s' but could not get PID: %v\n", agent.Name, err)
 	} else {
 		m.log.Log("Agent %q PID: %d", agent.Name, pid)
 	}
