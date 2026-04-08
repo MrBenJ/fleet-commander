@@ -7,11 +7,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/MrBenJ/fleet-commander/internal/global"
 	"github.com/MrBenJ/fleet-commander/internal/worktree"
 )
+
+// validAgentName matches alphanumeric names with hyphens and underscores.
+// Periods are excluded because tmux uses them as session name separators.
+var validAgentName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 //go:embed system_prompt.md
 var defaultSystemPrompt string
@@ -150,6 +155,10 @@ func loadFromPath(path string) (*Fleet, error) {
 // If the config save fails after the worktree is created, the worktree is
 // cleaned up automatically to avoid leaving orphaned directories.
 func (f *Fleet) AddAgent(name, branch string) (*Agent, error) {
+	if !validAgentName.MatchString(name) {
+		return nil, fmt.Errorf("invalid agent name '%s': must be alphanumeric with hyphens/underscores, starting with a letter or number", name)
+	}
+
 	// Fast-fail for duplicate before acquiring lock.
 	for _, a := range f.Agents {
 		if a.Name == name {
@@ -220,6 +229,10 @@ func (f *Fleet) RemoveAgent(name string) error {
 // RenameAgent renames an agent, moving its worktree and state file.
 // The agent must be stopped (no active tmux session) before renaming.
 func (f *Fleet) RenameAgent(oldName, newName string) error {
+	if !validAgentName.MatchString(newName) {
+		return fmt.Errorf("invalid agent name '%s': must be alphanumeric with hyphens/underscores, starting with a letter or number", newName)
+	}
+
 	// Fast-fail checks before acquiring lock.
 	if oldName == newName {
 		return fmt.Errorf("new name is the same as the current name")
