@@ -5,8 +5,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+// safeAgentName validates that an agent name contains only safe characters
+// before it is used in tmux commands. This is defense-in-depth — the fleet
+// layer also validates, but the tmux layer must not trust its callers.
+var safeAgentName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
+
+func validateAgentName(name string) error {
+	if !safeAgentName.MatchString(name) {
+		return fmt.Errorf("unsafe agent name %q: must be alphanumeric with hyphens/underscores", name)
+	}
+	return nil
+}
 
 // CommandRunner abstracts shell command execution so Manager can be tested
 // without real tmux.
@@ -113,6 +126,9 @@ func findFleetTmuxConf() string {
 // command is the command and arguments to run in the session.
 // If nil/empty, defaults to running "claude".
 func (m *Manager) CreateSession(agentName, worktreePath string, command []string, stateFilePath string) error {
+	if err := validateAgentName(agentName); err != nil {
+		return err
+	}
 	sessionName := m.SessionName(agentName)
 
 	// Check if claude is available when using default command

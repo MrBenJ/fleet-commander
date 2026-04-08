@@ -380,6 +380,31 @@ func TestCapturePane_Error(t *testing.T) {
 	}
 }
 
+func TestCreateSession_RejectsUnsafeName(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+
+	badNames := []string{
+		"foo:bar",
+		"foo.bar",
+		"../etc/passwd",
+		"name with spaces",
+		"",
+		"-starts-with-dash",
+		"has;semicolon",
+		"has$dollar",
+	}
+	for _, name := range badNames {
+		err := m.CreateSession(name, "/tmp/worktree", nil, "")
+		if err == nil {
+			t.Errorf("expected error for agent name %q, got nil", name)
+		}
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("expected 0 tmux calls for invalid names, got %d", len(f.calls))
+	}
+}
+
 // --- IsInsideTmux ---
 
 func TestIsInsideTmux_True(t *testing.T) {
