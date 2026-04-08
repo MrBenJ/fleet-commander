@@ -116,9 +116,16 @@ func (m *Monitor) GetSnapshot(agentName string) *Snapshot {
 
 // detectState analyzes terminal content to determine agent state.
 //
+// DEPRECATION NOTE: Pane scraping is the legacy fallback for state detection.
+// The preferred path is Claude Code hooks writing to state files via
+// "fleet signal waiting/working". New detection patterns should go into the
+// hooks path, not here. This function will eventually be removed once hooks
+// are reliable enough to be the sole detection mechanism.
+//
 // Detection order matters: waiting patterns are checked BEFORE working patterns
 // because Claude Code's persistent status bar (which contains "esc to interrupt")
-// stays visible even when the agent is idle at an input prompt.
+// stays visible even when the agent is idle at an input prompt. If we checked
+// for "esc to interrupt" first, every agent would always appear as working.
 func detectState(lastLine, fullContent string) AgentState {
 	lastLine = strings.TrimSpace(lastLine)
 	stripped := stripANSI(fullContent)
@@ -128,48 +135,49 @@ func detectState(lastLine, fullContent string) AgentState {
 		return StateStarting
 	}
 
-	// Only look at the BOTTOM of the pane (last 15 non-empty lines)
-	// Old prompts may still be visible higher up — ignore them
+	// Only look at the BOTTOM of the pane to avoid matching stale prompts
+	// that scrolled up but are still visible in the terminal buffer.
 	allLines := strings.Split(stripped, "\n")
 	bottom := getLastNonEmptyLines(allLines, paneBottomLines)
 	bottomText := strings.Join(bottom, "\n")
 
-	// WAITING PATTERNS — check these FIRST because Claude Code's status bar
-	// contains "esc to interrupt" even when the agent is at an input prompt.
+	// ── WAITING PATTERNS (checked first — see note above) ──
 
-	// Claude Code permission prompts ("Esc to cancel" footer)
+	// Permission prompts: Claude asks to run a tool and shows "Esc to cancel"
+	// in the footer. Note capital "E" — distinct from status bar's lowercase.
 	if strings.Contains(bottomText, "Esc to cancel") {
 		return StateWaiting
 	}
 
-	// Claude Code tool confirmation
+	// Batch tool confirmation: "Do you want to proceed?" when multiple tools queued.
 	if strings.Contains(bottomText, "Do you want to proceed") {
 		return StateWaiting
 	}
 
-	// Claude Code edit acceptance prompt
+	// File edit review: Claude shows diffs and asks the user to "accept edits".
 	if strings.Contains(bottomText, "accept edits") {
 		return StateWaiting
 	}
 
-	// Claude Code input hint bar
+	// Input mode hint bar: appears when Claude is at the text input prompt.
 	if strings.Contains(bottomText, "shift+tab to cycle") {
 		return StateWaiting
 	}
 
-	// Claude Code numbered choice menus
+	// Numbered choice menu: Claude presents options with ❯ cursor marker.
 	if strings.Contains(bottomText, "❯") && strings.Contains(bottomText, "1.") && strings.Contains(bottomText, "2.") {
 		return StateWaiting
 	}
 
-	// Claude Code bare input prompt: ❯ on its own line near the bottom
+	// Bare input prompt: just ❯ on its own line — Claude is waiting for user input.
 	for _, line := range bottom {
 		if strings.TrimSpace(line) == "❯" {
 			return StateWaiting
 		}
 	}
 
-	// Question at the very bottom (last 3 lines only)
+	// Question heuristic: a line ending with "?" in the last 3 lines.
+	// Min length 10 to avoid matching single-word false positives.
 	veryBottom := getLastNonEmptyLines(allLines, 3)
 	for _, line := range veryBottom {
 		trimmed := strings.TrimSpace(line)
@@ -181,15 +189,17 @@ func detectState(lastLine, fullContent string) AgentState {
 		}
 	}
 
-	// WORKING PATTERNS — only checked after ruling out waiting states
+	// ── WORKING PATTERNS (only after ruling out all waiting states) ──
 
-	// Claude Code shows "esc to interrupt" when actively working
-	// (but NOT when paired with a waiting indicator above)
+	// Status bar: "esc to interrupt" (lowercase) appears when Claude is actively
+	// generating. This is checked AFTER waiting patterns because the status bar
+	// persists even when a waiting prompt is shown above it.
 	if strings.Contains(bottomText, "esc to interrupt") {
 		return StateWorking
 	}
 
-	// Spinner characters (may or may not be captured by tmux)
+	// Braille spinner: animated progress indicator during tool execution.
+	// Tmux may or may not capture these depending on timing.
 	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	for _, s := range spinners {
 		if strings.Contains(bottomText, s) {
@@ -197,7 +207,11 @@ func detectState(lastLine, fullContent string) AgentState {
 		}
 	}
 
-	// Default: working
+	// No pattern matched. Default to working rather than unknown — in practice,
+	// unrecognized output is usually Claude producing content that doesn't match
+	// any specific pattern. The risk is that a genuinely waiting agent shows as
+	// working, but this is mitigated by the state file path (hooks) being the
+	// primary detection mechanism.
 	return StateWorking
 }
 
