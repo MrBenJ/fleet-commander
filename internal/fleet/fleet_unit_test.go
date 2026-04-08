@@ -600,3 +600,85 @@ func TestConfigPersistence_RoundTrip(t *testing.T) {
 		t.Errorf("hooks_ok = %v, want true", a["hooks_ok"])
 	}
 }
+
+func TestAddAgent_NameValidation(t *testing.T) {
+	dir := setupTestRepo(t)
+	f, err := Init(dir, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	valid := []string{
+		"alice",
+		"agent-1",
+		"agent_2",
+		"A",
+		"123",
+		"my-long-agent-name",
+		"CamelCase",
+		"mix_and-match",
+	}
+
+	for _, name := range valid {
+		t.Run("valid/"+name, func(t *testing.T) {
+			_, err := f.AddAgent(name, "feature/"+name)
+			if err != nil {
+				t.Errorf("AddAgent(%q) should succeed, got: %v", name, err)
+			}
+		})
+	}
+
+	invalid := []string{
+		"",
+		"-starts-with-dash",
+		"_starts-with-underscore",
+		"has spaces",
+		"has.period",
+		"has/slash",
+		"has@symbol",
+		"has:colon",
+		"emoji🎉",
+	}
+
+	for _, name := range invalid {
+		t.Run("invalid/"+name, func(t *testing.T) {
+			_, err := f.AddAgent(name, "feature/test")
+			if err == nil {
+				t.Errorf("AddAgent(%q) should fail, got nil", name)
+			}
+			if err != nil && !strings.Contains(err.Error(), "invalid agent name") {
+				t.Errorf("AddAgent(%q) error = %v, want 'invalid agent name'", name, err)
+			}
+		})
+	}
+}
+
+func TestRenameAgent_NameValidation(t *testing.T) {
+	dir := setupTestRepo(t)
+	f, err := Init(dir, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	if _, err := f.AddAgent("original", "feature/original"); err != nil {
+		t.Fatalf("AddAgent failed: %v", err)
+	}
+
+	invalid := []string{
+		"has.period",
+		"has spaces",
+		"-leading-dash",
+	}
+
+	for _, name := range invalid {
+		t.Run(name, func(t *testing.T) {
+			err := f.RenameAgent("original", name)
+			if err == nil {
+				t.Errorf("RenameAgent to %q should fail, got nil", name)
+			}
+			if err != nil && !strings.Contains(err.Error(), "invalid agent name") {
+				t.Errorf("RenameAgent to %q error = %v, want 'invalid agent name'", name, err)
+			}
+		})
+	}
+}
