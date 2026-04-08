@@ -212,3 +212,26 @@ Priority order:
 **Total: 7-8 PRs, done incrementally between feature work.**
 
 Each phase leaves the codebase strictly better than it found it. No phase depends on a later phase being completed — if you stop after Phase 3, you still have a cleaner, more understood codebase.
+
+---
+
+## Retrospective (completed 2026-04-07)
+
+All 6 phases were completed in a single session on the `tech-debt-cleanup` branch (7 commits total, including the spec itself). Key deviations from plan:
+
+- **Module path fix** was discovered during Phase 1: the module was `github.com/teknal/fleet-commander` (set by an AI assistant), corrected to `github.com/MrBenJ/fleet-commander` across all 20 source files + go.mod.
+
+- **Phase 5 was lighter than expected.** The launch flow was already well-structured — modes split into `launch_modes.go`, views into `launch_views.go`, `Update()` already a dispatcher. The planned "break up the monolith" refactor wasn't needed. Instead: added `parseClaudeResponse` unit tests (6 cases) and documented which fields are active per mode on the `LaunchModel` struct.
+
+- **Phase 6 found less missing coverage than expected.** Context channels already had 40+ tests, fleet operations were comprehensive, monitor detection had thorough table-driven tests. The real gap was agent name validation (regex added in Phase 3 with zero tests). Added 17 test cases covering valid and invalid names for both `AddAgent` and `RenameAgent`.
+
+- **Delivered as 1 bundled branch** (7 commits) instead of 7-8 separate PRs. All phases were small enough to review together.
+
+### Commits
+1. Add tech debt cleanup design spec
+2. Fix module path and Phase 1 hygiene sweep
+3. Phase 2: Harden core model (fleet, state, worktree)
+4. Phase 3: Audit integration layer, add agent name validation
+5. Phase 4: Document monitor detection patterns, mark pane scraping as legacy
+6. Phase 5: Add parseClaudeResponse tests, document launch model fields
+7. Phase 6: Add agent name validation tests
