@@ -184,6 +184,9 @@ func (m *Manager) CreateSession(agentName, worktreePath string, command []string
 
 // Attach attaches to a tmux session
 func (m *Manager) Attach(agentName string) error {
+	if err := validateAgentName(agentName); err != nil {
+		return err
+	}
 	sessionName := m.SessionName(agentName)
 	
 	// Check if session exists
@@ -202,6 +205,9 @@ func (m *Manager) Detach() error {
 
 // KillSession kills a tmux session
 func (m *Manager) KillSession(agentName string) error {
+	if err := validateAgentName(agentName); err != nil {
+		return err
+	}
 	sessionName := m.SessionName(agentName)
 	return m.runner.Run("tmux", "kill-session", "-t", sessionName)
 }
@@ -230,6 +236,9 @@ func (m *Manager) ListSessions() ([]string, error) {
 
 // SendKeys sends keystrokes to a tmux session
 func (m *Manager) SendKeys(agentName string, keys string) error {
+	if err := validateAgentName(agentName); err != nil {
+		return err
+	}
 	sessionName := m.SessionName(agentName)
 	return m.runner.Run("tmux", "send-keys", "-t", sessionName, keys)
 }
