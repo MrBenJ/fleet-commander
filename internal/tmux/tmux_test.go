@@ -441,6 +441,53 @@ func TestSendKeys_RejectsUnsafeName(t *testing.T) {
 	}
 }
 
+func TestSessionExists_ReturnsFalseForUnsafeName(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	if m.SessionExists("bad;name") {
+		t.Fatal("SessionExists should return false for unsafe name")
+	}
+	if len(f.calls) != 0 {
+		t.Error("no tmux commands should execute for invalid names")
+	}
+}
+
+func TestCapturePane_RejectsUnsafeName(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	_, err := m.CapturePane("bad;name")
+	if err == nil {
+		t.Fatal("expected error for unsafe agent name")
+	}
+	if len(f.calls) != 0 {
+		t.Error("no tmux commands should execute for invalid names")
+	}
+}
+
+func TestGetPID_RejectsUnsafeName(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	_, err := m.GetPID("bad;name")
+	if err == nil {
+		t.Fatal("expected error for unsafe agent name")
+	}
+	if len(f.calls) != 0 {
+		t.Error("no tmux commands should execute for invalid names")
+	}
+}
+
+func TestSwitchClient_RejectsUnsafeName(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.SwitchClient("bad;name")
+	if err == nil {
+		t.Fatal("expected error for unsafe agent name")
+	}
+	if len(f.calls) != 0 {
+		t.Error("no tmux commands should execute for invalid names")
+	}
+}
+
 // --- IsInsideTmux ---
 
 func TestIsInsideTmux_True(t *testing.T) {

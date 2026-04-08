@@ -87,6 +87,9 @@ func (m *Manager) SessionName(agentName string) string {
 
 // SessionExists checks if a tmux session exists
 func (m *Manager) SessionExists(agentName string) bool {
+	if validateAgentName(agentName) != nil {
+		return false
+	}
 	sessionName := m.SessionName(agentName)
 	err := m.runner.Run("tmux", "has-session", "-t", sessionName)
 	return err == nil
@@ -245,6 +248,9 @@ func (m *Manager) SendKeys(agentName string, keys string) error {
 
 // CapturePane captures the content of a tmux pane
 func (m *Manager) CapturePane(agentName string) (string, error) {
+	if err := validateAgentName(agentName); err != nil {
+		return "", err
+	}
 	sessionName := m.SessionName(agentName)
 	output, err := m.runner.Output("tmux", "capture-pane", "-t", sessionName, "-p")
 	if err != nil {
@@ -255,6 +261,9 @@ func (m *Manager) CapturePane(agentName string) (string, error) {
 
 // GetPID returns the PID of the process running in the tmux session
 func (m *Manager) GetPID(agentName string) (int, error) {
+	if err := validateAgentName(agentName); err != nil {
+		return 0, err
+	}
 	sessionName := m.SessionName(agentName)
 	output, err := m.runner.Output("tmux", "list-panes", "-t", sessionName, "-F", "#{pane_pid}")
 	if err != nil {
@@ -277,6 +286,9 @@ func IsInsideTmux() bool {
 
 // SwitchClient switches to a different tmux session (from within tmux)
 func (m *Manager) SwitchClient(agentName string) error {
+	if err := validateAgentName(agentName); err != nil {
+		return err
+	}
 	sessionName := m.SessionName(agentName)
 	return m.runner.Run("tmux", "switch-client", "-t", sessionName)
 }
