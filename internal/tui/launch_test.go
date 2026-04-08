@@ -533,3 +533,85 @@ func TestBuildFullPrompt_SingleAgent(t *testing.T) {
 		t.Error("roster should show the single agent")
 	}
 }
+
+// --- parseClaudeResponse tests ---
+
+func TestParseClaudeResponse_ValidJSON(t *testing.T) {
+	raw := `[{"prompt":"Fix the bug","agent_name":"fix-bug","branch":"fleet/fix-bug"}]`
+	items, err := parseClaudeResponse(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].AgentName != "fix-bug" {
+		t.Errorf("agent_name=%q, want %q", items[0].AgentName, "fix-bug")
+	}
+	if items[0].Branch != "fleet/fix-bug" {
+		t.Errorf("branch=%q, want %q", items[0].Branch, "fleet/fix-bug")
+	}
+	if items[0].Prompt != "Fix the bug" {
+		t.Errorf("prompt=%q, want %q", items[0].Prompt, "Fix the bug")
+	}
+}
+
+func TestParseClaudeResponse_MarkdownFences(t *testing.T) {
+	raw := "```json\n" +
+		`[{"prompt":"Add OAuth","agent_name":"add-oauth","branch":"fleet/add-oauth"}]` +
+		"\n```"
+	items, err := parseClaudeResponse(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].AgentName != "add-oauth" {
+		t.Errorf("agent_name=%q, want %q", items[0].AgentName, "add-oauth")
+	}
+}
+
+func TestParseClaudeResponse_ExtraTextAroundJSON(t *testing.T) {
+	raw := "Here are the tasks:\n\n" +
+		`[{"prompt":"Task one","agent_name":"task-one","branch":"fleet/task-one"}]` +
+		"\n\nLet me know if you need changes."
+	items, err := parseClaudeResponse(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+}
+
+func TestParseClaudeResponse_NoJSON(t *testing.T) {
+	raw := "I'm sorry, I can't do that."
+	_, err := parseClaudeResponse(raw)
+	if err == nil {
+		t.Error("expected error for input with no JSON array")
+	}
+}
+
+func TestParseClaudeResponse_EmptyArray(t *testing.T) {
+	raw := "[]"
+	_, err := parseClaudeResponse(raw)
+	if err == nil {
+		t.Error("expected error for empty array")
+	}
+}
+
+func TestParseClaudeResponse_MultipleItems(t *testing.T) {
+	raw := `[
+		{"prompt":"Fix login","agent_name":"fix-login","branch":"fleet/fix-login"},
+		{"prompt":"Add OAuth","agent_name":"add-oauth","branch":"fleet/add-oauth"},
+		{"prompt":"Refactor DB","agent_name":"refactor-db","branch":"fleet/refactor-db"}
+	]`
+	items, err := parseClaudeResponse(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
+	}
+}

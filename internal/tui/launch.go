@@ -36,6 +36,17 @@ type claudeResultMsg struct {
 }
 
 // LaunchModel is the Bubble Tea model for the fleet launch flow.
+//
+// Field usage by mode:
+//   All modes:        fleet, tmux, mode, width, height, quitting, aborted, statusMsg, log
+//   Input:            inputArea
+//   YoloConfirm:      pendingYoloInput
+//   Generating:       spinner
+//   Review:           prompts, currentIdx, promptViewport, promptViewportIdx, launched, skipped
+//   EditName:         prompts, currentIdx, nameInput
+//   EditBranch:       prompts, currentIdx, branchInput
+//   EditPrompt:       prompts, currentIdx, promptEdit
+//   launchCurrent():  systemPrompt, systemPromptLoaded, yoloMode, noAutoMerge, targetBranch, useJumpSh
 type LaunchModel struct {
 	fleet *fleet.Fleet
 	tmux  *tmux.Manager
@@ -45,7 +56,7 @@ type LaunchModel struct {
 	// Input phase
 	inputArea textarea.Model
 
-	// Parsed prompts
+	// Parsed prompts (used in Review and Edit modes, populated after Generating)
 	prompts    []LaunchItem
 	currentIdx int
 
@@ -61,7 +72,7 @@ type LaunchModel struct {
 	promptViewport    viewport.Model
 	promptViewportIdx int // tracks which prompt index the viewport was built for
 
-	// Results
+	// Results (accumulated across launches)
 	launched []string
 	skipped  int
 
@@ -74,14 +85,14 @@ type LaunchModel struct {
 	aborted   bool
 	statusMsg string
 
-	// YOLO mode
+	// YOLO mode flags (set once at creation, read during launch)
 	yoloMode         bool
 	skipYoloConfirm  bool   // --i-know-what-im-doing flag
 	noAutoMerge      bool   // --no-auto-merge flag
 	targetBranch     string // root repo's current branch, resolved at launch time
 	pendingYoloInput string // input saved from first CTRL+D, waiting for confirmation
 
-	// System prompt
+	// System prompt (lazy-loaded on first launchCurrent call)
 	systemPrompt       string
 	systemPromptLoaded bool
 
