@@ -3,9 +3,10 @@ package tui
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 )
 
 // ClaudeGeneratedItem represents a single task expanded by Claude.
@@ -19,8 +20,8 @@ type ClaudeGeneratedItem struct {
 // structured prompts, agent names, and branch names for each item.
 // If the input contains structured markdown with agent identity tables, it parses
 // them directly without calling Claude.
-func GenerateWithClaude(userInput string, existingAgents []string, log *LaunchLogger) ([]LaunchItem, error) {
-	log.Log("GenerateWithClaude: input_len=%d existing_agents=%d", len(userInput), len(existingAgents))
+func GenerateWithClaude(userInput string, existingAgents []string, drv driver.Driver, log *LaunchLogger) ([]LaunchItem, error) {
+	log.Log("GenerateWithClaude: input_len=%d existing_agents=%d driver=%s", len(userInput), len(existingAgents), drv.Name())
 
 	// Try structured markdown parsing first (deterministic, no LLM needed)
 	if items := parseStructuredMarkdown(userInput, log); len(items) > 0 {
@@ -29,18 +30,17 @@ func GenerateWithClaude(userInput string, existingAgents []string, log *LaunchLo
 		return items, nil
 	}
 
-	log.Log("Parse method: Claude LLM meta-prompt (structured markdown not detected)")
+	log.Log("Parse method: LLM meta-prompt via %s (structured markdown not detected)", drv.Name())
 	metaPrompt := buildMetaPrompt(userInput, existingAgents)
 	log.Log("Meta-prompt length: %d bytes", len(metaPrompt))
 
-	cmd := exec.Command("claude", "-p", metaPrompt)
-	output, err := cmd.CombinedOutput()
+	output, err := drv.PlanCommand(metaPrompt)
 	if err != nil {
-		log.Log("ERROR: claude -p failed: %v\noutput_len=%d\nfirst_500_bytes=%s", err, len(output), truncate(string(output), 500))
-		return nil, fmt.Errorf("claude command failed: %w\noutput: %s", err, string(output))
+		log.Log("ERROR: PlanCommand failed: %v\noutput_len=%d\nfirst_500_bytes=%s", err, len(output), truncate(string(output), 500))
+		return nil, fmt.Errorf("plan command failed: %w\noutput: %s", err, string(output))
 	}
-	log.Log("Claude response: %d bytes", len(output))
-	log.Log("Claude raw output (first 1000 chars): %s", truncate(string(output), 1000))
+	log.Log("Plan response: %d bytes", len(output))
+	log.Log("Plan raw output (first 1000 chars): %s", truncate(string(output), 1000))
 
 	items, err := parseClaudeResponse(string(output))
 	if err != nil {
@@ -61,15 +61,15 @@ func truncate(s string, maxLen int) string {
 func buildMetaPrompt(userInput string, existingAgents []string) string {
 	var sb strings.Builder
 
-	sb.WriteString(`You are a task planner for Fleet Commander, a tool that manages parallel Claude Code sessions.
+	sb.WriteString(`You are a task planner for Fleet Commander, a tool that manages parallel AI coding agent sessions.
 
 Given the following list of tasks, generate a JSON array where each element has:
-- "prompt": A detailed, actionable prompt to send to Claude Code for this task. Expand the user's brief description into a clear, specific instruction that Claude Code can act on immediately.
+- "prompt": A detailed, actionable prompt for the coding agent. Expand the user's brief description into a clear, specific instruction that the agent can act on immediately.
 - "agent_name": A short kebab-case name for the agent (max 30 chars, lowercase, no special chars except hyphens)
 - "branch": A git branch name in the format "fleet/<agent_name>", or explicitly named in the listed prompt itself
 
-You may see in the prompts that agent names and and git branches already provided. If this is the case, follow what the prompts are saying for agent name and git branch.
-This means that the entire fleet is self coordinating
+You may see in the prompts that agent names and git branches are already provided. If this is the case, follow what the prompts are saying for agent name and git branch.
+This means that the entire fleet is self coordinating.
 
 `)
 

@@ -11,6 +11,7 @@ type LaunchItem struct {
 	Prompt    string
 	AgentName string
 	Branch    string
+	Driver    string
 }
 
 var (

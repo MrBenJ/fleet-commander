@@ -6,9 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/global"
-	"github.com/MrBenJ/fleet-commander/internal/hooks"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 	"github.com/MrBenJ/fleet-commander/internal/worktree"
 	"github.com/spf13/cobra"
@@ -21,6 +21,12 @@ var addCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		branch := args[1]
+		driverName, _ := cmd.Flags().GetString("driver")
+
+		// Validate driver name
+		if _, err := driver.Get(driverName); err != nil {
+			return err
+		}
 
 		f, err := fleet.Load(".")
 		if err != nil {
@@ -32,8 +38,16 @@ var addCmd = &cobra.Command{
 			return fmt.Errorf("failed to add agent: %w", err)
 		}
 
+		// Set driver on agent (empty means default claude-code)
+		if driverName != "claude-code" {
+			f.UpdateAgentDriver(name, driverName)
+		}
+
 		fmt.Printf("Agent '%s' created on branch '%s'\n", agent.Name, agent.Branch)
 		fmt.Printf("Worktree: %s\n", agent.WorktreePath)
+		if driverName != "claude-code" {
+			fmt.Printf("Driver: %s\n", driverName)
+		}
 		return nil
 	},
 }
@@ -158,6 +172,17 @@ var startCmd = &cobra.Command{
 			return fmt.Errorf("tmux is not installed")
 		}
 
+		// Get the driver for this agent
+		drv, err := driver.Get(agent.Driver)
+		if err != nil {
+			return fmt.Errorf("failed to get driver for agent '%s': %w", agentName, err)
+		}
+
+		// Check that the agent CLI is available
+		if err := drv.CheckAvailable(); err != nil {
+			return err
+		}
+
 		// Create session if it doesn't exist
 		if !tm.SessionExists(agentName) {
 			statesDir := filepath.Join(f.FleetDir, "states")
@@ -166,7 +191,7 @@ var startCmd = &cobra.Command{
 			}
 			stateFilePath := filepath.Join(statesDir, agentName+".json")
 
-			if err := hooks.Inject(agent.WorktreePath); err != nil {
+			if err := drv.InjectHooks(agent.WorktreePath); err != nil {
 				// Non-fatal: common cause is malformed existing .claude/settings.json — check that file first.
 				fmt.Fprintf(os.Stderr, "warning: could not inject hooks into %s (.claude/settings.json may be malformed): %v\n", agent.WorktreePath, err)
 				stateFilePath = ""
@@ -175,7 +200,7 @@ var startCmd = &cobra.Command{
 				f.UpdateAgentHooks(agentName, true)
 			}
 
-			if err := tm.CreateSession(agentName, agent.WorktreePath, nil, stateFilePath); err != nil {
+			if err := tm.CreateSession(agentName, agent.WorktreePath, drv.InteractiveCommand(), stateFilePath); err != nil {
 				return fmt.Errorf("failed to create tmux session: %w", err)
 			}
 			fmt.Printf("Created tmux session for agent '%s'\n", agentName)
@@ -262,8 +287,11 @@ var stopCmd = &cobra.Command{
 		}
 
 		// Remove fleet hooks so they don't fire after the session ends
-		if err := hooks.Remove(agent.WorktreePath); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+		drv, _ := driver.Get(agent.Driver)
+		if drv != nil {
+			if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+			}
 		}
 		f.UpdateAgentHooks(agentName, false)
 
@@ -305,8 +333,11 @@ Use --branch to also delete the branch.`,
 		}
 
 		// Remove fleet hooks from the worktree
-		if err := hooks.Remove(agent.WorktreePath); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+		drv, _ := driver.Get(agent.Driver)
+		if drv != nil {
+			if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+			}
 		}
 
 		// Remove state file if present

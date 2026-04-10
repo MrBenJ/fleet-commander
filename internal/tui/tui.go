@@ -9,8 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
-	"github.com/MrBenJ/fleet-commander/internal/hooks"
 	"github.com/MrBenJ/fleet-commander/internal/monitor"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
@@ -100,10 +100,11 @@ func New(f *fleet.Fleet) Model {
 }
 
 func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.Item {
-	// First item is always "Add New Agent"
 	items := []list.Item{AddNewItem{}}
-
 	for _, a := range f.Agents {
+		if drv, err := driver.Get(a.Driver); err == nil {
+			mon.SetDriver(a.Name, drv)
+		}
 		snap := mon.CheckWithStateFile(a.Name, a.StateFilePath)
 		items = append(items, AgentItem{
 			Agent:    a,
@@ -117,24 +118,33 @@ func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.I
 // startAgentSession creates a tmux session for an agent, injecting hooks and
 // wiring the state file path.
 func (m *Model) startAgentSession(agent *fleet.Agent) error {
+	drv, err := driver.Get(agent.Driver)
+	if err != nil {
+		return fmt.Errorf("unknown driver %q: %w", agent.Driver, err)
+	}
+
+	if err := drv.CheckAvailable(); err != nil {
+		return err
+	}
+
 	statesDir := filepath.Join(m.fleet.FleetDir, "states")
 	if err := os.MkdirAll(statesDir, 0755); err != nil {
 		return fmt.Errorf("failed to create states dir: %w", err)
 	}
 	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
 
-	if err := hooks.Inject(agent.WorktreePath); err != nil {
-		stateFilePath = "" // degrade gracefully
+	if err := drv.InjectHooks(agent.WorktreePath); err != nil {
+		stateFilePath = ""
 		m.fleet.UpdateAgentHooks(agent.Name, false)
 	} else {
 		m.fleet.UpdateAgentHooks(agent.Name, true)
 	}
 
-	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, nil, stateFilePath); err != nil {
+	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, drv.InteractiveCommand(), stateFilePath); err != nil {
 		return err
 	}
 
-	// Persist so buildItems can pass stateFilePath to the monitor on next refresh
+	m.monitor.SetDriver(agent.Name, drv)
 	m.fleet.UpdateAgentStateFile(agent.Name, stateFilePath)
 	return nil
 }
@@ -244,12 +254,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.statusMsgTimer = time.Now()
 					}
 					m.fleet.UpdateAgentStateFile(agent.Name, "")
-					if err := hooks.Remove(agent.WorktreePath); err != nil {
+				}
+				drv, _ := driver.Get(agent.Driver)
+				if drv != nil {
+					if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
 						m.statusMsg = "⚠ could not remove hooks: " + err.Error()
 						m.statusMsgTimer = time.Now()
 					}
-					m.fleet.UpdateAgentHooks(agent.Name, false)
 				}
+				m.fleet.UpdateAgentHooks(agent.Name, false)
 				m.fleet.UpdateAgent(agent.Name, "stopped", 0)
 				items := buildItems(m.fleet, m.tmux, m.monitor)
 				m.list.SetItems(items)

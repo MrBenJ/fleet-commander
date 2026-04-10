@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 )
 
 func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -52,10 +53,11 @@ func (m LaunchModel) submitInput(input string) (tea.Model, tea.Cmd) {
 
 	m.log.Log("submitInput: input_len=%d existing_agents=%d", len(input), len(existingNames))
 
-	// Launch async Claude CLI call alongside the spinner
+	// Launch async plan command alongside the spinner
 	log := m.log // capture for closure
+	drv, _ := driver.Get("") // default driver for planning
 	claudeCmd := func() tea.Msg {
-		items, err := GenerateWithClaude(input, existingNames, log)
+		items, err := GenerateWithClaude(input, existingNames, drv, log)
 		return claudeResultMsg{items: items, err: err}
 	}
 	return m, tea.Batch(m.spinner.Tick, claudeCmd)

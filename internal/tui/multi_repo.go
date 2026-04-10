@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/global"
 	"github.com/MrBenJ/fleet-commander/internal/monitor"
@@ -135,6 +136,9 @@ func (m multiRepoModel) rebuildItems() []list.Item {
 		})
 
 		for _, a := range p.fleet.Agents {
+			if drv, err := driver.Get(a.Driver); err == nil {
+				p.mon.SetDriver(a.Name, drv)
+			}
 			snap := p.mon.CheckWithStateFile(a.Name, a.StateFilePath)
 			items = append(items, MultiRepoAgentItem{
 				AgentItem: AgentItem{
@@ -286,13 +290,29 @@ func startMultiRepoAgent(item MultiRepoAgentItem) error {
 	agent := item.Agent
 	f := item.Fleet
 
+	drv, err := driver.Get(agent.Driver)
+	if err != nil {
+		return fmt.Errorf("unknown driver %q: %w", agent.Driver, err)
+	}
+
+	if err := drv.CheckAvailable(); err != nil {
+		return err
+	}
+
 	statesDir := filepath.Join(f.FleetDir, "states")
 	if err := os.MkdirAll(statesDir, 0755); err != nil {
 		return err
 	}
 	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
 
-	if err := item.Tmux.CreateSession(agent.Name, agent.WorktreePath, nil, stateFilePath); err != nil {
+	if err := drv.InjectHooks(agent.WorktreePath); err != nil {
+		stateFilePath = ""
+		f.UpdateAgentHooks(agent.Name, false)
+	} else {
+		f.UpdateAgentHooks(agent.Name, true)
+	}
+
+	if err := item.Tmux.CreateSession(agent.Name, agent.WorktreePath, drv.InteractiveCommand(), stateFilePath); err != nil {
 		return err
 	}
 	f.UpdateAgentStateFile(agent.Name, stateFilePath)

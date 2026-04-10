@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/state"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
@@ -31,6 +32,7 @@ type Snapshot struct {
 type Monitor struct {
 	tmux      *tmux.Manager
 	snapshots map[string]*Snapshot
+	drivers   map[string]driver.Driver
 }
 
 // NewMonitor creates a new agent monitor
@@ -38,7 +40,13 @@ func NewMonitor(tm *tmux.Manager) *Monitor {
 	return &Monitor{
 		tmux:      tm,
 		snapshots: make(map[string]*Snapshot),
+		drivers:   make(map[string]driver.Driver),
 	}
+}
+
+// SetDriver registers a driver for agent-specific state detection.
+func (m *Monitor) SetDriver(agentName string, drv driver.Driver) {
+	m.drivers[agentName] = drv
 }
 
 // Check captures the current state of an agent
@@ -65,6 +73,20 @@ func (m *Monitor) Check(agentName string) *Snapshot {
 
 	snap.Content = content
 	snap.LastLine = getLastNonEmptyLine(content)
+
+	// Try driver-based detection first
+	if drv, ok := m.drivers[agentName]; ok {
+		stripped := stripANSI(content)
+		allLines := strings.Split(stripped, "\n")
+		bottomLines := getLastNonEmptyLines(allLines, paneBottomLines)
+		if state := drv.DetectState(bottomLines, stripped); state != nil {
+			snap.State = AgentState(*state)
+			m.snapshots[agentName] = snap
+			return snap
+		}
+	}
+
+	// Fallback to legacy detectState
 	snap.State = detectState(snap.LastLine, content)
 
 	m.snapshots[agentName] = snap
@@ -122,106 +144,32 @@ func (m *Monitor) GetSnapshot(agentName string) *Snapshot {
 // hooks path, not here. This function will eventually be removed once hooks
 // are reliable enough to be the sole detection mechanism.
 //
-// Detection order matters: waiting patterns are checked BEFORE working patterns
-// because Claude Code's persistent status bar (which contains "esc to interrupt")
-// stays visible even when the agent is idle at an input prompt. If we checked
-// for "esc to interrupt" first, every agent would always appear as working.
+// Delegates to ClaudeCodeDriver.DetectState so the pattern logic lives in one
+// place. When new drivers are added, this fallback stays Claude-specific —
+// agents with a registered driver never reach here (see Check).
 func detectState(lastLine, fullContent string) AgentState {
-	lastLine = strings.TrimSpace(lastLine)
+	d := &driver.ClaudeCodeDriver{}
 	stripped := stripANSI(fullContent)
-
-	// Empty content = probably starting up
-	if strings.TrimSpace(stripped) == "" {
-		return StateStarting
-	}
-
-	// Only look at the BOTTOM of the pane to avoid matching stale prompts
-	// that scrolled up but are still visible in the terminal buffer.
 	allLines := strings.Split(stripped, "\n")
-	bottom := getLastNonEmptyLines(allLines, paneBottomLines)
-	bottomText := strings.Join(bottom, "\n")
-
-	// ── WAITING PATTERNS (checked first — see note above) ──
-
-	// Permission prompts: Claude asks to run a tool and shows "Esc to cancel"
-	// in the footer. Note capital "E" — distinct from status bar's lowercase.
-	if strings.Contains(bottomText, "Esc to cancel") {
-		return StateWaiting
+	bottomLines := getLastNonEmptyLines(allLines, paneBottomLines)
+	if state := d.DetectState(bottomLines, stripped); state != nil {
+		return AgentState(*state)
 	}
-
-	// Batch tool confirmation: "Do you want to proceed?" when multiple tools queued.
-	if strings.Contains(bottomText, "Do you want to proceed") {
-		return StateWaiting
-	}
-
-	// File edit review: Claude shows diffs and asks the user to "accept edits".
-	if strings.Contains(bottomText, "accept edits") {
-		return StateWaiting
-	}
-
-	// Input mode hint bar: appears when Claude is at the text input prompt.
-	if strings.Contains(bottomText, "shift+tab to cycle") {
-		return StateWaiting
-	}
-
-	// Numbered choice menu: Claude presents options with ❯ cursor marker.
-	if strings.Contains(bottomText, "❯") && strings.Contains(bottomText, "1.") && strings.Contains(bottomText, "2.") {
-		return StateWaiting
-	}
-
-	// Bare input prompt: just ❯ on its own line — Claude is waiting for user input.
-	for _, line := range bottom {
-		if strings.TrimSpace(line) == "❯" {
-			return StateWaiting
-		}
-	}
-
-	// Question heuristic: a line ending with "?" in the last 3 lines.
-	// Min length 10 to avoid matching single-word false positives.
-	veryBottom := getLastNonEmptyLines(allLines, 3)
-	for _, line := range veryBottom {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasSuffix(trimmed, "?") && len(trimmed) > 10 {
-			return StateWaiting
-		}
-		if strings.Contains(trimmed, "(y/n)") || strings.Contains(trimmed, "[Y/n]") {
-			return StateWaiting
-		}
-	}
-
-	// ── WORKING PATTERNS (only after ruling out all waiting states) ──
-
-	// Status bar: "esc to interrupt" (lowercase) appears when Claude is actively
-	// generating. This is checked AFTER waiting patterns because the status bar
-	// persists even when a waiting prompt is shown above it.
-	if strings.Contains(bottomText, "esc to interrupt") {
-		return StateWorking
-	}
-
-	// Braille spinner: animated progress indicator during tool execution.
-	// Tmux may or may not capture these depending on timing.
-	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	for _, s := range spinners {
-		if strings.Contains(bottomText, s) {
-			return StateWorking
-		}
-	}
-
-	// No pattern matched. Default to working rather than unknown — in practice,
-	// unrecognized output is usually Claude producing content that doesn't match
-	// any specific pattern. The risk is that a genuinely waiting agent shows as
-	// working, but this is mitigated by the state file path (hooks) being the
-	// primary detection mechanism.
 	return StateWorking
 }
 
-// getLastNonEmptyLines returns the last N non-empty lines
+// getLastNonEmptyLines returns the last N non-empty lines in their original
+// (forward) order.
 func getLastNonEmptyLines(lines []string, n int) []string {
 	var result []string
 	for i := len(lines) - 1; i >= 0 && len(result) < n; i-- {
 		if strings.TrimSpace(lines[i]) != "" {
 			result = append(result, lines[i])
 		}
+	}
+	// Reverse so lines are in forward order
+	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
 	}
 	return result
 }

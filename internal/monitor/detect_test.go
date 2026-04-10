@@ -175,19 +175,19 @@ func TestGetLastNonEmptyLines(t *testing.T) {
 			name:  "returns last N non-empty",
 			input: "line1\nline2\nline3\nline4\nline5",
 			n:     3,
-			want:  []string{"line5", "line4", "line3"},
+			want:  []string{"line3", "line4", "line5"},
 		},
 		{
 			name:  "skips trailing empty lines",
 			input: "line1\nline2\nline3\n\n\n",
 			n:     2,
-			want:  []string{"line3", "line2"},
+			want:  []string{"line2", "line3"},
 		},
 		{
 			name:  "returns fewer than N when not enough non-empty lines",
 			input: "line1\nline2",
 			n:     5,
-			want:  []string{"line2", "line1"},
+			want:  []string{"line1", "line2"},
 		},
 		{
 			name:  "empty input returns empty slice",
