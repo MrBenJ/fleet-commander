@@ -12,8 +12,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
-	"github.com/MrBenJ/fleet-commander/internal/hooks"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
@@ -354,9 +354,13 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
 
 	// Inject hooks for state signaling
-	if err := hooks.Inject(agent.WorktreePath); err != nil {
+	drv, err := driver.Get(item.Driver)
+	if err != nil {
+		drv, _ = driver.Get("") // default to claude-code
+	}
+	if err := drv.InjectHooks(agent.WorktreePath); err != nil {
 		m.log.Log("WARNING: Hook injection failed for %q: %v", agent.Name, err)
-		fmt.Fprintf(os.Stderr, "warning: could not inject hooks for agent '%s' (.claude/settings.json may be malformed): %v\n", agent.Name, err)
+		fmt.Fprintf(os.Stderr, "warning: could not inject hooks for agent '%s': %v\n", agent.Name, err)
 		stateFilePath = ""
 		m.fleet.UpdateAgentHooks(agent.Name, false)
 	} else {
@@ -386,14 +390,12 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	m.log.Log("Prompt written to file: %s (%d bytes)", promptFile, len(fullPrompt))
 
 	// Create a launcher script that reads the prompt from file.
-	// Variable expansion in "$prompt" does NOT re-interpret shell metacharacters,
-	// so the prompt content is passed to claude verbatim.
 	launcherFile := filepath.Join(promptsDir, agent.Name+".sh")
-	claudeArgs := ""
-	if m.yoloMode {
-		claudeArgs = " --dangerously-skip-permissions"
-	}
-	launcherScript := fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec claude%s -- \"$prompt\"\n", promptFile, claudeArgs)
+	launcherScript := drv.BuildCommand(driver.LaunchOpts{
+		YoloMode:   m.yoloMode,
+		PromptFile: promptFile,
+		AgentName:  agent.Name,
+	})
 	if err := os.WriteFile(launcherFile, []byte(launcherScript), 0755); err != nil {
 		m.log.Log("ERROR: Failed to write launcher script: %s", err)
 		m.statusMsg = fmt.Sprintf("Failed to write launcher script: %s", err)
@@ -420,6 +422,9 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 		m.log.Log("Agent %q PID: %d", agent.Name, pid)
 	}
 	m.fleet.UpdateAgent(agent.Name, "running", pid)
+	if item.Driver != "" && item.Driver != "claude-code" {
+		m.fleet.UpdateAgentDriver(agent.Name, item.Driver)
+	}
 	m.launched = append(m.launched, agent.Name)
 
 	return m.advance()
