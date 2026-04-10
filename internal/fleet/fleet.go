@@ -372,6 +372,19 @@ func (f *Fleet) UpdateAgentDriver(name, driverName string) error {
 	})
 }
 
+// UpdateAgentDriverConfig sets the driver config for an agent.
+func (f *Fleet) UpdateAgentDriverConfig(name string, config *DriverConfig) error {
+	return f.withLock(func() error {
+		for _, a := range f.Agents {
+			if a.Name == name {
+				a.DriverConfig = config
+				return nil
+			}
+		}
+		return fmt.Errorf("agent '%s' not found", name)
+	})
+}
+
 // CurrentBranch returns the currently checked-out branch of the fleet's root repo.
 func (f *Fleet) CurrentBranch() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")

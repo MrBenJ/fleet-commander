@@ -76,8 +76,8 @@ func TestGetForAgent(t *testing.T) {
 		if !ok {
 			t.Fatal("expected *GenericDriver")
 		}
-		if gd.Config.Command != "my-agent" {
-			t.Errorf("expected config command 'my-agent', got %q", gd.Config.Command)
+		if gd.config.Command != "my-agent" {
+			t.Errorf("expected config command 'my-agent', got %q", gd.config.Command)
 		}
 	})
 
