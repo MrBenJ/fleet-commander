@@ -71,7 +71,7 @@ func init() {
 	initCmd.Flags().String("name", "", "Short name for this repo (defaults to directory name)")
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
-	addCmd.Flags().String("driver", "claude-code", "Coding agent driver (claude-code, codex, aider, generic)")
+	addCmd.Flags().String("driver", "claude-code", "Coding agent driver (currently: claude-code)")
 	rootCmd.AddCommand(listCmd)
 	listCmd.Flags().Bool("agent-list", false, "Print only agent names, one per line (useful for piping to xargs)")
 	rootCmd.AddCommand(startCmd)

@@ -290,11 +290,27 @@ func startMultiRepoAgent(item MultiRepoAgentItem) error {
 	agent := item.Agent
 	f := item.Fleet
 
+	drv, err := driver.Get(agent.Driver)
+	if err != nil {
+		return fmt.Errorf("unknown driver %q: %w", agent.Driver, err)
+	}
+
+	if err := drv.CheckAvailable(); err != nil {
+		return err
+	}
+
 	statesDir := filepath.Join(f.FleetDir, "states")
 	if err := os.MkdirAll(statesDir, 0755); err != nil {
 		return err
 	}
 	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
+
+	if err := drv.InjectHooks(agent.WorktreePath); err != nil {
+		stateFilePath = ""
+		f.UpdateAgentHooks(agent.Name, false)
+	} else {
+		f.UpdateAgentHooks(agent.Name, true)
+	}
 
 	if err := item.Tmux.CreateSession(agent.Name, agent.WorktreePath, nil, stateFilePath); err != nil {
 		return err
