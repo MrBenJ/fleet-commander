@@ -16,24 +16,11 @@ func (d *ClaudeCodeDriver) Name() string {
 }
 
 func (d *ClaudeCodeDriver) BuildCommand(opts LaunchOpts) string {
-	var parts []string
-
-	if opts.PromptFile != "" {
-		parts = append(parts, fmt.Sprintf(`prompt=$(cat %q)`, opts.PromptFile))
-	}
-
-	claudeCmd := "claude"
+	claudeArgs := ""
 	if opts.YoloMode {
-		claudeCmd += " --dangerously-skip-permissions"
+		claudeArgs = " --dangerously-skip-permissions"
 	}
-
-	if opts.PromptFile != "" {
-		claudeCmd += ` -p "$prompt"`
-	}
-
-	parts = append(parts, claudeCmd)
-
-	return strings.Join(parts, " && ")
+	return fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec claude%s -- \"$prompt\"\n", opts.PromptFile, claudeArgs)
 }
 
 func (d *ClaudeCodeDriver) DetectState(bottomLines []string, fullContent string) *AgentState {
