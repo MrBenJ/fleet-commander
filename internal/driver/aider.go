@@ -76,7 +76,7 @@ func (d *AiderDriver) DetectState(bottomLines []string, fullContent string) *Age
 		return &s
 	}
 
-	if strings.Contains(bottomText, "Editing") || strings.Contains(bottomText, "Committing") {
+	if strings.Contains(bottomText, "Editing ") || strings.Contains(bottomText, "Committing ") {
 		s := StateWorking
 		return &s
 	}
