@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/global"
 	"github.com/MrBenJ/fleet-commander/internal/hooks"
@@ -21,6 +22,12 @@ var addCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		branch := args[1]
+		driverName, _ := cmd.Flags().GetString("driver")
+
+		// Validate driver name
+		if _, err := driver.Get(driverName); err != nil {
+			return err
+		}
 
 		f, err := fleet.Load(".")
 		if err != nil {
@@ -32,8 +39,16 @@ var addCmd = &cobra.Command{
 			return fmt.Errorf("failed to add agent: %w", err)
 		}
 
+		// Set driver on agent (empty means default claude-code)
+		if driverName != "claude-code" {
+			f.UpdateAgentDriver(name, driverName)
+		}
+
 		fmt.Printf("Agent '%s' created on branch '%s'\n", agent.Name, agent.Branch)
 		fmt.Printf("Worktree: %s\n", agent.WorktreePath)
+		if driverName != "claude-code" {
+			fmt.Printf("Driver: %s\n", driverName)
+		}
 		return nil
 	},
 }
