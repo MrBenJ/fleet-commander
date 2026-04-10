@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/global"
 	"github.com/MrBenJ/fleet-commander/internal/monitor"
@@ -135,6 +136,9 @@ func (m multiRepoModel) rebuildItems() []list.Item {
 		})
 
 		for _, a := range p.fleet.Agents {
+			if drv, err := driver.Get(a.Driver); err == nil {
+				p.mon.SetDriver(a.Name, drv)
+			}
 			snap := p.mon.CheckWithStateFile(a.Name, a.StateFilePath)
 			items = append(items, MultiRepoAgentItem{
 				AgentItem: AgentItem{
