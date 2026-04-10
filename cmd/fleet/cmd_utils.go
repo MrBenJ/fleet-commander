@@ -59,7 +59,7 @@ var unlockCmd = &cobra.Command{
 
 var signalCmd = &cobra.Command{
 	Use:    "signal [state]",
-	Short:  "Write agent state (called by Claude Code hooks)",
+	Short:  "Write agent state (called by coding agent hooks)",
 	Args:   cobra.ExactArgs(1),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

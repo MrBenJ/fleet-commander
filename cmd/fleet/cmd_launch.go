@@ -12,7 +12,7 @@ var launchCmd = &cobra.Command{
 	Use:   "launch",
 	Short: "Launch multiple agents from a list of prompts",
 	Long: `Enter a list of tasks or prompts, review auto-generated agent names
-and branches, then launch them all as parallel Claude Code sessions.
+and branches, then launch them all as parallel coding agent sessions.
 
 Each prompt becomes a separate agent with its own git worktree.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

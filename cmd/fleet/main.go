@@ -19,13 +19,13 @@ var rootCmd = &cobra.Command{
 	Use:     "fleet",
 	Short:   "Fleet Commander - Multi-agent orchestration for AI coding",
 	Version: version + " (" + commit + ")",
-	Long: `Fleet Commander lets you run multiple Claude Code instances in parallel,
+	Long: `Fleet Commander lets you run multiple AI coding agents in parallel,
 each on different branches. When agents need input, they queue up.
 
 Quick start:
   fleet init ~/projects/my-app
   fleet add feat-auth "feature/auth"
-  fleet add bug-fix "bugfix/login"
+  fleet add bug-fix "bugfix/login" --driver codex
   fleet queue`,
 }
 
