@@ -22,9 +22,18 @@ type Driver interface {
 	// Name returns the driver identifier (e.g., "claude-code").
 	Name() string
 
+	// InteractiveCommand returns the command and args to launch the agent in
+	// interactive mode (no prompt). Used by "fleet start" and the queue TUI.
+	InteractiveCommand() []string
+
 	// BuildCommand returns a shell script body (with shebang) that launches the
-	// agent. The caller writes this to a .sh file and passes it to tmux.
+	// agent with a prompt read from opts.PromptFile. Used by "fleet launch".
 	BuildCommand(opts LaunchOpts) string
+
+	// PlanCommand runs the agent as a one-shot planner: sends prompt, returns
+	// stdout+stderr. Used by "fleet launch" to expand user tasks into structured
+	// JSON (agent names, branches, prompts).
+	PlanCommand(prompt string) ([]byte, error)
 
 	// DetectState analyzes tmux pane content to determine agent state.
 	// bottomLines contains the last ~15 non-empty lines from the pane.

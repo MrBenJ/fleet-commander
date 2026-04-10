@@ -312,7 +312,7 @@ func startMultiRepoAgent(item MultiRepoAgentItem) error {
 		f.UpdateAgentHooks(agent.Name, true)
 	}
 
-	if err := item.Tmux.CreateSession(agent.Name, agent.WorktreePath, nil, stateFilePath); err != nil {
+	if err := item.Tmux.CreateSession(agent.Name, agent.WorktreePath, drv.InteractiveCommand(), stateFilePath); err != nil {
 		return err
 	}
 	f.UpdateAgentStateFile(agent.Name, stateFilePath)

@@ -200,7 +200,7 @@ var startCmd = &cobra.Command{
 				f.UpdateAgentHooks(agentName, true)
 			}
 
-			if err := tm.CreateSession(agentName, agent.WorktreePath, nil, stateFilePath); err != nil {
+			if err := tm.CreateSession(agentName, agent.WorktreePath, drv.InteractiveCommand(), stateFilePath); err != nil {
 				return fmt.Errorf("failed to create tmux session: %w", err)
 			}
 			fmt.Printf("Created tmux session for agent '%s'\n", agentName)

@@ -15,6 +15,14 @@ func (d *ClaudeCodeDriver) Name() string {
 	return "claude-code"
 }
 
+func (d *ClaudeCodeDriver) InteractiveCommand() []string {
+	return []string{"claude"}
+}
+
+func (d *ClaudeCodeDriver) PlanCommand(prompt string) ([]byte, error) {
+	return exec.Command("claude", "-p", prompt).CombinedOutput()
+}
+
 func (d *ClaudeCodeDriver) BuildCommand(opts LaunchOpts) string {
 	claudeArgs := ""
 	if opts.YoloMode {

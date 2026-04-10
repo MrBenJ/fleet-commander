@@ -151,6 +151,14 @@ func TestClaudeCodeDetectState(t *testing.T) {
 	}
 }
 
+func TestClaudeCodeInteractiveCommand(t *testing.T) {
+	d := &ClaudeCodeDriver{}
+	cmd := d.InteractiveCommand()
+	if len(cmd) != 1 || cmd[0] != "claude" {
+		t.Errorf("expected [\"claude\"], got %v", cmd)
+	}
+}
+
 func TestClaudeCodeCheckAvailable(t *testing.T) {
 	d := &ClaudeCodeDriver{}
 	// Just verify it doesn't panic; claude may or may not be installed
