@@ -9,7 +9,6 @@ import (
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/global"
-	"github.com/MrBenJ/fleet-commander/internal/hooks"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 	"github.com/MrBenJ/fleet-commander/internal/worktree"
 	"github.com/spf13/cobra"
@@ -288,8 +287,11 @@ var stopCmd = &cobra.Command{
 		}
 
 		// Remove fleet hooks so they don't fire after the session ends
-		if err := hooks.Remove(agent.WorktreePath); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+		drv, _ := driver.Get(agent.Driver)
+		if drv != nil {
+			if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+			}
 		}
 		f.UpdateAgentHooks(agentName, false)
 
@@ -331,8 +333,11 @@ Use --branch to also delete the branch.`,
 		}
 
 		// Remove fleet hooks from the worktree
-		if err := hooks.Remove(agent.WorktreePath); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+		drv, _ := driver.Get(agent.Driver)
+		if drv != nil {
+			if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+			}
 		}
 
 		// Remove state file if present
