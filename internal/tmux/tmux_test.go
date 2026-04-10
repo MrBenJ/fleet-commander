@@ -189,8 +189,9 @@ func TestCreateSession_DefaultCommand(t *testing.T) {
 	if !contains(c.Args, "/tmp/worktree") {
 		t.Error("expected args to contain worktree path")
 	}
-	if !contains(c.Args, "claude") {
-		t.Error("expected args to contain 'claude' as default command")
+	// When no command is given, tmux starts the user's default shell — no "claude" in args
+	if contains(c.Args, "claude") {
+		t.Error("args should not contain 'claude' when no command is given (driver handles this now)")
 	}
 }
 
@@ -239,7 +240,10 @@ func TestCreateSession_CustomCommand(t *testing.T) {
 	}
 }
 
-func TestCreateSession_ClaudeNotInPath(t *testing.T) {
+func TestCreateSession_NoCommandStartsShell(t *testing.T) {
+	// When no command is provided and claude is not in PATH,
+	// CreateSession should still succeed — the driver layer handles
+	// availability checks, not tmux.
 	f := &fakeRunner{
 		lookPath: map[string]error{
 			"claude": errors.New("not found"),
@@ -247,11 +251,8 @@ func TestCreateSession_ClaudeNotInPath(t *testing.T) {
 	}
 	m := NewManagerWithRunner("fleet", f)
 	err := m.CreateSession("auth", "/tmp/worktree", nil, "")
-	if err == nil {
-		t.Fatal("expected error when claude is not in PATH")
-	}
-	if !contains([]string{err.Error()}, "claude command not found in PATH") {
-		t.Errorf("unexpected error message: %v", err)
+	if err != nil {
+		t.Fatalf("expected no error when no command given (tmux uses default shell), got: %v", err)
 	}
 }
 

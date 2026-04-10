@@ -173,6 +173,17 @@ var startCmd = &cobra.Command{
 			return fmt.Errorf("tmux is not installed")
 		}
 
+		// Get the driver for this agent
+		drv, err := driver.Get(agent.Driver)
+		if err != nil {
+			return fmt.Errorf("failed to get driver for agent '%s': %w", agentName, err)
+		}
+
+		// Check that the agent CLI is available
+		if err := drv.CheckAvailable(); err != nil {
+			return err
+		}
+
 		// Create session if it doesn't exist
 		if !tm.SessionExists(agentName) {
 			statesDir := filepath.Join(f.FleetDir, "states")
@@ -181,7 +192,7 @@ var startCmd = &cobra.Command{
 			}
 			stateFilePath := filepath.Join(statesDir, agentName+".json")
 
-			if err := hooks.Inject(agent.WorktreePath); err != nil {
+			if err := drv.InjectHooks(agent.WorktreePath); err != nil {
 				// Non-fatal: common cause is malformed existing .claude/settings.json — check that file first.
 				fmt.Fprintf(os.Stderr, "warning: could not inject hooks into %s (.claude/settings.json may be malformed): %v\n", agent.WorktreePath, err)
 				stateFilePath = ""
