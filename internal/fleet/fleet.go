@@ -38,6 +38,7 @@ type Agent struct {
 	PID           int    `json:"pid"`
 	StateFilePath string `json:"state_file_path,omitempty"`
 	HooksOK       bool   `json:"hooks_ok"`
+	Driver        string `json:"driver,omitempty"`
 }
 
 const fleetDirName = ".fleet"
@@ -339,6 +340,19 @@ func (f *Fleet) UpdateAgentHooks(name string, hooksOK bool) error {
 		for _, a := range f.Agents {
 			if a.Name == name {
 				a.HooksOK = hooksOK
+				return nil
+			}
+		}
+		return fmt.Errorf("agent '%s' not found", name)
+	})
+}
+
+// UpdateAgentDriver sets the driver for an agent.
+func (f *Fleet) UpdateAgentDriver(name, driverName string) error {
+	return f.withLock(func() error {
+		for _, a := range f.Agents {
+			if a.Name == name {
+				a.Driver = driverName
 				return nil
 			}
 		}
