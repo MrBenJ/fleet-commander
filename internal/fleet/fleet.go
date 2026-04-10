@@ -29,16 +29,28 @@ type Fleet struct {
 	Agents    []*Agent `json:"agents"`
 }
 
+// DriverConfig holds configuration for the generic driver or custom agent commands.
+type DriverConfig struct {
+	Command         string   `json:"command,omitempty"`
+	Args            []string `json:"args,omitempty"`
+	YoloArgs        []string `json:"yolo_args,omitempty"`
+	PromptFlag      string   `json:"prompt_flag,omitempty"`
+	PromptFromFile  bool     `json:"prompt_from_file,omitempty"`
+	WaitingPatterns []string `json:"waiting_patterns,omitempty"`
+	WorkingPatterns []string `json:"working_patterns,omitempty"`
+}
+
 // Agent represents a single agent workspace
 type Agent struct {
-	Name          string `json:"name"`
-	Branch        string `json:"branch"`
-	WorktreePath  string `json:"worktree_path"`
-	Status        string `json:"status"`
-	PID           int    `json:"pid"`
-	StateFilePath string `json:"state_file_path,omitempty"`
-	HooksOK       bool   `json:"hooks_ok"`
-	Driver        string `json:"driver,omitempty"`
+	Name          string        `json:"name"`
+	Branch        string        `json:"branch"`
+	WorktreePath  string        `json:"worktree_path"`
+	Status        string        `json:"status"`
+	PID           int           `json:"pid"`
+	StateFilePath string        `json:"state_file_path,omitempty"`
+	HooksOK       bool          `json:"hooks_ok"`
+	Driver        string        `json:"driver,omitempty"`
+	DriverConfig  *DriverConfig `json:"driver_config,omitempty"`
 }
 
 const fleetDirName = ".fleet"
