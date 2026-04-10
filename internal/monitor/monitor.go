@@ -9,14 +9,16 @@ import (
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
-// AgentState represents what the agent is currently doing
-type AgentState string
+// AgentState is an alias for driver.AgentState. The canonical definition
+// lives in internal/driver/. This alias keeps existing monitor consumers
+// compiling without changing their imports.
+type AgentState = driver.AgentState
 
 const (
-	StateWorking  AgentState = "working"  // Agent is actively producing output
-	StateWaiting  AgentState = "waiting"  // Agent is waiting for user input
-	StateStopped  AgentState = "stopped"  // Session not running
-	StateStarting AgentState = "starting" // Session just created
+	StateWorking  = driver.StateWorking
+	StateWaiting  = driver.StateWaiting
+	StateStopped  = driver.StateStopped
+	StateStarting = driver.StateStarting
 )
 
 // Snapshot holds a point-in-time capture of an agent's terminal

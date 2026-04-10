@@ -12,9 +12,10 @@ const (
 
 // LaunchOpts contains options passed when launching an agent.
 type LaunchOpts struct {
-	YoloMode   bool
-	PromptFile string
-	AgentName  string
+	YoloMode      bool   // Skip all permission prompts / reviews
+	PromptFile    string // Path to file containing the full prompt text
+	StateFilePath string // Path where the agent should write state updates
+	AgentName     string // The fleet agent name
 }
 
 // Driver defines the interface for a coding agent backend.

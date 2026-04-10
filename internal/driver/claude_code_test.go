@@ -193,6 +193,36 @@ func TestGetDriver(t *testing.T) {
 		}
 	})
 
+	t.Run("codex", func(t *testing.T) {
+		d, err := Get("codex")
+		if err != nil {
+			t.Fatalf("Get('codex') returned error: %v", err)
+		}
+		if d.Name() != "codex" {
+			t.Errorf("expected 'codex', got %q", d.Name())
+		}
+	})
+
+	t.Run("aider", func(t *testing.T) {
+		d, err := Get("aider")
+		if err != nil {
+			t.Fatalf("Get('aider') returned error: %v", err)
+		}
+		if d.Name() != "aider" {
+			t.Errorf("expected 'aider', got %q", d.Name())
+		}
+	})
+
+	t.Run("generic", func(t *testing.T) {
+		d, err := Get("generic")
+		if err != nil {
+			t.Fatalf("Get('generic') returned error: %v", err)
+		}
+		if d.Name() != "generic" {
+			t.Errorf("expected 'generic', got %q", d.Name())
+		}
+	})
+
 	t.Run("nonexistent returns error", func(t *testing.T) {
 		_, err := Get("nonexistent")
 		if err == nil {
@@ -203,14 +233,13 @@ func TestGetDriver(t *testing.T) {
 
 func TestAvailable(t *testing.T) {
 	names := Available()
-	found := false
-	for _, name := range names {
-		if name == "claude-code" {
-			found = true
-			break
-		}
+	expected := []string{"aider", "claude-code", "codex", "generic"}
+	if len(names) != len(expected) {
+		t.Fatalf("Available() returned %v, want %v", names, expected)
 	}
-	if !found {
-		t.Errorf("Available() should include 'claude-code', got: %v", names)
+	for i, name := range names {
+		if name != expected[i] {
+			t.Errorf("Available()[%d] = %q, want %q", i, name, expected[i])
+		}
 	}
 }
