@@ -1,10 +1,12 @@
 # Fleet Commander
 
-A CLI + TUI tool for managing parallel Claude Code sessions across multiple repositories, each agent in its own git worktree. You stay in control -- there is no AI coordinator.
+A CLI + TUI tool for managing parallel coding-agent sessions across multiple repositories, each agent in its own git worktree. You stay in control -- there is no AI coordinator.
+
+Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Aider, and arbitrary terminal-based agents are supported via the driver system.
 
 ## How It Works
 
-Fleet Commander gives each Claude Code instance its own git worktree and tmux session. You switch between agents using a TUI queue that shows which agents are working and which need your input. With multi-repo support, you can manage fleets across different repositories from a single interface.
+Fleet Commander gives each agent its own git worktree and tmux session. You switch between agents using a TUI queue that shows which agents are working and which need your input. With multi-repo support, you can manage fleets across different repositories from a single interface.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -77,7 +79,9 @@ fleet queue
 | `fleet init <repo>` | Initialize a fleet for a repository (also creates `.fleet/FLEET_SYSTEM_PROMPT.md`) |
 | `fleet init <repo> --name <short>` | Initialize with a custom short name (defaults to directory basename) |
 | `fleet add <name> <branch>` | Add a new agent with its own worktree and branch |
+| `fleet add <name> <branch> --driver <name>` | Add an agent backed by a specific driver (`claude-code`, `codex`, `aider`, `generic`) |
 | `fleet remove <name>` | Remove an agent, kill its session, clean up worktree |
+| `fleet clear [--force]` | Remove every agent: kill sessions, tear down worktrees, drop from config (branches kept) |
 | `fleet rename <old> <new>` | Rename an agent and move its worktree (agent must be stopped) |
 | `fleet list` | Show all agents with status, branch, hooks, and PID |
 | `fleet list --agent-list` | Print only agent names, one per line (useful for piping to `xargs`) |
@@ -221,6 +225,28 @@ Hooks are automatically injected when an agent starts and cleaned up when it sto
 ## System Prompt
 
 `fleet init` creates `.fleet/FLEET_SYSTEM_PROMPT.md` with sensible defaults that teach agents how to use the shared context system, identify themselves via the `FLEET_AGENT_NAME` environment variable, and coordinate with other agents. You can edit this file to customize agent behavior across your entire fleet.
+
+## Drivers
+
+Fleet Commander talks to coding agents through a `Driver` interface, so you're not locked into Claude Code. Pick a driver per agent with `fleet add <name> <branch> --driver <driver>`.
+
+| Driver | Agent | Notes |
+|--------|-------|-------|
+| `claude-code` (default) | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Full support: hook-based state signaling, system prompts, YOLO mode |
+| `codex` | [Codex CLI](https://github.com/openai/codex) | Pane-scrape state detection |
+| `aider` | [Aider](https://aider.chat) | Pane-scrape state detection |
+| `generic` | Any terminal-based agent | Supply `--command`, optional `--prompt-flag` and `--yolo-args` |
+
+Example -- add a Codex agent and a custom agent alongside Claude Code:
+
+```bash
+fleet add feat-auth feature/auth                         # Claude Code (default)
+fleet add codex-refactor refactor/api --driver codex     # Codex CLI
+fleet add my-agent feature/x --driver generic \
+  --command my-cli --prompt-flag --prompt                # arbitrary agent
+```
+
+Each driver implements its own state detection (so the queue TUI still shows "needs input" vs "working"), hook injection where supported, and command building. See `docs/drivers/` for interface details.
 
 ## YOLO Mode
 
