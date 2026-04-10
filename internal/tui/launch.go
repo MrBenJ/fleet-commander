@@ -354,7 +354,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
 
 	// Inject hooks for state signaling
-	drv, err := driver.Get(item.Driver)
+	drv, err := driver.GetForAgent(agent)
 	if err != nil {
 		drv, _ = driver.Get("") // default to claude-code
 	}

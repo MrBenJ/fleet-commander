@@ -23,9 +23,28 @@ var addCmd = &cobra.Command{
 		branch := args[1]
 		driverName, _ := cmd.Flags().GetString("driver")
 
-		// Validate driver name
-		if _, err := driver.Get(driverName); err != nil {
-			return err
+		// Validate driver name (generic is always valid since it's config-driven)
+		if driverName != "generic" {
+			if _, err := driver.Get(driverName); err != nil {
+				return err
+			}
+		}
+
+		// Build DriverConfig for generic driver
+		var driverConfig *fleet.DriverConfig
+		if driverName == "generic" {
+			command, _ := cmd.Flags().GetString("command")
+			if command == "" {
+				return fmt.Errorf("--command is required when using --driver generic")
+			}
+			promptFlag, _ := cmd.Flags().GetString("prompt-flag")
+			yoloArgs, _ := cmd.Flags().GetStringSlice("yolo-args")
+
+			driverConfig = &fleet.DriverConfig{
+				Command:    command,
+				PromptFlag: promptFlag,
+				YoloArgs:   yoloArgs,
+			}
 		}
 
 		f, err := fleet.Load(".")
@@ -41,6 +60,11 @@ var addCmd = &cobra.Command{
 		// Set driver on agent (empty means default claude-code)
 		if driverName != "claude-code" {
 			f.UpdateAgentDriver(name, driverName)
+		}
+
+		// Set driver config for generic agents
+		if driverConfig != nil {
+			f.UpdateAgentDriverConfig(name, driverConfig)
 		}
 
 		fmt.Printf("Agent '%s' created on branch '%s'\n", agent.Name, agent.Branch)
@@ -173,7 +197,7 @@ var startCmd = &cobra.Command{
 		}
 
 		// Get the driver for this agent
-		drv, err := driver.Get(agent.Driver)
+		drv, err := driver.GetForAgent(agent)
 		if err != nil {
 			return fmt.Errorf("failed to get driver for agent '%s': %w", agentName, err)
 		}
@@ -287,7 +311,7 @@ var stopCmd = &cobra.Command{
 		}
 
 		// Remove fleet hooks so they don't fire after the session ends
-		drv, _ := driver.Get(agent.Driver)
+		drv, _ := driver.GetForAgent(agent)
 		if drv != nil {
 			if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
@@ -333,7 +357,7 @@ Use --branch to also delete the branch.`,
 		}
 
 		// Remove fleet hooks from the worktree
-		drv, _ := driver.Get(agent.Driver)
+		drv, _ := driver.GetForAgent(agent)
 		if drv != nil {
 			if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)

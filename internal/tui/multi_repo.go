@@ -136,7 +136,7 @@ func (m multiRepoModel) rebuildItems() []list.Item {
 		})
 
 		for _, a := range p.fleet.Agents {
-			if drv, err := driver.Get(a.Driver); err == nil {
+			if drv, err := driver.GetForAgent(a); err == nil {
 				p.mon.SetDriver(a.Name, drv)
 			}
 			snap := p.mon.CheckWithStateFile(a.Name, a.StateFilePath)
@@ -290,7 +290,7 @@ func startMultiRepoAgent(item MultiRepoAgentItem) error {
 	agent := item.Agent
 	f := item.Fleet
 
-	drv, err := driver.Get(agent.Driver)
+	drv, err := driver.GetForAgent(agent)
 	if err != nil {
 		return fmt.Errorf("unknown driver %q: %w", agent.Driver, err)
 	}

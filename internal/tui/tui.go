@@ -102,7 +102,7 @@ func New(f *fleet.Fleet) Model {
 func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.Item {
 	items := []list.Item{AddNewItem{}}
 	for _, a := range f.Agents {
-		if drv, err := driver.Get(a.Driver); err == nil {
+		if drv, err := driver.GetForAgent(a); err == nil {
 			mon.SetDriver(a.Name, drv)
 		}
 		snap := mon.CheckWithStateFile(a.Name, a.StateFilePath)
@@ -118,7 +118,7 @@ func buildItems(f *fleet.Fleet, tm *tmux.Manager, mon *monitor.Monitor) []list.I
 // startAgentSession creates a tmux session for an agent, injecting hooks and
 // wiring the state file path.
 func (m *Model) startAgentSession(agent *fleet.Agent) error {
-	drv, err := driver.Get(agent.Driver)
+	drv, err := driver.GetForAgent(agent)
 	if err != nil {
 		return fmt.Errorf("unknown driver %q: %w", agent.Driver, err)
 	}
@@ -255,7 +255,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.fleet.UpdateAgentStateFile(agent.Name, "")
 				}
-				drv, _ := driver.Get(agent.Driver)
+				drv, _ := driver.GetForAgent(agent)
 				if drv != nil {
 					if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
 						m.statusMsg = "⚠ could not remove hooks: " + err.Error()

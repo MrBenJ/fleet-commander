@@ -206,13 +206,10 @@ func TestGetDriver(t *testing.T) {
 		}
 	})
 
-	t.Run("generic", func(t *testing.T) {
-		d, err := Get("generic")
-		if err != nil {
-			t.Fatalf("Get('generic') returned error: %v", err)
-		}
-		if d.Name() != "generic" {
-			t.Errorf("expected 'generic', got %q", d.Name())
+	t.Run("generic requires config via GetForAgent", func(t *testing.T) {
+		_, err := Get("generic")
+		if err == nil {
+			t.Fatal("Get('generic') should error — generic driver requires GetForAgent with config")
 		}
 	})
 
