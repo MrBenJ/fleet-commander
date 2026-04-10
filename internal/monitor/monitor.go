@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/state"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
@@ -31,6 +32,7 @@ type Snapshot struct {
 type Monitor struct {
 	tmux      *tmux.Manager
 	snapshots map[string]*Snapshot
+	drivers   map[string]driver.Driver
 }
 
 // NewMonitor creates a new agent monitor
@@ -38,7 +40,13 @@ func NewMonitor(tm *tmux.Manager) *Monitor {
 	return &Monitor{
 		tmux:      tm,
 		snapshots: make(map[string]*Snapshot),
+		drivers:   make(map[string]driver.Driver),
 	}
+}
+
+// SetDriver registers a driver for agent-specific state detection.
+func (m *Monitor) SetDriver(agentName string, drv driver.Driver) {
+	m.drivers[agentName] = drv
 }
 
 // Check captures the current state of an agent
@@ -65,6 +73,20 @@ func (m *Monitor) Check(agentName string) *Snapshot {
 
 	snap.Content = content
 	snap.LastLine = getLastNonEmptyLine(content)
+
+	// Try driver-based detection first
+	if drv, ok := m.drivers[agentName]; ok {
+		stripped := stripANSI(content)
+		allLines := strings.Split(stripped, "\n")
+		bottomLines := getLastNonEmptyLines(allLines, paneBottomLines)
+		if state := drv.DetectState(bottomLines, stripped); state != nil {
+			snap.State = AgentState(*state)
+			m.snapshots[agentName] = snap
+			return snap
+		}
+	}
+
+	// Fallback to legacy detectState
 	snap.State = detectState(snap.LastLine, content)
 
 	m.snapshots[agentName] = snap
