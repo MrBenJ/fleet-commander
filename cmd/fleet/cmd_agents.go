@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
@@ -325,6 +327,59 @@ var stopCmd = &cobra.Command{
 	},
 }
 
+func removeAgentFromFleet(f *fleet.Fleet, agentName string, deleteBranch bool) error {
+	agent, err := f.GetAgent(agentName)
+	if err != nil {
+		return err
+	}
+
+	tm := tmux.NewManager(f.TmuxPrefix())
+	if tm.SessionExists(agentName) {
+		fmt.Printf("Killing tmux session for '%s'...\n", agentName)
+		if err := tm.KillSession(agentName); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not kill tmux session for '%s': %v\n", agentName, err)
+		}
+	}
+
+	drv, _ := driver.GetForAgent(agent)
+	if drv != nil {
+		if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+		}
+	}
+
+	if agent.StateFilePath != "" {
+		if err := os.Remove(agent.StateFilePath); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "warning: could not remove state file: %v\n", err)
+		}
+	}
+
+	fmt.Printf("Removing worktree at %s...\n", agent.WorktreePath)
+	wt := worktree.NewManager(f.RepoPath)
+	if err := wt.Remove(agent.WorktreePath); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not clean up worktree: %v\n", err)
+	}
+
+	if deleteBranch {
+		fmt.Printf("Deleting branch '%s'...\n", agent.Branch)
+		deleteBr := exec.Command("git", "branch", "-D", agent.Branch)
+		deleteBr.Dir = f.RepoPath
+		if out, err := deleteBr.CombinedOutput(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not delete branch: %s\n", string(out))
+		}
+	}
+
+	if err := f.RemoveAgent(agentName); err != nil {
+		return err
+	}
+
+	fmt.Printf("✅ Agent '%s' removed\n", agentName)
+	if !deleteBranch {
+		fmt.Printf("Branch '%s' preserved (push it for a PR, or use --branch to delete)\n", agent.Branch)
+	}
+	return nil
+}
+
 var removeCmd = &cobra.Command{
 	Use:   "remove [agent-name]",
 	Short: "Remove an agent and clean up its worktree",
@@ -334,69 +389,67 @@ The branch is NOT deleted — it stays in git for PRs and review.
 Use --branch to also delete the branch.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		agentName := args[0]
 		deleteBranch, _ := cmd.Flags().GetBool("branch")
+		f, err := fleet.Load(".")
+		if err != nil {
+			return fmt.Errorf("failed to load fleet: %w", err)
+		}
+		return removeAgentFromFleet(f, args[0], deleteBranch)
+	},
+}
+
+var clearCmd = &cobra.Command{
+	Use:   "clear",
+	Short: "Remove all agents from the fleet",
+	Long: `Remove every agent in the fleet: kill tmux sessions, tear down worktrees,
+and drop them from fleet config. Branches remain in git for review.
+
+Use --force to skip the confirmation prompt.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		force, _ := cmd.Flags().GetBool("force")
 
 		f, err := fleet.Load(".")
 		if err != nil {
 			return fmt.Errorf("failed to load fleet: %w", err)
 		}
 
-		agent, err := f.GetAgent(agentName)
-		if err != nil {
-			return err
+		if len(f.Agents) == 0 {
+			fmt.Println("No agents to clear.")
+			return nil
 		}
 
-		// Kill tmux session if running
-		tm := tmux.NewManager(f.TmuxPrefix())
-		if tm.SessionExists(agentName) {
-			fmt.Printf("Killing tmux session for '%s'...\n", agentName)
-			if err := tm.KillSession(agentName); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: could not kill tmux session for '%s': %v\n", agentName, err)
+		if !force {
+			for _, a := range f.Agents {
+				fmt.Println(a.Name)
+			}
+			fmt.Println()
+			fmt.Println("The above agents will be killed, worktrees terminated (but still saved in git) + pruned, and removed from fleet.")
+			fmt.Print("Are you sure you want to continue? [y/N] ")
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			answer := strings.TrimSpace(scanner.Text())
+			if !strings.EqualFold(answer, "y") && !strings.EqualFold(answer, "yes") {
+				fmt.Println("Aborted.")
+				return nil
 			}
 		}
 
-		// Remove fleet hooks from the worktree
-		drv, _ := driver.GetForAgent(agent)
-		if drv != nil {
-			if err := drv.RemoveHooks(agent.WorktreePath); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: could not remove hooks: %v\n", err)
+		names := make([]string, len(f.Agents))
+		for i, a := range f.Agents {
+			names[i] = a.Name
+		}
+
+		removed := 0
+		for _, name := range names {
+			if err := removeAgentFromFleet(f, name, false); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to remove '%s': %v\n", name, err)
+				continue
 			}
+			removed++
 		}
 
-		// Remove state file if present
-		if agent.StateFilePath != "" {
-			if err := os.Remove(agent.StateFilePath); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: could not remove state file: %v\n", err)
-			}
-		}
-
-		// Remove git worktree
-		fmt.Printf("Removing worktree at %s...\n", agent.WorktreePath)
-		wt := worktree.NewManager(f.RepoPath)
-		if err := wt.Remove(agent.WorktreePath); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not clean up worktree: %v\n", err)
-		}
-
-		// Optionally delete branch
-		if deleteBranch {
-			fmt.Printf("Deleting branch '%s'...\n", agent.Branch)
-			deleteBr := exec.Command("git", "branch", "-D", agent.Branch)
-			deleteBr.Dir = f.RepoPath
-			if out, err := deleteBr.CombinedOutput(); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: could not delete branch: %s\n", string(out))
-			}
-		}
-
-		// Remove agent from fleet config
-		if err := f.RemoveAgent(agentName); err != nil {
-			return err
-		}
-
-		fmt.Printf("✅ Agent '%s' removed\n", agentName)
-		if !deleteBranch {
-			fmt.Printf("Branch '%s' preserved (push it for a PR, or use --branch to delete)\n", agent.Branch)
-		}
+		fmt.Printf("\nCleared %d/%d agents.\n", removed, len(names))
 		return nil
 	},
 }

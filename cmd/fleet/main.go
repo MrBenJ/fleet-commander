@@ -83,6 +83,8 @@ func init() {
 	rootCmd.AddCommand(queueCmd)
 	rootCmd.AddCommand(launchCmd)
 	rootCmd.AddCommand(removeCmd)
+	rootCmd.AddCommand(clearCmd)
+	clearCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	rootCmd.AddCommand(renameCmd)
 	rootCmd.AddCommand(hintCmd)
 	rootCmd.AddCommand(signalCmd)
