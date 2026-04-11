@@ -96,3 +96,39 @@ func TestBuildConsensusSuffix_ReviewMaster_NonReviewer(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildMergerSuffix(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "a", Branch: "squadron/alpha/a"},
+		{Name: "b", Branch: "squadron/alpha/b"},
+		{Name: "c", Branch: "squadron/alpha/c"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "main", agents)
+
+	mustContain := []string{
+		"Squadron Merge Duties",
+		"MERGE MASTER",
+		`squadron "alpha"`,
+		"git checkout main",
+		"git checkout -b squadron/alpha",
+		"git merge --no-ff",
+		"a -> squadron/alpha/a",
+		"b -> squadron/alpha/b",
+		"c -> squadron/alpha/c",
+		`"MERGE_COMPLETE: squadron/alpha"`,
+		`"MERGE_FAILED:`,
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("merger suffix missing %q\n---\n%s", s, got)
+		}
+	}
+
+	// Ordering: all three agents present in array order (including merger's own — caller decides who's merger)
+	aIdx := strings.Index(got, "a -> squadron/alpha/a")
+	bIdx := strings.Index(got, "b -> squadron/alpha/b")
+	cIdx := strings.Index(got, "c -> squadron/alpha/c")
+	if !(aIdx < bIdx && bIdx < cIdx) {
+		t.Errorf("merge order not preserved: a=%d b=%d c=%d", aIdx, bIdx, cIdx)
+	}
+}

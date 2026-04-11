@@ -111,6 +111,52 @@ func BuildReviewMasterReviewerSuffix(squadronName string, agents []string, baseB
 	)
 }
 
+const mergerTemplate = `---
+
+## Squadron Merge Duties
+
+You are also the MERGE MASTER for squadron "%s". After the squadron reaches consensus (all APPROVED for review modes, or all COMPLETED for none mode), you must merge everyone's work into a single squadron branch.
+
+1. Create the squadron branch from the base:
+   git checkout %s
+   git checkout -b squadron/%s
+
+2. Merge each agent's working branch in sequentially (in the order listed below):
+   git merge --no-ff <agent-branch>
+
+3. If a merge produces conflicts, resolve them yourself. Use each agent's original prompt (available in the squadron channel) as context for what they were trying to accomplish. Prefer preserving all agents' intent.
+
+4. After all merges succeed, announce:
+   fleet context channel-send squadron-%s "MERGE_COMPLETE: squadron/%s"
+
+5. If a merge fails and you cannot resolve it safely, announce:
+   fleet context channel-send squadron-%s "MERGE_FAILED: <agent-name> - <reason>"
+   and stop. Do not force-merge or discard changes.
+
+Agent branches to merge (in order):
+%s
+`
+
+// BuildMergerSuffix returns the merger-duties suffix appended to the merge
+// master's prompt. Pass every agent in the squadron (including the merger
+// itself) in the order they should be merged.
+func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch) string {
+	var lines []string
+	for _, ab := range agents {
+		lines = append(lines, fmt.Sprintf("%s -> %s", ab.Name, ab.Branch))
+	}
+	list := strings.Join(lines, "\n")
+
+	return fmt.Sprintf(
+		mergerTemplate,
+		squadronName,
+		baseBranch, squadronName,
+		squadronName, squadronName,
+		squadronName,
+		list,
+	)
+}
+
 // BuildConsensusSuffix returns the prompt suffix appended to every agent's
 // prompt based on the consensus type. Returns "" for "none" (no suffix).
 //
