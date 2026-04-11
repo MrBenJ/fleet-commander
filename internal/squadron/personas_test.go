@@ -35,3 +35,29 @@ func TestApplyPersona_PrependsPreamble(t *testing.T) {
 		t.Error("preamble should come before the original prompt")
 	}
 }
+
+func TestBuiltInPersonas(t *testing.T) {
+	want := []string{
+		"overconfident-engineer",
+		"zen-master",
+		"paranoid-perfectionist",
+		"raging-jerk",
+		"peter-molyneux",
+	}
+	for _, key := range want {
+		p, ok := squadron.LookupPersona(key)
+		if !ok {
+			t.Errorf("persona %q not registered", key)
+			continue
+		}
+		if p.Name != key {
+			t.Errorf("persona %q has Name=%q", key, p.Name)
+		}
+		if p.DisplayName == "" {
+			t.Errorf("persona %q missing DisplayName", key)
+		}
+		if len(p.Preamble) < 100 {
+			t.Errorf("persona %q preamble too short (%d bytes)", key, len(p.Preamble))
+		}
+	}
+}
