@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/squadron"
@@ -346,6 +348,40 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	item := m.prompts[m.currentIdx]
 	m.log.Log("launchCurrent: agent=%q branch=%q prompt_len=%d", item.AgentName, item.Branch, len(item.Prompt))
 
+	if m.squadronMode && !m.squadronChannelCreated {
+		if m.baseBranch == "" {
+			if cb, err := m.fleet.CurrentBranch(); err == nil {
+				m.baseBranch = cb
+			} else {
+				m.log.Log("WARNING: could not resolve base branch: %v", err)
+				m.baseBranch = "main"
+			}
+		}
+
+		agentNames := make([]string, 0, len(m.prompts))
+		for _, p := range m.prompts {
+			agentNames = append(agentNames, p.AgentName)
+		}
+
+		if m.consensusType == "review_master" && m.reviewMaster == "" {
+			m.reviewMaster = agentNames[rand.Intn(len(agentNames))]
+			m.log.Log("Squadron review master selected: %s", m.reviewMaster)
+		}
+		if m.autoMerge && m.mergeMaster == "" {
+			m.mergeMaster = agentNames[rand.Intn(len(agentNames))]
+			m.log.Log("Squadron merge master selected: %s", m.mergeMaster)
+		}
+
+		channelName := "squadron-" + m.squadronName
+		description := fmt.Sprintf("Squadron %s (%s)", m.squadronName, m.consensusType)
+		if _, err := fleetctx.CreateChannel(m.fleet.FleetDir, channelName, description, agentNames); err != nil {
+			m.log.Log("NOTE: squadron channel create returned: %v (ignored if already exists)", err)
+		} else {
+			m.log.Log("Squadron channel created: %s", channelName)
+		}
+		m.squadronChannelCreated = true
+	}
+
 	// In YOLO mode, append auto-merge instructions to the prompt (unless suppressed)
 	if m.yoloMode && !m.noAutoMerge && m.targetBranch != "" {
 		item.Prompt = item.Prompt + fmt.Sprintf(`
@@ -407,6 +443,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 
 	// Assemble full prompt with system prompt and roster
 	fullPrompt := buildFullPrompt(m.systemPrompt, m.prompts, item)
+	fullPrompt = m.applySquadronSuffixes(item.AgentName, fullPrompt)
 	m.log.Log("Full prompt assembled: %d bytes", len(fullPrompt))
 
 	// Write prompt to file to avoid shell metacharacter issues in tmux.
