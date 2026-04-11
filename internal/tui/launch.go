@@ -173,6 +173,21 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoM
 	}
 }
 
+func newSquadronLaunchModel(f *fleet.Fleet, useJumpSh bool) LaunchModel {
+	m := newLaunchModel(f, true, true, true, useJumpSh)
+	m.squadronMode = true
+	m.autoMerge = true
+	m.personas = map[string]string{}
+
+	ni := textinput.New()
+	ni.Placeholder = "alpha"
+	ni.CharLimit = 30
+	m.squadronNameInput = ni
+
+	m.mode = launchModeSquadronConsensus
+	return m
+}
+
 func (m LaunchModel) Init() tea.Cmd {
 	return textarea.Blink
 }

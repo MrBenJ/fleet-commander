@@ -615,3 +615,27 @@ func TestParseClaudeResponse_MultipleItems(t *testing.T) {
 		t.Fatalf("expected 3 items, got %d", len(items))
 	}
 }
+
+func TestNewSquadronLaunchModel_Defaults(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+
+	if !m.squadronMode {
+		t.Error("squadronMode should be true")
+	}
+	if !m.yoloMode {
+		t.Error("squadron mode implies yoloMode=true")
+	}
+	if !m.noAutoMerge {
+		t.Error("squadron mode implies noAutoMerge=true (per-agent auto-merge off)")
+	}
+	if !m.skipYoloConfirm {
+		t.Error("squadron mode implies skipYoloConfirm=true")
+	}
+	if m.mode != launchModeSquadronConsensus {
+		t.Errorf("initial mode = %v, want squadronConsensus", m.mode)
+	}
+	if !m.autoMerge {
+		t.Error("autoMerge (squadron-level) should default to true")
+	}
+}
