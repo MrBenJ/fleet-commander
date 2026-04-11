@@ -585,3 +585,25 @@ func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge 
 
 	return nil
 }
+
+func RunSquadronLaunch(f *fleet.Fleet, useJumpSh bool) error {
+	m := newSquadronLaunchModel(f, useJumpSh)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+
+	finalModel, err := p.Run()
+	if m.log != nil {
+		logPath := m.log.Path()
+		m.log.Close()
+		if logPath != "" {
+			fmt.Fprintf(os.Stderr, "Launch log: %s\n", logPath)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("failed to run squadron launch TUI: %w", err)
+	}
+
+	if fm, ok := finalModel.(LaunchModel); ok && fm.statusMsg != "" {
+		fmt.Fprintf(os.Stderr, "Launch error: %s\n", fm.statusMsg)
+	}
+	return nil
+}
