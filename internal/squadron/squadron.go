@@ -1,5 +1,43 @@
 package squadron
 
+import (
+	"fmt"
+	"strings"
+)
+
+const universalTemplate = `---
+
+## Squadron Consensus Protocol (UNIVERSAL)
+
+You are a member of squadron "%s". Your squadron channel is ` + "`squadron-%s`" + `.
+
+After completing your primary task, you MUST participate in the squadron review process:
+
+1. Announce completion:
+   fleet context channel-send squadron-%s "COMPLETED: <one-line summary of what you did>"
+
+2. Poll for other agents' status (every 30 seconds):
+   fleet context channel-read squadron-%s
+
+3. Once ALL squadron members have posted COMPLETED, review each agent's work:
+   - Check out their branch: git diff %s...<their-branch>
+   - Evaluate: does their work meet the requirements described in their prompt?
+
+4. Post your review for each agent:
+   fleet context channel-send squadron-%s "APPROVED: <agent-name>"
+   OR
+   fleet context channel-send squadron-%s "CHANGES_REQUESTED: <agent-name> - <reason>"
+
+5. If changes are requested on YOUR work, address them and re-announce:
+   fleet context channel-send squadron-%s "REVISED: <summary of changes>"
+
+6. Your work is ONLY complete when:
+   - You have approved ALL other squadron members
+   - ALL other squadron members have approved you
+
+Squadron members: %s
+`
+
 // AgentBranch pairs an agent name with its working branch.
 // Used by BuildMergerSuffix to render the merge list.
 type AgentBranch struct {
@@ -20,8 +58,17 @@ type AgentBranch struct {
 // non-reviewer agents UNLESS the caller wants the reviewer's suffix — see
 // BuildReviewMasterSuffix for that case.
 func BuildConsensusSuffix(consensusType, squadronName string, agents []string, reviewMaster, baseBranch string) string {
-	if consensusType == "none" {
+	switch consensusType {
+	case "none":
 		return ""
+	case "universal":
+		return fmt.Sprintf(
+			universalTemplate,
+			squadronName, squadronName, squadronName, squadronName,
+			baseBranch,
+			squadronName, squadronName, squadronName,
+			strings.Join(agents, ", "),
+		)
 	}
 	return ""
 }
