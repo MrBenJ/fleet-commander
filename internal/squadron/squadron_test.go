@@ -40,3 +40,59 @@ func TestBuildConsensusSuffix_Universal(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildConsensusSuffix_ReviewMaster_Reviewer(t *testing.T) {
+	// When the caller asks for the review master's own suffix — passing
+	// reviewMaster == "" signals "build for a non-reviewer". To build the
+	// reviewer's own suffix, pass their name in the `selfAgent` argument via
+	// the dedicated BuildReviewMasterReviewerSuffix helper.
+	got := squadron.BuildReviewMasterReviewerSuffix(
+		"alpha",
+		[]string{"a", "b", "c"},
+		"main",
+	)
+	mustContain := []string{
+		"Squadron Consensus Protocol (REVIEW MASTER)",
+		"You are the REVIEW MASTER",
+		`squadron "alpha"`,
+		"squadron-alpha",
+		"git diff main...<their-branch>",
+		`"ALL_APPROVED:`,
+		"Squadron members: a, b, c",
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("reviewer suffix missing %q\n---\n%s", s, got)
+		}
+	}
+}
+
+func TestBuildConsensusSuffix_ReviewMaster_NonReviewer(t *testing.T) {
+	got := squadron.BuildConsensusSuffix(
+		"review_master",
+		"alpha",
+		[]string{"a", "b", "c"},
+		"b", // review master
+		"main",
+	)
+	mustContain := []string{
+		"Squadron Consensus Protocol (REVIEW MASTER)",
+		"You are a member of squadron",
+		`Agent "b" is the designated review master`,
+		"squadron-alpha",
+		"Review master: b",
+		"Squadron members: a, b, c",
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("non-reviewer suffix missing %q\n---\n%s", s, got)
+		}
+	}
+	// Non-reviewer suffix must NOT contain reviewer-only phrases
+	forbidden := []string{"You are the REVIEW MASTER", `"ALL_APPROVED:`}
+	for _, s := range forbidden {
+		if strings.Contains(got, s) {
+			t.Errorf("non-reviewer suffix should not contain %q", s)
+		}
+	}
+}
