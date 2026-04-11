@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/squadron"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
@@ -478,6 +479,49 @@ func (m LaunchModel) advance() (tea.Model, tea.Cmd) {
 	m.promptViewportIdx = -1
 	m.setupPromptViewport()
 	return m, nil
+}
+
+// applySquadronSuffixes assembles the final prompt for a squadron agent by
+// appending consensus and merger suffixes then prepending any assigned persona.
+// Returns basePrompt unchanged when squadronMode is false.
+func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string {
+	if !m.squadronMode {
+		return basePrompt
+	}
+
+	agentNames := make([]string, 0, len(m.prompts))
+	for _, p := range m.prompts {
+		agentNames = append(agentNames, p.AgentName)
+	}
+
+	result := basePrompt
+
+	switch m.consensusType {
+	case "universal", "review_master", "none":
+		if m.consensusType == "review_master" && agentName == m.reviewMaster {
+			result += "\n" + squadron.BuildReviewMasterReviewerSuffix(m.squadronName, agentNames, m.baseBranch)
+		} else {
+			if suffix := squadron.BuildConsensusSuffix(m.consensusType, m.squadronName, agentNames, m.reviewMaster, m.baseBranch); suffix != "" {
+				result += "\n" + suffix
+			}
+		}
+	}
+
+	if m.autoMerge && agentName == m.mergeMaster && m.mergeMaster != "" {
+		agentBranches := make([]squadron.AgentBranch, 0, len(m.prompts))
+		for _, p := range m.prompts {
+			agentBranches = append(agentBranches, squadron.AgentBranch{Name: p.AgentName, Branch: p.Branch})
+		}
+		result += "\n" + squadron.BuildMergerSuffix(m.squadronName, m.baseBranch, agentBranches)
+	}
+
+	if key, ok := m.personas[agentName]; ok && key != "" {
+		if p, ok := squadron.LookupPersona(key); ok {
+			result = squadron.ApplyPersona(p, result)
+		}
+	}
+
+	return result
 }
 
 // RunLaunch starts the launch TUI flow.

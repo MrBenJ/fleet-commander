@@ -704,3 +704,71 @@ func TestSquadronName_EscGoesBackToConsensus(t *testing.T) {
 		t.Errorf("esc should return to consensus, mode = %v", m.mode)
 	}
 }
+
+func TestLaunchCurrent_AppendsConsensusSuffix(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.squadronName = "alpha"
+	m.consensusType = "universal"
+	m.baseBranch = "main"
+	m.prompts = []LaunchItem{
+		{AgentName: "a", Branch: "squadron/alpha/a", Prompt: "do a"},
+		{AgentName: "b", Branch: "squadron/alpha/b", Prompt: "do b"},
+	}
+
+	got := m.applySquadronSuffixes("a", "ORIGINAL")
+
+	if !strings.Contains(got, "ORIGINAL") {
+		t.Error("original prompt should be preserved")
+	}
+	if !strings.Contains(got, "Squadron Consensus Protocol (UNIVERSAL)") {
+		t.Error("universal suffix missing")
+	}
+	if !strings.Contains(got, "squadron-alpha") {
+		t.Error("channel name missing")
+	}
+}
+
+func TestLaunchCurrent_MergerGetsMergerSuffix(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.squadronName = "alpha"
+	m.consensusType = "none"
+	m.baseBranch = "main"
+	m.mergeMaster = "b"
+	m.prompts = []LaunchItem{
+		{AgentName: "a", Branch: "squadron/alpha/a", Prompt: "do a"},
+		{AgentName: "b", Branch: "squadron/alpha/b", Prompt: "do b"},
+	}
+
+	aPrompt := m.applySquadronSuffixes("a", "A-ORIG")
+	bPrompt := m.applySquadronSuffixes("b", "B-ORIG")
+
+	if strings.Contains(aPrompt, "Squadron Merge Duties") {
+		t.Error("non-merger should not get merge duties")
+	}
+	if !strings.Contains(bPrompt, "Squadron Merge Duties") {
+		t.Error("merger should get merge duties")
+	}
+	if !strings.Contains(bPrompt, "a -> squadron/alpha/a") {
+		t.Error("merger suffix should list all agents")
+	}
+}
+
+func TestLaunchCurrent_PersonaPrepended(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.squadronName = "alpha"
+	m.consensusType = "none"
+	m.baseBranch = "main"
+	m.personas = map[string]string{"a": "overconfident-engineer"}
+	m.prompts = []LaunchItem{
+		{AgentName: "a", Branch: "squadron/alpha/a", Prompt: "do a"},
+	}
+
+	got := m.applySquadronSuffixes("a", "ORIGINAL")
+
+	if !strings.HasPrefix(got, "You are the Overconfident Engineer") {
+		t.Errorf("persona should be prepended above everything, got prefix: %q", got[:60])
+	}
+}
