@@ -9,6 +9,12 @@ import (
 
 var nameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
+// ValidName reports whether s is a valid squadron or agent name:
+// non-empty, max 30 chars, matching ^[a-zA-Z0-9][a-zA-Z0-9_-]*$.
+func ValidName(s string) bool {
+	return s != "" && len(s) <= 30 && nameRe.MatchString(s)
+}
+
 type SquadronData struct {
 	Name         string          `json:"name"`
 	Consensus    string          `json:"consensus"`

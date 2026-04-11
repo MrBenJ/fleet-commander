@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -9,9 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
+	"github.com/MrBenJ/fleet-commander/internal/squadron"
 )
-
-var squadronNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
@@ -269,7 +267,7 @@ func (m LaunchModel) updateSquadronName(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key.String() {
 		case "enter":
 			val := strings.TrimSpace(m.squadronNameInput.Value())
-			if val == "" || len(val) > 30 || !squadronNameRe.MatchString(val) {
+			if !squadron.ValidName(val) {
 				m.statusMsg = "Invalid name (alphanumeric, hyphens/underscores, max 30 chars, must start with letter or digit)"
 				return m, nil
 			}
