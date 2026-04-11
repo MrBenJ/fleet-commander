@@ -27,6 +27,8 @@ const (
 	launchModeEditName
 	launchModeEditBranch
 	launchModeEditPrompt
+	launchModeSquadronConsensus
+	launchModeSquadronName
 )
 
 // claudeResultMsg carries the result of the async Claude CLI call.
@@ -98,6 +100,21 @@ type LaunchModel struct {
 
 	// Jump.sh integration
 	useJumpSh bool
+
+	// Squadron mode (set once at creation)
+	squadronMode           bool
+	squadronName           string
+	consensusType          string // "universal" | "review_master" | "none"
+	reviewMaster           string
+	mergeMaster            string
+	autoMerge              bool
+	baseBranch             string
+	squadronChannelCreated bool
+	personas               map[string]string // agent name -> persona key
+
+	// Squadron consensus selector cursor (TUI state)
+	squadronConsensusCursor int
+	squadronNameInput       textinput.Model
 
 	// Debug logger
 	log *LaunchLogger
