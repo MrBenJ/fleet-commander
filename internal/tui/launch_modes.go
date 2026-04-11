@@ -226,6 +226,44 @@ func (m LaunchModel) updateEditBranch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+var squadronConsensusOptions = []struct {
+	Key, Label, Desc string
+}{
+	{"universal", "UNIVERSAL CONSENSUS", "All agents must review and approve every other agent's work. Work is not complete until unanimous approval."},
+	{"review_master", "REVIEW MASTER", "One randomly designated agent reviews all other agents' work after they finish."},
+	{"none", "NONE", "No review required. Agents finish independently."},
+}
+
+func (m LaunchModel) updateSquadronConsensus(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyMsg); ok {
+		switch key.String() {
+		case "up", "k":
+			if m.squadronConsensusCursor > 0 {
+				m.squadronConsensusCursor--
+			}
+			return m, nil
+		case "down", "j":
+			if m.squadronConsensusCursor < len(squadronConsensusOptions)-1 {
+				m.squadronConsensusCursor++
+			}
+			return m, nil
+		case "enter":
+			m.consensusType = squadronConsensusOptions[m.squadronConsensusCursor].Key
+			m.mode = launchModeSquadronName
+			return m, m.squadronNameInput.Focus()
+		case "esc", "ctrl+c":
+			m.quitting = true
+			m.aborted = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m LaunchModel) updateSquadronName(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return m, nil
+}
+
 func (m LaunchModel) updateEditPrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {

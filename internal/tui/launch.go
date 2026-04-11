@@ -254,6 +254,10 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateEditBranch(msg)
 	case launchModeEditPrompt:
 		return m.updateEditPrompt(msg)
+	case launchModeSquadronConsensus:
+		return m.updateSquadronConsensus(msg)
+	case launchModeSquadronName:
+		return m.updateSquadronName(msg)
 	}
 
 	return m, nil

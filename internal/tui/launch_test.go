@@ -639,3 +639,27 @@ func TestNewSquadronLaunchModel_Defaults(t *testing.T) {
 		t.Error("autoMerge (squadron-level) should default to true")
 	}
 }
+
+func TestSquadronConsensus_Navigation(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+
+	if m.squadronConsensusCursor != 0 {
+		t.Fatalf("cursor start = %d, want 0", m.squadronConsensusCursor)
+	}
+
+	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = model.(LaunchModel)
+	if m.squadronConsensusCursor != 1 {
+		t.Errorf("after down: cursor = %d, want 1", m.squadronConsensusCursor)
+	}
+
+	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = model.(LaunchModel)
+	if m.consensusType != "review_master" {
+		t.Errorf("consensusType = %q, want review_master", m.consensusType)
+	}
+	if m.mode != launchModeSquadronName {
+		t.Errorf("mode after enter = %v, want squadronName", m.mode)
+	}
+}
