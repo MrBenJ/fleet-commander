@@ -216,7 +216,18 @@ func (m LaunchModel) viewSquadronConsensus() string {
 	return b.String()
 }
 
-func (m LaunchModel) viewSquadronName() string { return "" }
+func (m LaunchModel) viewSquadronName() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("⚓ Squadron — Name") + "\n\n")
+	b.WriteString("  " + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render("Consensus: ") +
+		lipgloss.NewStyle().Bold(true).Render(m.consensusType) + "\n\n")
+	b.WriteString("  " + selectedItemStyle.Render("> Squadron name: ") + m.squadronNameInput.View() + "\n")
+	if m.statusMsg != "" {
+		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
+	}
+	b.WriteString("\n" + helpStyle.Render("  Enter: confirm • Esc: back"))
+	return b.String()
+}
 
 func (m LaunchModel) renderSummary(header string) string {
 	var b strings.Builder

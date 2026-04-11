@@ -663,3 +663,44 @@ func TestSquadronConsensus_Navigation(t *testing.T) {
 		t.Errorf("mode after enter = %v, want squadronName", m.mode)
 	}
 }
+
+func TestSquadronName_ValidatesAndAdvances(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.consensusType = "none"
+	m.mode = launchModeSquadronName
+	m.squadronNameInput.Focus()
+
+	m.squadronNameInput.SetValue("!!!")
+	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = model.(LaunchModel)
+	if m.mode != launchModeSquadronName {
+		t.Errorf("invalid name should stay on name screen, mode = %v", m.mode)
+	}
+	if m.statusMsg == "" {
+		t.Error("expected a validation error in statusMsg")
+	}
+
+	m.statusMsg = ""
+	m.squadronNameInput.SetValue("alpha")
+	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = model.(LaunchModel)
+	if m.squadronName != "alpha" {
+		t.Errorf("squadronName = %q", m.squadronName)
+	}
+	if m.mode != launchModeInput {
+		t.Errorf("after valid name, mode = %v, want launchModeInput", m.mode)
+	}
+}
+
+func TestSquadronName_EscGoesBackToConsensus(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.mode = launchModeSquadronName
+
+	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = model.(LaunchModel)
+	if m.mode != launchModeSquadronConsensus {
+		t.Errorf("esc should return to consensus, mode = %v", m.mode)
+	}
+}

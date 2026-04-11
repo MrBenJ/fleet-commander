@@ -1,13 +1,17 @@
 package tui
 
 import (
+	"regexp"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 )
+
+var squadronNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
@@ -261,7 +265,29 @@ func (m LaunchModel) updateSquadronConsensus(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m LaunchModel) updateSquadronName(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return m, nil
+	if key, ok := msg.(tea.KeyMsg); ok {
+		switch key.String() {
+		case "enter":
+			val := strings.TrimSpace(m.squadronNameInput.Value())
+			if val == "" || len(val) > 30 || !squadronNameRe.MatchString(val) {
+				m.statusMsg = "Invalid name (alphanumeric, hyphens/underscores, max 30 chars, must start with letter or digit)"
+				return m, nil
+			}
+			m.squadronName = val
+			m.statusMsg = ""
+			m.mode = launchModeInput
+			m.inputArea.Focus()
+			return m, textarea.Blink
+		case "esc":
+			m.statusMsg = ""
+			m.mode = launchModeSquadronConsensus
+			return m, nil
+		}
+	}
+
+	var cmd tea.Cmd
+	m.squadronNameInput, cmd = m.squadronNameInput.Update(msg)
+	return m, cmd
 }
 
 func (m LaunchModel) updateEditPrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
