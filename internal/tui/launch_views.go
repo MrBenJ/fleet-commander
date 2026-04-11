@@ -34,6 +34,10 @@ func (m LaunchModel) View() string {
 		return m.viewEditBranch()
 	case launchModeEditPrompt:
 		return m.viewEditPrompt()
+	case launchModeSquadronConsensus:
+		return m.viewSquadronConsensus()
+	case launchModeSquadronName:
+		return m.viewSquadronName()
 	}
 
 	return ""
@@ -184,6 +188,44 @@ func (m LaunchModel) viewEditPrompt() string {
 		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
 	}
 	b.WriteString("\n" + helpStyle.Render("  Ctrl+D: confirm • Esc: back"))
+	return b.String()
+}
+
+func (m LaunchModel) viewSquadronConsensus() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("⚓ Squadron — Consensus Mode") + "\n\n")
+	b.WriteString("  How should your squadron reach consensus?\n\n")
+
+	selected := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	normal := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+
+	for i, opt := range squadronConsensusOptions {
+		marker := "  "
+		style := normal
+		if i == m.squadronConsensusCursor {
+			marker = "▸ "
+			style = selected
+		}
+		b.WriteString("  " + marker + style.Render(opt.Label) + "\n")
+	}
+
+	b.WriteString("\n")
+	desc := squadronConsensusOptions[m.squadronConsensusCursor].Desc
+	b.WriteString("  " + lipgloss.NewStyle().Italic(true).Render(desc) + "\n\n")
+	b.WriteString(helpStyle.Render("  ↑↓/jk: move • Enter: select • Esc: abort"))
+	return b.String()
+}
+
+func (m LaunchModel) viewSquadronName() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("⚓ Squadron — Name") + "\n\n")
+	b.WriteString("  " + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render("Consensus: ") +
+		lipgloss.NewStyle().Bold(true).Render(m.consensusType) + "\n\n")
+	b.WriteString("  " + selectedItemStyle.Render("> Squadron name: ") + m.squadronNameInput.View() + "\n")
+	if m.statusMsg != "" {
+		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
+	}
+	b.WriteString("\n" + helpStyle.Render("  Enter: confirm • Esc: back"))
 	return b.String()
 }
 

@@ -46,6 +46,12 @@ Fleet Commander is a CLI + TUI tool for managing parallel Claude Code sessions, 
 2. The monitor polls each tmux session's pane and applies regex-like heuristics to determine if Claude is waiting for input vs. actively working.
 3. Agents marked `⏳ NEEDS INPUT` are the ones the user should attend to first.
 
+**Squadron mode — `fleet launch squadron`:**
+1. Interactive: consensus selector → squadron name → standard launch flow. Always runs yolo + per-agent auto-merge OFF.
+2. Headless: `fleet launch squadron --data '<json>'` parses a SquadronData payload and skips the TUI entirely.
+3. A fleet context channel `squadron-<name>` is auto-created with all agents as members.
+4. Each agent's prompt is assembled with a consensus suffix (+ merger suffix for the designated merger + persona preamble). See `internal/squadron/`.
+
 **Tmux session naming:** `fleet-<agentName>` (prefix hardcoded as `"fleet"` in `NewManager`).
 
 **Fleet config location:** `.fleet/config.json` inside the target repo (not the fleet-commander repo). `.fleet/` is automatically added to `.gitignore`.
