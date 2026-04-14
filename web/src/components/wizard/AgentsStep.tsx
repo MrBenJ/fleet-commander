@@ -145,7 +145,7 @@ export function AgentsStep({
           <textarea
             style={{
               ...inputStyle,
-              minHeight: 200,
+              minHeight: "75%",
               resize: "vertical",
               marginBottom: "1rem",
             }}
