@@ -68,6 +68,7 @@ export function AgentsStep({
   const [branch, setBranch] = useState("");
   const [prompt, setPrompt] = useState("");
   const [selectedDriver, setSelectedDriver] = useState(drivers[0] || "claude-code");
+  const [manualPersona, setManualPersona] = useState("");
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -93,11 +94,12 @@ export function AgentsStep({
     const agentBranch = branch || `squadron/${squadronName}/${name}`;
     setAgents((prev) => [
       ...prev,
-      { name, branch: agentBranch, prompt, driver: selectedDriver, persona: "" },
+      { name, branch: agentBranch, prompt, driver: selectedDriver, persona: manualPersona },
     ]);
     setName("");
     setBranch("");
     setPrompt("");
+    setManualPersona("");
   };
 
   const handleRemove = (idx: number) => {
@@ -221,6 +223,19 @@ export function AgentsStep({
               >
                 {drivers.map((d) => (
                   <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Persona</label>
+              <select
+                style={inputStyle}
+                value={manualPersona}
+                onChange={(e) => setManualPersona(e.target.value)}
+              >
+                <option value="">No persona</option>
+                {personas.map((p) => (
+                  <option key={p.name} value={p.name}>{p.displayName}</option>
                 ))}
               </select>
             </div>
