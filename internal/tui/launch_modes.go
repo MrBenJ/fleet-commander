@@ -3,10 +3,12 @@ package tui
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
+	"github.com/MrBenJ/fleet-commander/internal/squadron"
 )
 
 func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -223,6 +225,66 @@ func (m LaunchModel) updateEditBranch(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.branchInput, cmd = m.branchInput.Update(msg)
+	return m, cmd
+}
+
+var squadronConsensusOptions = []struct {
+	Key, Label, Desc string
+}{
+	{"universal", "UNIVERSAL CONSENSUS", "All agents must review and approve every other agent's work. Work is not complete until unanimous approval."},
+	{"review_master", "REVIEW MASTER", "One randomly designated agent reviews all other agents' work after they finish."},
+	{"none", "NONE", "No review required. Agents finish independently."},
+}
+
+func (m LaunchModel) updateSquadronConsensus(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyMsg); ok {
+		switch key.String() {
+		case "up", "k":
+			if m.squadronConsensusCursor > 0 {
+				m.squadronConsensusCursor--
+			}
+			return m, nil
+		case "down", "j":
+			if m.squadronConsensusCursor < len(squadronConsensusOptions)-1 {
+				m.squadronConsensusCursor++
+			}
+			return m, nil
+		case "enter":
+			m.consensusType = squadronConsensusOptions[m.squadronConsensusCursor].Key
+			m.mode = launchModeSquadronName
+			return m, m.squadronNameInput.Focus()
+		case "esc", "ctrl+c":
+			m.quitting = true
+			m.aborted = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m LaunchModel) updateSquadronName(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyMsg); ok {
+		switch key.String() {
+		case "enter":
+			val := strings.TrimSpace(m.squadronNameInput.Value())
+			if !squadron.ValidName(val) {
+				m.statusMsg = "Invalid name (alphanumeric, hyphens/underscores, max 30 chars, must start with letter or digit)"
+				return m, nil
+			}
+			m.squadronName = val
+			m.statusMsg = ""
+			m.mode = launchModeInput
+			m.inputArea.Focus()
+			return m, textarea.Blink
+		case "esc":
+			m.statusMsg = ""
+			m.mode = launchModeSquadronConsensus
+			return m, nil
+		}
+	}
+
+	var cmd tea.Cmd
+	m.squadronNameInput, cmd = m.squadronNameInput.Update(msg)
 	return m, cmd
 }
 

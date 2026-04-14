@@ -615,3 +615,160 @@ func TestParseClaudeResponse_MultipleItems(t *testing.T) {
 		t.Fatalf("expected 3 items, got %d", len(items))
 	}
 }
+
+func TestNewSquadronLaunchModel_Defaults(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+
+	if !m.squadronMode {
+		t.Error("squadronMode should be true")
+	}
+	if !m.yoloMode {
+		t.Error("squadron mode implies yoloMode=true")
+	}
+	if !m.noAutoMerge {
+		t.Error("squadron mode implies noAutoMerge=true (per-agent auto-merge off)")
+	}
+	if !m.skipYoloConfirm {
+		t.Error("squadron mode implies skipYoloConfirm=true")
+	}
+	if m.mode != launchModeSquadronConsensus {
+		t.Errorf("initial mode = %v, want squadronConsensus", m.mode)
+	}
+	if !m.autoMerge {
+		t.Error("autoMerge (squadron-level) should default to true")
+	}
+}
+
+func TestSquadronConsensus_Navigation(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+
+	if m.squadronConsensusCursor != 0 {
+		t.Fatalf("cursor start = %d, want 0", m.squadronConsensusCursor)
+	}
+
+	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = model.(LaunchModel)
+	if m.squadronConsensusCursor != 1 {
+		t.Errorf("after down: cursor = %d, want 1", m.squadronConsensusCursor)
+	}
+
+	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = model.(LaunchModel)
+	if m.consensusType != "review_master" {
+		t.Errorf("consensusType = %q, want review_master", m.consensusType)
+	}
+	if m.mode != launchModeSquadronName {
+		t.Errorf("mode after enter = %v, want squadronName", m.mode)
+	}
+}
+
+func TestSquadronName_ValidatesAndAdvances(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.consensusType = "none"
+	m.mode = launchModeSquadronName
+	m.squadronNameInput.Focus()
+
+	m.squadronNameInput.SetValue("!!!")
+	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = model.(LaunchModel)
+	if m.mode != launchModeSquadronName {
+		t.Errorf("invalid name should stay on name screen, mode = %v", m.mode)
+	}
+	if m.statusMsg == "" {
+		t.Error("expected a validation error in statusMsg")
+	}
+
+	m.statusMsg = ""
+	m.squadronNameInput.SetValue("alpha")
+	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = model.(LaunchModel)
+	if m.squadronName != "alpha" {
+		t.Errorf("squadronName = %q", m.squadronName)
+	}
+	if m.mode != launchModeInput {
+		t.Errorf("after valid name, mode = %v, want launchModeInput", m.mode)
+	}
+}
+
+func TestSquadronName_EscGoesBackToConsensus(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.mode = launchModeSquadronName
+
+	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = model.(LaunchModel)
+	if m.mode != launchModeSquadronConsensus {
+		t.Errorf("esc should return to consensus, mode = %v", m.mode)
+	}
+}
+
+func TestLaunchCurrent_AppendsConsensusSuffix(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.squadronName = "alpha"
+	m.consensusType = "universal"
+	m.baseBranch = "main"
+	m.prompts = []LaunchItem{
+		{AgentName: "a", Branch: "squadron/alpha/a", Prompt: "do a"},
+		{AgentName: "b", Branch: "squadron/alpha/b", Prompt: "do b"},
+	}
+
+	got := m.applySquadronSuffixes("a", "ORIGINAL")
+
+	if !strings.Contains(got, "ORIGINAL") {
+		t.Error("original prompt should be preserved")
+	}
+	if !strings.Contains(got, "Squadron Consensus Protocol (UNIVERSAL)") {
+		t.Error("universal suffix missing")
+	}
+	if !strings.Contains(got, "squadron-alpha") {
+		t.Error("channel name missing")
+	}
+}
+
+func TestLaunchCurrent_MergerGetsMergerSuffix(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.squadronName = "alpha"
+	m.consensusType = "none"
+	m.baseBranch = "main"
+	m.mergeMaster = "b"
+	m.prompts = []LaunchItem{
+		{AgentName: "a", Branch: "squadron/alpha/a", Prompt: "do a"},
+		{AgentName: "b", Branch: "squadron/alpha/b", Prompt: "do b"},
+	}
+
+	aPrompt := m.applySquadronSuffixes("a", "A-ORIG")
+	bPrompt := m.applySquadronSuffixes("b", "B-ORIG")
+
+	if strings.Contains(aPrompt, "Squadron Merge Duties") {
+		t.Error("non-merger should not get merge duties")
+	}
+	if !strings.Contains(bPrompt, "Squadron Merge Duties") {
+		t.Error("merger should get merge duties")
+	}
+	if !strings.Contains(bPrompt, "a -> squadron/alpha/a") {
+		t.Error("merger suffix should list all agents")
+	}
+}
+
+func TestLaunchCurrent_PersonaPrepended(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.squadronName = "alpha"
+	m.consensusType = "none"
+	m.baseBranch = "main"
+	m.personas = map[string]string{"a": "overconfident-engineer"}
+	m.prompts = []LaunchItem{
+		{AgentName: "a", Branch: "squadron/alpha/a", Prompt: "do a"},
+	}
+
+	got := m.applySquadronSuffixes("a", "ORIGINAL")
+
+	if !strings.HasPrefix(got, "You are the Overconfident Engineer") {
+		t.Errorf("persona should be prepended above everything, got prefix: %q", got[:60])
+	}
+}

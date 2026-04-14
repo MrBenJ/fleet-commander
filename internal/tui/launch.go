@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,8 +13,10 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/squadron"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
@@ -27,6 +30,8 @@ const (
 	launchModeEditName
 	launchModeEditBranch
 	launchModeEditPrompt
+	launchModeSquadronConsensus
+	launchModeSquadronName
 )
 
 // claudeResultMsg carries the result of the async Claude CLI call.
@@ -99,6 +104,21 @@ type LaunchModel struct {
 	// Jump.sh integration
 	useJumpSh bool
 
+	// Squadron mode (set once at creation)
+	squadronMode           bool
+	squadronName           string
+	consensusType          string // "universal" | "review_master" | "none"
+	reviewMaster           string
+	mergeMaster            string
+	autoMerge              bool
+	baseBranch             string
+	squadronChannelCreated bool
+	personas               map[string]string // agent name -> persona key
+
+	// Squadron consensus selector cursor (TUI state)
+	squadronConsensusCursor int
+	squadronNameInput       textinput.Model
+
 	// Debug logger
 	log *LaunchLogger
 }
@@ -154,6 +174,21 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoM
 		useJumpSh:       useJumpSh,
 		log:             log,
 	}
+}
+
+func newSquadronLaunchModel(f *fleet.Fleet, useJumpSh bool) LaunchModel {
+	m := newLaunchModel(f, true, true, true, useJumpSh)
+	m.squadronMode = true
+	m.autoMerge = true
+	m.personas = map[string]string{}
+
+	ni := textinput.New()
+	ni.Placeholder = "alpha"
+	ni.CharLimit = 30
+	m.squadronNameInput = ni
+
+	m.mode = launchModeSquadronConsensus
+	return m
 }
 
 func (m LaunchModel) Init() tea.Cmd {
@@ -222,6 +257,10 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateEditBranch(msg)
 	case launchModeEditPrompt:
 		return m.updateEditPrompt(msg)
+	case launchModeSquadronConsensus:
+		return m.updateSquadronConsensus(msg)
+	case launchModeSquadronName:
+		return m.updateSquadronName(msg)
 	}
 
 	return m, nil
@@ -309,6 +348,43 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 	item := m.prompts[m.currentIdx]
 	m.log.Log("launchCurrent: agent=%q branch=%q prompt_len=%d", item.AgentName, item.Branch, len(item.Prompt))
 
+	if m.squadronMode && !m.squadronChannelCreated {
+		if m.baseBranch == "" {
+			if cb, err := m.fleet.CurrentBranch(); err == nil {
+				m.baseBranch = cb
+			} else {
+				m.log.Log("WARNING: could not resolve base branch: %v", err)
+				m.baseBranch = "main"
+			}
+		}
+
+		agentNames := make([]string, 0, len(m.prompts))
+		for _, p := range m.prompts {
+			agentNames = append(agentNames, p.AgentName)
+		}
+
+		if m.consensusType == "review_master" && m.reviewMaster == "" {
+			m.reviewMaster = agentNames[rand.Intn(len(agentNames))]
+			m.log.Log("Squadron review master selected: %s", m.reviewMaster)
+		}
+		if m.autoMerge && m.mergeMaster == "" {
+			m.mergeMaster = agentNames[rand.Intn(len(agentNames))]
+			m.log.Log("Squadron merge master selected: %s", m.mergeMaster)
+		}
+
+		channelName := "squadron-" + m.squadronName
+		description := fmt.Sprintf("Squadron %s (%s)", m.squadronName, m.consensusType)
+		if _, err := fleetctx.CreateChannel(m.fleet.FleetDir, channelName, description, agentNames); err != nil {
+			if !strings.Contains(err.Error(), "already exists") {
+				m.log.Log("ERROR: squadron channel create failed: %v", err)
+				return m, tea.Quit
+			}
+		} else {
+			m.log.Log("Squadron channel created: %s", channelName)
+		}
+		m.squadronChannelCreated = true
+	}
+
 	// In YOLO mode, append auto-merge instructions to the prompt (unless suppressed)
 	if m.yoloMode && !m.noAutoMerge && m.targetBranch != "" {
 		item.Prompt = item.Prompt + fmt.Sprintf(`
@@ -370,6 +446,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 
 	// Assemble full prompt with system prompt and roster
 	fullPrompt := buildFullPrompt(m.systemPrompt, m.prompts, item)
+	fullPrompt = m.applySquadronSuffixes(item.AgentName, fullPrompt)
 	m.log.Log("Full prompt assembled: %d bytes", len(fullPrompt))
 
 	// Write prompt to file to avoid shell metacharacter issues in tmux.
@@ -444,6 +521,49 @@ func (m LaunchModel) advance() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// applySquadronSuffixes assembles the final prompt for a squadron agent by
+// appending consensus and merger suffixes then prepending any assigned persona.
+// Returns basePrompt unchanged when squadronMode is false.
+func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string {
+	if !m.squadronMode {
+		return basePrompt
+	}
+
+	agentNames := make([]string, 0, len(m.prompts))
+	for _, p := range m.prompts {
+		agentNames = append(agentNames, p.AgentName)
+	}
+
+	result := basePrompt
+
+	switch m.consensusType {
+	case "universal", "review_master", "none":
+		if m.consensusType == "review_master" && agentName == m.reviewMaster {
+			result += "\n" + squadron.BuildReviewMasterReviewerSuffix(m.squadronName, agentNames, m.baseBranch)
+		} else {
+			if suffix := squadron.BuildConsensusSuffix(m.consensusType, m.squadronName, agentNames, m.reviewMaster, m.baseBranch); suffix != "" {
+				result += "\n" + suffix
+			}
+		}
+	}
+
+	if m.autoMerge && agentName == m.mergeMaster && m.mergeMaster != "" {
+		agentBranches := make([]squadron.AgentBranch, 0, len(m.prompts))
+		for _, p := range m.prompts {
+			agentBranches = append(agentBranches, squadron.AgentBranch{Name: p.AgentName, Branch: p.Branch})
+		}
+		result += "\n" + squadron.BuildMergerSuffix(m.squadronName, m.baseBranch, agentBranches)
+	}
+
+	if key, ok := m.personas[agentName]; ok && key != "" {
+		if p, ok := squadron.LookupPersona(key); ok {
+			result = squadron.ApplyPersona(p, result)
+		}
+	}
+
+	return result
+}
+
 // RunLaunch starts the launch TUI flow.
 func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge bool, useJumpSh bool) error {
 	m := newLaunchModel(f, yoloMode, skipYoloConfirm, noAutoMerge, useJumpSh)
@@ -466,5 +586,27 @@ func RunLaunch(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoMerge 
 		fmt.Fprintf(os.Stderr, "Launch error: %s\n", fm.statusMsg)
 	}
 
+	return nil
+}
+
+func RunSquadronLaunch(f *fleet.Fleet, useJumpSh bool) error {
+	m := newSquadronLaunchModel(f, useJumpSh)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+
+	finalModel, err := p.Run()
+	if m.log != nil {
+		logPath := m.log.Path()
+		m.log.Close()
+		if logPath != "" {
+			fmt.Fprintf(os.Stderr, "Launch log: %s\n", logPath)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("failed to run squadron launch TUI: %w", err)
+	}
+
+	if fm, ok := finalModel.(LaunchModel); ok && fm.statusMsg != "" {
+		fmt.Fprintf(os.Stderr, "Launch error: %s\n", fm.statusMsg)
+	}
 	return nil
 }
