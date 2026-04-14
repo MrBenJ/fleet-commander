@@ -49,7 +49,7 @@ export function SetupStep({ initial, currentBranch, onDone }: SetupStepProps) {
     <div>
       <h2 style={{ marginBottom: "0.5rem" }}>Squadron Setup</h2>
       <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>
-        Configure the basics for your squadron
+        Tell us about your squadron
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 500 }}>
