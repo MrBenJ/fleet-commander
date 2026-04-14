@@ -43,3 +43,12 @@ Thumbs.db
 .worktrees/
 .fleet
 .fleet/config.lock
+.superpowers/
+
+# Web frontend
+web/node_modules/
+web/dist/
+
+# Embedded web dist (build artifact, .gitkeep is tracked)
+cmd/fleet/webdist/*
+!cmd/fleet/webdist/.gitkeep

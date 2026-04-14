@@ -130,6 +130,11 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 			return fmt.Errorf("write launcher %s: %w", launcherFile, err)
 		}
 
+		// Kill any leftover session from a previous attempt
+		if tm.SessionExists(agent.Name) {
+			_ = tm.KillSession(agent.Name)
+		}
+
 		if err := tm.CreateSession(agent.Name, agent.WorktreePath, []string{launcherFile}, stateFilePath); err != nil {
 			return fmt.Errorf("create tmux session %q: %w", agent.Name, err)
 		}

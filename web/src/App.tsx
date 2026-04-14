@@ -1,0 +1,73 @@
+import { useState } from "react";
+import { useFleet } from "./hooks/useFleet";
+import { WizardLayout } from "./components/wizard/WizardLayout";
+import { MissionControl } from "./components/mission/MissionControl";
+import { TerminalPage } from "./components/terminal/TerminalPage";
+import type { SquadronAgent } from "./types";
+
+type View = "wizard" | "mission";
+
+export function App() {
+  // If we're on a /terminal/ path, render the terminal directly
+  if (window.location.pathname.startsWith("/terminal/")) {
+    return <TerminalPage />;
+  }
+
+  const { fleet, personas, drivers, loading, error } = useFleet();
+  const [view, setView] = useState<View>("wizard");
+  const [activeSquadron, setActiveSquadron] = useState<string | null>(null);
+  const [launchedAgents, setLaunchedAgents] = useState<SquadronAgent[]>([]);
+  const [launchConfig, setLaunchConfig] = useState<{
+    consensus: string;
+    autoMerge: boolean;
+  }>({ consensus: "universal", autoMerge: true });
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div style={{ color: "var(--text-secondary)" }}>Loading fleet...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div style={{ color: "var(--red)" }}>Error: {error}</div>
+      </div>
+    );
+  }
+
+  const handleLaunched = (
+    name: string,
+    agents: SquadronAgent[],
+    config: { consensus: string; autoMerge: boolean }
+  ) => {
+    setActiveSquadron(name);
+    setLaunchedAgents(agents);
+    setLaunchConfig(config);
+    setView("mission");
+  };
+
+  return (
+    <div style={{ minHeight: "100vh" }}>
+      {view === "wizard" && fleet && (
+        <WizardLayout
+          personas={personas}
+          drivers={drivers}
+          currentBranch={fleet.currentBranch}
+          onLaunched={handleLaunched}
+        />
+      )}
+      {view === "mission" && activeSquadron && (
+        <MissionControl
+          squadronName={activeSquadron}
+          agents={launchedAgents}
+          personas={personas}
+          consensus={launchConfig.consensus}
+          autoMerge={launchConfig.autoMerge}
+        />
+      )}
+    </div>
+  );
+}

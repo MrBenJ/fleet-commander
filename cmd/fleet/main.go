@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 
 	"github.com/spf13/cobra"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/hangar"
 	"github.com/MrBenJ/fleet-commander/internal/tui"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Set via -ldflags at build time. Falls back to "dev" if unset.
@@ -64,6 +69,82 @@ var queueCmd = &cobra.Command{
 
 		return tui.Run(f)
 	},
+}
+
+var hangarCmd = &cobra.Command{
+	Use:   "hangar",
+	Short: "Launch the web-based squadron mission control",
+	Long:  "Start a web server and open the Fleet Hangar in your browser — a visual interface for configuring, launching, and monitoring squadrons.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		f, err := fleet.Load(".")
+		if err != nil {
+			return fmt.Errorf("no fleet found — run `fleet init` first: %w", err)
+		}
+
+		port, _ := cmd.Flags().GetInt("port")
+		noOpen, _ := cmd.Flags().GetBool("no-open")
+		devMode, _ := cmd.Flags().GetBool("dev")
+
+		cfg := hangar.Config{
+			Port:       port,
+			DevMode:    devMode,
+			RepoPath:   f.RepoPath,
+			FleetDir:   f.FleetDir,
+			TmuxPrefix: f.TmuxPrefix(),
+		}
+
+		if !devMode {
+			webFS, err := getWebFS()
+			if err != nil {
+				return fmt.Errorf("failed to load embedded web UI: %w", err)
+			}
+			cfg.WebFS = webFS
+		}
+
+		srv := hangar.NewServer(cfg)
+		url := fmt.Sprintf("http://localhost:%d", port)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		errCh := make(chan error, 1)
+		go func() { errCh <- srv.Start(ctx) }()
+
+		if !noOpen {
+			openBrowser(url)
+		}
+
+		tuiModel := hangar.NewTUIModel(url)
+		p := tea.NewProgram(tuiModel)
+
+		// Feed server logs to TUI
+		go func() {
+			for msg := range srv.LogCh {
+				p.Send(hangar.LogMsg{Message: msg})
+			}
+		}()
+
+		if _, err := p.Run(); err != nil {
+			cancel()
+			return err
+		}
+
+		cancel()
+		return nil
+	},
+}
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	default:
+		return
+	}
+	cmd.Start()
 }
 
 func init() {
@@ -130,6 +211,11 @@ func init() {
 	launchCmd.Flags().Bool("i-know-what-im-doing", false, "Skip the yolo mode confirmation prompt")
 	launchCmd.Flags().Bool("no-auto-merge", false, "Disable auto-merge instructions; agents stop when done and leave worktrees intact for review")
 	launchCmd.Flags().Bool("use-jump-sh", false, "Include jump.sh local dev server instructions in the system prompt")
+
+	hangarCmd.Flags().Int("port", 4242, "Port to listen on")
+	hangarCmd.Flags().Bool("no-open", false, "Don't auto-open the browser")
+	hangarCmd.Flags().Bool("dev", false, "Proxy to Vite dev server for hot reload")
+	rootCmd.AddCommand(hangarCmd)
 }
 
 func main() {

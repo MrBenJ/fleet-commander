@@ -1,0 +1,147 @@
+package hangar
+
+import (
+	"context"
+	"fmt"
+	"io/fs"
+	"log"
+	"net"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
+
+	"github.com/MrBenJ/fleet-commander/internal/hangar/api"
+	"github.com/MrBenJ/fleet-commander/internal/hangar/terminal"
+	"github.com/MrBenJ/fleet-commander/internal/hangar/ws"
+)
+
+type Server struct {
+	port     int
+	addr     string
+	devMode  bool
+	webFS    fs.FS
+	mux      *http.ServeMux
+	logger   *log.Logger
+	server   *http.Server
+	fleetDir string
+	api      *api.Handlers
+	hub      *ws.Hub
+	terminal *terminal.Proxy
+	LogCh    chan string
+}
+
+type Config struct {
+	Port       int
+	DevMode    bool
+	WebFS      fs.FS
+	RepoPath   string // repo root — for fleet.Load()
+	FleetDir   string // .fleet directory — for context/channels
+	TmuxPrefix string
+}
+
+func NewServer(cfg Config) *Server {
+	logger := log.New(log.Writer(), "[hangar] ", log.LstdFlags)
+	s := &Server{
+		port:     cfg.Port,
+		devMode:  cfg.DevMode,
+		webFS:    cfg.WebFS,
+		fleetDir: cfg.FleetDir,
+		mux:      http.NewServeMux(),
+		logger:   logger,
+		api:      api.NewHandlers(cfg.RepoPath, cfg.FleetDir),
+		hub:      ws.NewHub(cfg.FleetDir, logger),
+		terminal: terminal.NewProxy(cfg.TmuxPrefix, logger),
+		LogCh:    make(chan string, 100),
+	}
+	s.routes()
+	return s
+}
+
+func (s *Server) routes() {
+	s.mux.Handle("/ws/terminal/", http.HandlerFunc(s.terminal.HandleTerminal))
+	s.mux.HandleFunc("/ws/events", s.hub.HandleWebSocket)
+	s.mux.HandleFunc("/api/health", s.handleHealth)
+	s.mux.HandleFunc("/api/fleet", s.api.HandleGetFleet)
+	s.mux.HandleFunc("/api/fleet/personas", s.api.HandleGetPersonas)
+	s.mux.HandleFunc("/api/fleet/drivers", s.api.HandleGetDrivers)
+	s.mux.HandleFunc("/api/squadron/launch", s.api.HandleLaunchSquadron)
+	s.mux.HandleFunc("/api/squadron/generate", s.api.HandleGenerate)
+	s.mux.HandleFunc("/api/squadron/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/status") {
+			s.api.HandleSquadronStatus(w, r)
+			return
+		}
+		http.NotFound(w, r)
+	})
+	s.mux.HandleFunc("/api/agent/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/stop") {
+			s.api.HandleStopAgent(w, r)
+			return
+		}
+		http.NotFound(w, r)
+	})
+
+	if s.devMode {
+		target, _ := url.Parse("http://localhost:5173")
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		s.mux.Handle("/", proxy)
+	} else if s.webFS != nil {
+		spa := &spaHandler{fs: http.FileServerFS(s.webFS)}
+		s.mux.Handle("/", spa)
+	}
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
+type spaHandler struct {
+	fs http.Handler
+}
+
+func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	if path != "/" && !strings.Contains(path, ".") {
+		r.URL.Path = "/"
+	}
+	h.fs.ServeHTTP(w, r)
+}
+
+func (s *Server) Start(ctx context.Context) error {
+	addr := fmt.Sprintf(":%d", s.port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("port %d in use: %w (try --port)", s.port, err)
+	}
+	s.addr = listener.Addr().String()
+
+	s.server = &http.Server{Handler: s.mux}
+
+	go func() {
+		<-ctx.Done()
+		s.server.Shutdown(context.Background())
+	}()
+
+	go s.hub.PollLoop(ctx)
+
+	s.log(fmt.Sprintf("Server started on %s", s.addr))
+	return s.server.Serve(listener)
+}
+
+func (s *Server) Addr() string {
+	return s.addr
+}
+
+func (s *Server) Port() int {
+	return s.port
+}
+
+func (s *Server) log(msg string) {
+	s.logger.Print(msg)
+	select {
+	case s.LogCh <- msg:
+	default:
+	}
+}
