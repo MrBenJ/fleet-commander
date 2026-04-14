@@ -375,7 +375,10 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 		channelName := "squadron-" + m.squadronName
 		description := fmt.Sprintf("Squadron %s (%s)", m.squadronName, m.consensusType)
 		if _, err := fleetctx.CreateChannel(m.fleet.FleetDir, channelName, description, agentNames); err != nil {
-			m.log.Log("NOTE: squadron channel create returned: %v (ignored if already exists)", err)
+			if !strings.Contains(err.Error(), "already exists") {
+				m.log.Log("ERROR: squadron channel create failed: %v", err)
+				return m, tea.Quit
+			}
 		} else {
 			m.log.Log("Squadron channel created: %s", channelName)
 		}

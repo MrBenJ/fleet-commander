@@ -46,7 +46,9 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 	channelName := "squadron-" + data.Name
 	description := fmt.Sprintf("Squadron %s (%s)", data.Name, data.Consensus)
 	if _, err := fleetctx.CreateChannel(f.FleetDir, channelName, description, agentNames); err != nil {
-		fmt.Fprintf(os.Stderr, "note: squadron channel create: %v\n", err)
+		if !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("create squadron channel %q: %w", channelName, err)
+		}
 	}
 
 	sysPrompt, _ := fleet.LoadSystemPrompt(f.FleetDir)
