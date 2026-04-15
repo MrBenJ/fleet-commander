@@ -52,6 +52,7 @@ func (w *chanWriter) Write(p []byte) (int, error) {
 type Server struct {
 	port     int
 	addr     string
+	addrMu   sync.RWMutex
 	devMode  bool
 	webFS    fs.FS
 	mux      *http.ServeMux
@@ -158,7 +159,9 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("port %d in use: %w (try --port)", s.port, err)
 	}
+	s.addrMu.Lock()
 	s.addr = listener.Addr().String()
+	s.addrMu.Unlock()
 
 	s.server = &http.Server{Handler: s.mux}
 
@@ -174,6 +177,8 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) Addr() string {
+	s.addrMu.RLock()
+	defer s.addrMu.RUnlock()
 	return s.addr
 }
 
