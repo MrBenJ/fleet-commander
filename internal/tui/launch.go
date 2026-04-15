@@ -465,7 +465,7 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 
 	command := []string{launcherFile}
 	m.log.Log("Creating tmux session: name=%q launcher=%q prompt_bytes=%d", agent.Name, launcherFile, len(fullPrompt))
-	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, command, stateFilePath); err != nil {
+	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, command, stateFilePath, m.squadronName); err != nil {
 		m.log.Log("ERROR: CreateSession failed: %s", err)
 		m.statusMsg = fmt.Sprintf("Failed to create session: %s", err)
 		return m, nil

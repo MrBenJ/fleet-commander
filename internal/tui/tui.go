@@ -140,7 +140,7 @@ func (m *Model) startAgentSession(agent *fleet.Agent) error {
 		m.fleet.UpdateAgentHooks(agent.Name, true)
 	}
 
-	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, drv.InteractiveCommand(), stateFilePath); err != nil {
+	if err := m.tmux.CreateSession(agent.Name, agent.WorktreePath, drv.InteractiveCommand(), stateFilePath, ""); err != nil {
 		return err
 	}
 
