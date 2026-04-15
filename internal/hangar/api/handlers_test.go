@@ -803,3 +803,55 @@ func TestWriteError(t *testing.T) {
 		t.Errorf("expected 'you messed up', got %q", errResp.Error)
 	}
 }
+
+// --- HandleLaunchSquadron autoPR gh check ---
+
+func TestHandleLaunchSquadron_AutoPR_NoGH(t *testing.T) {
+	repoPath, fleetDir := createTestFleet(t, []agentFixture{})
+
+	// Override PATH so gh is not found.
+	t.Setenv("PATH", t.TempDir())
+
+	h := NewHandlers(repoPath, fleetDir)
+	body := `{"name":"test","consensus":"none","autoMerge":true,"autoPR":true,"agents":[{"name":"a","branch":"squadron/test/a","prompt":"do stuff","driver":"claude-code"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/launch", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleLaunchSquadron(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when gh is missing and autoPR=true, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var errResp ErrorResponse
+	json.Unmarshal(w.Body.Bytes(), &errResp)
+	if !strings.Contains(errResp.Error, "gh") {
+		t.Errorf("error should mention gh CLI, got %q", errResp.Error)
+	}
+}
+
+func TestHandleLaunchSquadron_AutoPR_False_NoGHCheck(t *testing.T) {
+	repoPath, fleetDir := createTestFleet(t, []agentFixture{})
+
+	// Override PATH so gh is not found — should not matter when autoPR is false.
+	t.Setenv("PATH", t.TempDir())
+
+	h := NewHandlers(repoPath, fleetDir)
+	body := `{"name":"test","consensus":"none","autoMerge":true,"agents":[{"name":"a","branch":"squadron/test/a","prompt":"do stuff","driver":"claude-code"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/launch", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleLaunchSquadron(w, req)
+
+	// Should NOT get 400 for missing gh — it should proceed past the gh check.
+	// It will fail later (fleet.Load on a temp dir won't have worktrees), but not with 400.
+	if w.Code == http.StatusBadRequest {
+		var errResp ErrorResponse
+		json.Unmarshal(w.Body.Bytes(), &errResp)
+		if strings.Contains(errResp.Error, "gh") {
+			t.Fatalf("should not check for gh when autoPR is false, got: %s", errResp.Error)
+		}
+	}
+}

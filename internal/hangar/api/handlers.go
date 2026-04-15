@@ -225,6 +225,15 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Pre-flight: autoPR requires the gh CLI.
+	if data.AutoPR {
+		if _, err := exec.LookPath("gh"); err != nil {
+			writeError(w, http.StatusBadRequest,
+				"autoPR requires the gh CLI (https://cli.github.com) — install it and run `gh auth login`")
+			return
+		}
+	}
+
 	f, err := fleet.Load(h.repoPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to load fleet: %v", err))
