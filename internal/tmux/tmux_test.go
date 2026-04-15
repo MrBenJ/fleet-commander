@@ -641,7 +641,7 @@ func TestSwitchClient_Success(t *testing.T) {
 func TestCreateSession_RunError(t *testing.T) {
 	f := &fakeRunner{runErr: errors.New("tmux failed")}
 	m := NewManagerWithRunner("fleet", f)
-	err := m.CreateSession("worker", "/tmp/wt", nil, "")
+	err := m.CreateSession("worker", "/tmp/wt", nil, "", "")
 	if err == nil {
 		t.Fatal("expected error when Run fails")
 	}
@@ -653,7 +653,7 @@ func TestCreateSession_RunError(t *testing.T) {
 func TestCreateSession_WithCommandAndStateFile(t *testing.T) {
 	f := &fakeRunner{}
 	m := NewManagerWithRunner("fleet", f)
-	err := m.CreateSession("worker", "/tmp/wt", []string{"bash", "-c", "echo hi"}, "/tmp/state.json")
+	err := m.CreateSession("worker", "/tmp/wt", []string{"bash", "-c", "echo hi"}, "/tmp/state.json", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
