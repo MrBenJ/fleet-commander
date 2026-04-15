@@ -137,7 +137,7 @@ describe("ReviewStep", () => {
 
   describe("launch", () => {
     it("calls launchSquadron and onLaunched on success", async () => {
-      mockLaunchSquadron.mockResolvedValueOnce(undefined);
+      mockLaunchSquadron.mockResolvedValueOnce({ mergeMaster: "agent-beta" });
       render(<ReviewStep {...defaultProps} />);
       await userEvent.click(screen.getByText("Launch Squadron"));
       expect(mockLaunchSquadron).toHaveBeenCalledWith(
@@ -151,7 +151,7 @@ describe("ReviewStep", () => {
       expect(defaultProps.onLaunched).toHaveBeenCalledWith(
         "test-squadron",
         agents,
-        { consensus: "universal", autoMerge: true, mergeMaster: "agent-alpha" }
+        { consensus: "universal", autoMerge: true, mergeMaster: "agent-beta" }
       );
     });
 

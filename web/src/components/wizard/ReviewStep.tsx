@@ -101,7 +101,7 @@ export function ReviewStep({
   const handleLaunch = async () => {
     dispatch({ type: "LAUNCH_START" });
     try {
-      await launchSquadron({
+      const result = await launchSquadron({
         name: config.name,
         consensus: state.consensus,
         reviewMaster: state.consensus === "review_master" ? state.reviewMaster || undefined : undefined,
@@ -113,7 +113,7 @@ export function ReviewStep({
       onLaunched(config.name, agents, {
         consensus: state.consensus,
         autoMerge: state.autoMerge,
-        mergeMaster: state.autoMerge && agents.length > 0 ? agents[0].name : undefined,
+        mergeMaster: result.mergeMaster || undefined,
       });
     } catch (err) {
       dispatch({ type: "LAUNCH_ERROR", error: err instanceof Error ? err.message : "Launch failed" });

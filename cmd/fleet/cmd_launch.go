@@ -68,7 +68,8 @@ Headless (hangar output):
 				}
 				return fmt.Errorf("squadron --data validation failed (%d error(s))", len(errs))
 			}
-			return squadron.RunHeadless(f, data)
+			_, err := squadron.RunHeadless(f, data)
+			return err
 		}
 
 		return tui.RunSquadronLaunch(f, useJumpSh)

@@ -44,6 +44,10 @@ type LaunchAgentInput struct {
 	Persona string `json:"persona,omitempty"`
 }
 
+type LaunchResponse struct {
+	MergeMaster string `json:"mergeMaster,omitempty"`
+}
+
 type GenerateRequest struct {
 	Description string `json:"description"`
 }
