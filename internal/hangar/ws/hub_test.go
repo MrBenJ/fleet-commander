@@ -13,7 +13,7 @@ import (
 
 func TestHubBroadcast(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	hub := NewHub("/tmp/fake", logger)
+	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)
 
 	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
 	defer server.Close()
@@ -50,7 +50,7 @@ func TestHubBroadcast(t *testing.T) {
 
 func TestHubMultipleClients(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	hub := NewHub("/tmp/fake", logger)
+	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)
 
 	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
 	defer server.Close()

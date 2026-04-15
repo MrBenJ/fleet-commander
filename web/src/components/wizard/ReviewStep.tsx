@@ -4,6 +4,7 @@ import { launchSquadron } from "../../api";
 import type { ConsensusType } from "./review-constants";
 import { AgentCard } from "./AgentCard";
 import { ConsensusSelector } from "./ConsensusSelector";
+import { HelpTooltip } from "../common/HelpTooltip";
 
 interface ReviewConfig {
   name: string;
@@ -174,6 +175,7 @@ export function ReviewStep({
         />
         <label htmlFor="auto-merge">
           Auto-merge all agent branches into <span style={{ color: "var(--blue)", fontWeight: 500 }}>'{config.name}-merged'</span>
+          <HelpTooltip text="When enabled, all agent branches will be automatically merged into a single combined branch after the squadron completes." />
         </label>
       </div>
 

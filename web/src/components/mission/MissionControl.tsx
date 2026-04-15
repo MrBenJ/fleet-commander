@@ -1,9 +1,12 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import type { ContextMessage, SquadronAgent, Persona, WSEvent } from "../../types";
 import { useWebSocket } from "../../hooks/useWebSocket";
+import { getFleet } from "../../api";
 import { AgentPill } from "./AgentPill";
 import { AgentTooltip } from "./AgentTooltip";
 import { ContextLog } from "./ContextLog";
+import { MultiViewToggle } from "./MultiViewToggle";
+import { MultiView } from "./MultiView";
 
 interface MissionControlProps {
   squadronName: string;
@@ -32,6 +35,7 @@ export function MissionControl({
   const [messages, setMessages] = useState<ContextMessage[]>([]);
   const [agentStates, setAgentStates] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [multiView, setMultiView] = useState(false);
 
   const agentColors = useMemo(() => {
     const colors: Record<string, string> = {};
@@ -59,6 +63,17 @@ export function MissionControl({
   }, []);
 
   const { connected } = useWebSocket("/ws/events", { onEvent: handleEvent });
+
+  // Seed initial agent states from the REST API so dots aren't gray on load.
+  useEffect(() => {
+    getFleet().then((info) => {
+      const states: Record<string, string> = {};
+      for (const a of info.agents) {
+        if (a.status) states[a.name] = a.status;
+      }
+      setAgentStates((prev) => ({ ...states, ...prev }));
+    }).catch(() => {});
+  }, []);
 
   const selectedAgentData = agents.find((a) => a.name === selectedAgent);
   const selectedPersona = selectedAgentData
@@ -115,6 +130,17 @@ export function MissionControl({
           alignItems: "center",
         }}
       >
+        <MultiViewToggle
+          active={multiView}
+          onToggle={() => setMultiView((v) => !v)}
+        />
+        <span
+          style={{
+            width: 1,
+            height: 16,
+            background: "var(--border)",
+          }}
+        />
         <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }} id="agents-label">
           Agents:
         </span>
@@ -131,12 +157,16 @@ export function MissionControl({
         </div>
       </nav>
 
-      {/* Context log */}
-      <ContextLog
-        messages={messages}
-        agentColors={agentColors}
-        onAgentClick={(name) => setSelectedAgent(name)}
-      />
+      {/* Main content: context log or multi-view */}
+      {multiView ? (
+        <MultiView agents={agents} />
+      ) : (
+        <ContextLog
+          messages={messages}
+          agentColors={agentColors}
+          onAgentClick={(name) => setSelectedAgent(name)}
+        />
+      )}
 
       {/* Agent tooltip modal */}
       {selectedAgent && selectedAgentData && (

@@ -163,4 +163,33 @@ describe("MissionControl", () => {
     renderMission();
     expect(screen.getByRole("navigation", { name: /squadron agents/i })).toBeInTheDocument();
   });
+
+  it("renders multi-view toggle in the agents nav bar", () => {
+    renderMission();
+    expect(screen.getByRole("button", { name: /multi-view/i })).toBeInTheDocument();
+  });
+
+  it("shows context log by default, not multi-view", () => {
+    renderMission();
+    expect(screen.getByRole("log", { name: /context messages/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("multi-view-grid")).not.toBeInTheDocument();
+  });
+
+  it("switches to multi-view when toggle is clicked", async () => {
+    const user = userEvent.setup();
+    renderMission();
+    await user.click(screen.getByRole("button", { name: /multi-view/i }));
+    expect(screen.getByTestId("multi-view-grid")).toBeInTheDocument();
+    expect(screen.queryByRole("log", { name: /context messages/ })).not.toBeInTheDocument();
+  });
+
+  it("switches back to context log when toggle is clicked again", async () => {
+    const user = userEvent.setup();
+    renderMission();
+    await user.click(screen.getByRole("button", { name: /multi-view/i }));
+    expect(screen.getByTestId("multi-view-grid")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /multi-view/i }));
+    expect(screen.getByRole("log", { name: /context messages/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("multi-view-grid")).not.toBeInTheDocument();
+  });
 });

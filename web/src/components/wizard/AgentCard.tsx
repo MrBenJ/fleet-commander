@@ -1,5 +1,7 @@
 import type { SquadronAgent, Persona } from "../../types";
 import { driverColors, driverTextColors, personaIcons, inputStyle, labelStyle } from "./review-constants";
+import { CodeEditor } from "../common/CodeEditor";
+import { HelpTooltip } from "../common/HelpTooltip";
 
 interface AgentCardProps {
   agent: SquadronAgent;
@@ -46,7 +48,10 @@ export function AgentCard({
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`edit-name-${agent.name}`} style={labelStyle}>Agent Name</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-name-${agent.name}`} style={labelStyle}>Agent Name</label>
+                <HelpTooltip text="A short identifier for this agent. Used in branch names and tmux session names." />
+              </div>
               <input
                 id={`edit-name-${agent.name}`}
                 style={inputStyle}
@@ -55,7 +60,10 @@ export function AgentCard({
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`edit-branch-${agent.name}`} style={labelStyle}>Branch</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-branch-${agent.name}`} style={labelStyle}>Branch</label>
+                <HelpTooltip text="The git branch name for this agent's worktree. Each agent works in its own isolated branch." />
+              </div>
               <input
                 id={`edit-branch-${agent.name}`}
                 style={inputStyle}
@@ -64,7 +72,10 @@ export function AgentCard({
               />
             </div>
             <div style={{ width: 150 }}>
-              <label htmlFor={`edit-harness-${agent.name}`} style={labelStyle}>Harness</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-harness-${agent.name}`} style={labelStyle}>Harness</label>
+                <HelpTooltip text="The harness configures how the agent runs — including permissions, tools, and execution constraints." />
+              </div>
               <select
                 id={`edit-harness-${agent.name}`}
                 style={inputStyle}
@@ -77,7 +88,10 @@ export function AgentCard({
               </select>
             </div>
             <div style={{ width: 180 }}>
-              <label htmlFor={`edit-persona-${agent.name}`} style={labelStyle}>Persona</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-persona-${agent.name}`} style={labelStyle}>Persona</label>
+                <HelpTooltip text="A persona defines the agent's coding style, expertise areas, and approach to problem-solving." />
+              </div>
               <select
                 id={`edit-persona-${agent.name}`}
                 style={inputStyle}
@@ -92,12 +106,12 @@ export function AgentCard({
             </div>
           </div>
           <div>
-            <label htmlFor={`edit-prompt-${agent.name}`} style={labelStyle}>Prompt</label>
-            <textarea
-              id={`edit-prompt-${agent.name}`}
-              style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
+            <label id={`edit-prompt-label-${agent.name}`} style={labelStyle}>Prompt</label>
+            <CodeEditor
+              labelId={`edit-prompt-label-${agent.name}`}
               value={editDraft.prompt}
-              onChange={(e) => onDraftChange({ ...editDraft, prompt: e.target.value })}
+              onChange={(val) => onDraftChange({ ...editDraft, prompt: val })}
+              minHeight={200}
             />
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
