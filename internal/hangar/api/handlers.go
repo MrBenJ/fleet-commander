@@ -230,12 +230,13 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := squadron.RunHeadless(f, data); err != nil {
+	mergeMaster, err := squadron.RunHeadless(f, data)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("launch failed: %v", err))
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, LaunchResponse{MergeMaster: mergeMaster})
 }
 
 // HandleStopAgent handles POST /api/agent/{name}/stop — stops a named agent.

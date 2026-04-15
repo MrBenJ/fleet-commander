@@ -49,7 +49,12 @@ func TestRunHeadless_WritesPromptsWithSuffixes(t *testing.T) {
 		},
 	}
 
-	_ = squadron.RunHeadless(f, data)
+	mergeMaster, _ := squadron.RunHeadless(f, data)
+
+	// With AutoMerge enabled, a merge master must be selected.
+	if mergeMaster != "aaa" && mergeMaster != "bbb" {
+		t.Errorf("expected mergeMaster to be one of the agents, got %q", mergeMaster)
+	}
 
 	for _, name := range []string{"aaa", "bbb"} {
 		path := filepath.Join(f.FleetDir, "prompts", name+".txt")

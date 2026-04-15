@@ -13,16 +13,18 @@ import (
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
-func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
+// RunHeadless launches a squadron in headless mode and returns the name of the
+// agent selected as merge master (empty string when auto-merge is disabled).
+func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 	if len(data.Agents) == 0 {
-		return fmt.Errorf("no agents in squadron")
+		return "", fmt.Errorf("no agents in squadron")
 	}
 
 	baseBranch := data.BaseBranch
 	if baseBranch == "" {
 		cb, err := f.CurrentBranch()
 		if err != nil {
-			return fmt.Errorf("could not resolve base branch: %w", err)
+			return "", fmt.Errorf("could not resolve base branch: %w", err)
 		}
 		baseBranch = cb
 	}
@@ -47,7 +49,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 	description := fmt.Sprintf("Squadron %s (%s)", data.Name, data.Consensus)
 	if _, err := fleetctx.CreateChannel(f.FleetDir, channelName, description, agentNames); err != nil {
 		if !strings.Contains(err.Error(), "already exists") {
-			return fmt.Errorf("create squadron channel %q: %w", channelName, err)
+			return "", fmt.Errorf("create squadron channel %q: %w", channelName, err)
 		}
 	}
 
@@ -58,7 +60,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 
 	promptsDir := filepath.Join(f.FleetDir, "prompts")
 	if err := os.MkdirAll(promptsDir, 0755); err != nil {
-		return fmt.Errorf("create prompts dir: %w", err)
+		return "", fmt.Errorf("create prompts dir: %w", err)
 	}
 
 	tm := tmux.NewManager(f.TmuxPrefix())
@@ -71,11 +73,11 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 		agent, err := f.AddAgent(a.Name, a.Branch)
 		if err != nil {
 			if !strings.Contains(err.Error(), "already exists") {
-				return fmt.Errorf("add agent %q: %w", a.Name, err)
+				return "", fmt.Errorf("add agent %q: %w", a.Name, err)
 			}
 			agent, err = f.GetAgent(a.Name)
 			if err != nil {
-				return fmt.Errorf("get agent %q: %w", a.Name, err)
+				return "", fmt.Errorf("get agent %q: %w", a.Name, err)
 			}
 		}
 
@@ -110,7 +112,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 
 		promptFile := filepath.Join(promptsDir, agent.Name+".txt")
 		if err := os.WriteFile(promptFile, []byte(fullPrompt), 0644); err != nil {
-			return fmt.Errorf("write prompt file %s: %w", promptFile, err)
+			return "", fmt.Errorf("write prompt file %s: %w", promptFile, err)
 		}
 
 		drv, err := driver.GetForAgent(agent)
@@ -133,7 +135,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 			AgentName:  agent.Name,
 		})
 		if err := os.WriteFile(launcherFile, []byte(launcherScript), 0755); err != nil {
-			return fmt.Errorf("write launcher %s: %w", launcherFile, err)
+			return "", fmt.Errorf("write launcher %s: %w", launcherFile, err)
 		}
 
 		// Kill any leftover session from a previous attempt
@@ -142,7 +144,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 		}
 
 		if err := tm.CreateSession(agent.Name, agent.WorktreePath, []string{launcherFile}, stateFilePath, data.Name); err != nil {
-			return fmt.Errorf("create tmux session %q: %w", agent.Name, err)
+			return "", fmt.Errorf("create tmux session %q: %w", agent.Name, err)
 		}
 		f.UpdateAgentStateFile(agent.Name, stateFilePath)
 		pid, _ := tm.GetPID(agent.Name)
@@ -154,7 +156,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 	}
 
 	fmt.Fprintf(os.Stderr, "Squadron %q launched: %s\n", data.Name, strings.Join(launched, ", "))
-	return nil
+	return mergeMaster, nil
 }
 
 func buildHeadlessPrompt(systemPrompt string, all []SquadronAgent, current SquadronAgent) string {
