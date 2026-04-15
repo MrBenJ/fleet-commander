@@ -20,7 +20,6 @@ const inputStyle: React.CSSProperties = {
   color: "var(--text-primary)",
   width: "100%",
   fontSize: "0.9rem",
-  outline: "none",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -46,18 +45,21 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 500, width: "100%" }}>
         <div>
-          <label style={labelStyle}>Squadron Name</label>
+          <label htmlFor="squadron-name" style={labelStyle}>Squadron Name</label>
           <input
+            id="squadron-name"
             style={inputStyle}
             value={config.name}
             onChange={(e) => setConfig({ ...config, name: e.target.value })}
             placeholder="page/homepage-fixes"
+            aria-required="true"
           />
         </div>
 
         <div>
-          <label style={labelStyle}>Base Branch</label>
+          <label htmlFor="base-branch" style={labelStyle}>Base Branch</label>
           <select
+            id="base-branch"
             style={{ ...inputStyle, appearance: "auto" }}
             value={config.baseBranch}
             onChange={(e) => setConfig({ ...config, baseBranch: e.target.value })}
@@ -74,6 +76,7 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
         <button
           onClick={() => onDone(config)}
           disabled={!canContinue}
+          aria-disabled={!canContinue}
           style={{
             background: canContinue ? "var(--green)" : "var(--bg-secondary)",
             color: canContinue ? "#fff" : "var(--text-muted)",

@@ -71,7 +71,6 @@ const inputStyle: React.CSSProperties = {
   color: "var(--text-primary)",
   width: "100%",
   fontSize: "0.85rem",
-  outline: "none",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -154,14 +153,16 @@ export function ReviewStep({
   return (
     <div>
       <div style={{ marginBottom: "1.5rem" }}>
-        <span style={{ fontWeight: 600, fontSize: "1.1rem" }}>Squadron: </span>
-        <span style={{ color: "var(--blue)", fontSize: "1.1rem" }}>{config.name}</span>
+        <h2 style={{ display: "inline", fontSize: "1.1rem" }}>
+          <span style={{ fontWeight: 600 }}>Squadron: </span>
+          <span style={{ color: "var(--blue)" }}>{config.name}</span>
+        </h2>
       </div>
 
       {/* Agent cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem" }}>
+      <ul style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem", listStyle: "none", padding: 0 }} aria-label="Agents to launch">
         {agents.map((a, idx) => (
-          <div
+          <li
             key={idx}
             style={{
               background: "var(--bg-secondary)",
@@ -174,24 +175,27 @@ export function ReviewStep({
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 <div style={{ display: "flex", gap: "0.75rem" }}>
                   <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Agent Name</label>
+                    <label htmlFor={`edit-name-${idx}`} style={labelStyle}>Agent Name</label>
                     <input
+                      id={`edit-name-${idx}`}
                       style={inputStyle}
                       value={editDraft.name}
                       onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
                     />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Branch</label>
+                    <label htmlFor={`edit-branch-${idx}`} style={labelStyle}>Branch</label>
                     <input
+                      id={`edit-branch-${idx}`}
                       style={inputStyle}
                       value={editDraft.branch}
                       onChange={(e) => setEditDraft({ ...editDraft, branch: e.target.value })}
                     />
                   </div>
                   <div style={{ width: 150 }}>
-                    <label style={labelStyle}>Harness</label>
+                    <label htmlFor={`edit-harness-${idx}`} style={labelStyle}>Harness</label>
                     <select
+                      id={`edit-harness-${idx}`}
                       style={inputStyle}
                       value={editDraft.driver}
                       onChange={(e) => setEditDraft({ ...editDraft, driver: e.target.value })}
@@ -202,8 +206,9 @@ export function ReviewStep({
                     </select>
                   </div>
                   <div style={{ width: 180 }}>
-                    <label style={labelStyle}>Persona</label>
+                    <label htmlFor={`edit-persona-${idx}`} style={labelStyle}>Persona</label>
                     <select
+                      id={`edit-persona-${idx}`}
                       style={inputStyle}
                       value={editDraft.persona}
                       onChange={(e) => setEditDraft({ ...editDraft, persona: e.target.value })}
@@ -216,8 +221,9 @@ export function ReviewStep({
                   </div>
                 </div>
                 <div>
-                  <label style={labelStyle}>Prompt</label>
+                  <label htmlFor={`edit-prompt-${idx}`} style={labelStyle}>Prompt</label>
                   <textarea
+                    id={`edit-prompt-${idx}`}
                     style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
                     value={editDraft.prompt}
                     onChange={(e) => setEditDraft({ ...editDraft, prompt: e.target.value })}
@@ -275,7 +281,7 @@ export function ReviewStep({
                     </span>
                     {a.persona && (
                       <span style={{ fontSize: "0.7rem", color: "var(--purple, #a855f7)" }}>
-                        {getPersonaIcon(a.persona)} {getPersonaName(a.persona)}
+                        <span aria-hidden="true">{getPersonaIcon(a.persona)}</span> {getPersonaName(a.persona)}
                       </span>
                     )}
                   </div>
@@ -285,21 +291,23 @@ export function ReviewStep({
                 </div>
                 <button
                   onClick={() => startEditing(idx)}
+                  aria-label={`Edit agent ${a.name}`}
                   style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}
                 >
-                  ✏️
+                  <span aria-hidden="true">✏️</span>
                 </button>
                 <button
                   onClick={() => removeAgent(idx)}
+                  aria-label={`Remove agent ${a.name}`}
                   style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: "1rem" }}
                 >
                   X
                 </button>
               </div>
             )}
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       {/* Consensus description box */}
       <div
@@ -372,25 +380,29 @@ export function ReviewStep({
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
         <input
           type="checkbox"
+          id="auto-merge"
           checked={autoMerge}
           onChange={(e) => setAutoMerge(e.target.checked)}
           style={{ width: 18, height: 18 }}
         />
-        <span>
+        <label htmlFor="auto-merge">
           Auto-merge all agent branches into <span style={{ color: "var(--blue)", fontWeight: 500 }}>'{config.name}-merged'</span>
-        </span>
+        </label>
       </div>
 
-      {error && (
-        <div style={{ color: "var(--red)", marginBottom: "1rem", fontSize: "0.9rem" }}>
-          {error}
-        </div>
-      )}
+      <div role="alert" aria-live="assertive">
+        {error && (
+          <div style={{ color: "var(--red)", marginBottom: "1rem", fontSize: "0.9rem" }}>
+            {error}
+          </div>
+        )}
+      </div>
 
       <div style={{ display: "flex", gap: "1rem" }}>
         <button
           onClick={handleLaunch}
           disabled={launching || agents.length === 0}
+          aria-disabled={launching || agents.length === 0}
           style={{
             flex: 1,
             background: "var(--green)",

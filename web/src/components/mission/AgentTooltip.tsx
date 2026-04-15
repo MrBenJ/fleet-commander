@@ -1,6 +1,6 @@
 import type { Persona, SquadronAgent } from "../../types";
 import { stopAgent } from "../../api";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface AgentTooltipProps {
   agent: SquadronAgent;
@@ -32,6 +32,39 @@ export function AgentTooltip({
 }: AgentTooltipProps) {
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      onClose();
+      return;
+    }
+
+    if (e.key === "Tab" && dialogRef.current) {
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    const firstButton = dialogRef.current?.querySelector<HTMLElement>("button");
+    firstButton?.focus();
+
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   const handleStop = async () => {
     if (!confirm(`Stop ${agent.name}?`)) return;
@@ -62,10 +95,16 @@ export function AgentTooltip({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        background: "rgba(0,0,0,0.5)",
       }}
       onClick={onClose}
+      role="presentation"
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Agent details: ${agent.name}`}
         style={{
           background: "var(--bg-tertiary)",
           border: "1px solid var(--border)",
@@ -86,7 +125,7 @@ export function AgentTooltip({
             borderBottom: "1px solid var(--border)",
           }}
         >
-          <div style={{ fontSize: "2rem" }}>
+          <div style={{ fontSize: "2rem" }} aria-hidden="true">
             {personaIcons[agent.persona] || "\u{1F916}"}
           </div>
           <div style={{ flex: 1 }}>
@@ -97,6 +136,7 @@ export function AgentTooltip({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <span
+              aria-hidden="true"
               style={{
                 width: 10,
                 height: 10,
@@ -117,7 +157,7 @@ export function AgentTooltip({
           </div>
         </div>
 
-        <div
+        <dl
           style={{
             display: "flex",
             flexDirection: "column",
@@ -127,14 +167,14 @@ export function AgentTooltip({
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "var(--text-secondary)" }}>Branch</span>
-            <code>{agent.branch}</code>
+            <dt style={{ color: "var(--text-secondary)" }}>Branch</dt>
+            <dd style={{ margin: 0 }}><code>{agent.branch}</code></dd>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ color: "var(--text-secondary)" }}>Harness</span>
-            <span style={{ color: "var(--blue)" }}>{agent.driver}</span>
+            <dt style={{ color: "var(--text-secondary)" }}>Harness</dt>
+            <dd style={{ margin: 0, color: "var(--blue)" }}>{agent.driver}</dd>
           </div>
-        </div>
+        </dl>
 
         <div
           style={{
@@ -155,7 +195,7 @@ export function AgentTooltip({
         </div>
 
         {stopError && (
-          <div style={{ color: "var(--red)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+          <div role="alert" style={{ color: "var(--red)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
             {stopError}
           </div>
         )}
@@ -180,6 +220,7 @@ export function AgentTooltip({
           <button
             onClick={handleStop}
             disabled={stopping}
+            aria-disabled={stopping}
             style={{
               background: "var(--bg-tertiary)",
               border: "1px solid var(--border)",
@@ -190,7 +231,7 @@ export function AgentTooltip({
               cursor: stopping ? "wait" : "pointer",
             }}
           >
-            Stop
+            {stopping ? "Stopping..." : "Stop"}
           </button>
         </div>
       </div>
