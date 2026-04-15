@@ -24,17 +24,17 @@ export function App() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div style={{ color: "var(--text-secondary)" }}>Loading fleet...</div>
-      </div>
+      <main style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div role="status" aria-live="polite" style={{ color: "var(--text-secondary)" }}>Loading fleet...</div>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div style={{ color: "var(--red)" }}>Error: {error}</div>
-      </div>
+      <main style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div role="alert" style={{ color: "var(--red)" }}>Error: {error}</div>
+      </main>
     );
   }
 
@@ -51,23 +51,26 @@ export function App() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      {view === "wizard" && fleet && (
-        <WizardLayout
-          personas={personas}
-          drivers={drivers}
-          currentBranch={fleet.currentBranch}
-          onLaunched={handleLaunched}
-        />
-      )}
-      {view === "mission" && activeSquadron && (
-        <MissionControl
-          squadronName={activeSquadron}
-          agents={launchedAgents}
-          personas={personas}
-          consensus={launchConfig.consensus}
-          autoMerge={launchConfig.autoMerge}
-        />
-      )}
+      <a href="#main-content" className="skip-nav">Skip to main content</a>
+      <main id="main-content">
+        {view === "wizard" && fleet && (
+          <WizardLayout
+            personas={personas}
+            drivers={drivers}
+            currentBranch={fleet.currentBranch}
+            onLaunched={handleLaunched}
+          />
+        )}
+        {view === "mission" && activeSquadron && (
+          <MissionControl
+            squadronName={activeSquadron}
+            agents={launchedAgents}
+            personas={personas}
+            consensus={launchConfig.consensus}
+            autoMerge={launchConfig.autoMerge}
+          />
+        )}
+      </main>
     </div>
   );
 }

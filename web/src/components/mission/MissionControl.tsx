@@ -68,7 +68,7 @@ export function MissionControl({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       {/* Top bar */}
-      <div
+      <header
         style={{
           background: "var(--bg-secondary)",
           borderBottom: "1px solid var(--border)",
@@ -79,10 +79,12 @@ export function MissionControl({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>
+          <h1 style={{ fontWeight: 700, fontSize: "1.1rem", margin: 0 }}>
             {squadronName}
-          </span>
+          </h1>
           <span
+            role="status"
+            aria-live="polite"
             style={{
               fontSize: "0.75rem",
               background: connected ? "var(--green)" : "var(--red)",
@@ -100,10 +102,11 @@ export function MissionControl({
         <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
           {agents.length} agents
         </div>
-      </div>
+      </header>
 
       {/* Agent pills */}
-      <div
+      <nav
+        aria-label="Squadron agents"
         style={{
           borderBottom: "1px solid var(--border)",
           padding: "0.6rem 1.5rem",
@@ -112,19 +115,21 @@ export function MissionControl({
           alignItems: "center",
         }}
       >
-        <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+        <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }} id="agents-label">
           Agents:
         </span>
-        {agents.map((a) => (
-          <AgentPill
-            key={a.name}
-            name={a.name}
-            state={agentStates[a.name] || "starting"}
-            driver={a.driver}
-            onClick={() => setSelectedAgent(a.name)}
-          />
-        ))}
-      </div>
+        <div role="group" aria-labelledby="agents-label" style={{ display: "flex", gap: "0.75rem" }}>
+          {agents.map((a) => (
+            <AgentPill
+              key={a.name}
+              name={a.name}
+              state={agentStates[a.name] || "starting"}
+              driver={a.driver}
+              onClick={() => setSelectedAgent(a.name)}
+            />
+          ))}
+        </div>
+      </nav>
 
       {/* Context log */}
       <ContextLog

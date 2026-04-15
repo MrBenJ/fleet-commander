@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { SquadronAgent, Persona } from "../../types";
 import { SetupStep } from "./SetupStep";
 import { AgentsStep } from "./AgentsStep";
@@ -38,6 +38,11 @@ export function WizardLayout({
   });
   const [agents, setAgents] = useState<SquadronAgent[]>([]);
   const [editingAgentIdx, setEditingAgentIdx] = useState<number | null>(null);
+  const stepContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    stepContentRef.current?.focus();
+  }, [step]);
 
   const handleSetupDone = (c: SquadronConfig) => {
     setConfig(c);
@@ -69,91 +74,104 @@ export function WizardLayout({
 
   const steps: Step[] = ["setup", "agents", "review"];
   const stepLabels = { setup: "Setup", agents: "Agents", persona: "Persona", review: "Review" };
+  const currentStepIndex = steps.indexOf(step);
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
       {/* Progress indicator */}
-      <div
-        style={{
-          display: "flex",
-          gap: "1rem",
-          marginBottom: "2rem",
-          justifyContent: "center",
-        }}
-      >
-        {steps.map((s, i) => (
-          <div
-            key={s}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              color: step === s ? "var(--blue)" : "var(--text-muted)",
-              fontWeight: step === s ? 600 : 400,
-            }}
-          >
-            <span
+      <nav aria-label="Wizard progress">
+        <ol
+          style={{
+            display: "flex",
+            gap: "1rem",
+            marginBottom: "2rem",
+            justifyContent: "center",
+            listStyle: "none",
+            padding: 0,
+          }}
+        >
+          {steps.map((s, i) => (
+            <li
+              key={s}
+              aria-current={step === s ? "step" : undefined}
               style={{
-                width: 24,
-                height: 24,
-                borderRadius: "50%",
-                background:
-                  step === s ? "var(--blue)" : "var(--bg-secondary)",
-                color: step === s ? "#fff" : "var(--text-muted)",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.75rem",
+                gap: "0.5rem",
+                color: step === s ? "var(--blue)" : "var(--text-muted)",
+                fontWeight: step === s ? 600 : 400,
               }}
             >
-              {i + 1}
-            </span>
-            {stepLabels[s]}
-            {i < steps.length - 1 && (
-              <span style={{ color: "var(--text-muted)", marginLeft: "0.5rem" }}>
-                →
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background:
+                    step === s ? "var(--blue)" : "var(--bg-secondary)",
+                  color: step === s ? "#fff" : "var(--text-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.75rem",
+                }}
+              >
+                {i + 1}
               </span>
-            )}
-          </div>
-        ))}
-      </div>
+              <span>
+                {stepLabels[s]}
+                {i < currentStepIndex && <span className="sr-only"> (completed)</span>}
+                {step === s && <span className="sr-only"> (current)</span>}
+              </span>
+              {i < steps.length - 1 && (
+                <span style={{ color: "var(--text-muted)", marginLeft: "0.5rem" }} aria-hidden="true">
+                  →
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
 
-      {step === "setup" && (
-        <SetupStep
-          initial={config}
-          currentBranch={currentBranch}
-          onDone={handleSetupDone}
-        />
-      )}
-      {step === "agents" && (
-        <AgentsStep
-          squadronName={config.name}
-          agents={agents}
-          drivers={drivers}
-          personas={personas}
-          onDone={handleAgentsDone}
-          onPickPersona={handlePickPersona}
-        />
-      )}
-      {step === "persona" && (
-        <PersonaStep
-          personas={personas}
-          onSelect={handlePersonaSelected}
-          onCancel={() => setStep("agents")}
-        />
-      )}
-      {step === "review" && (
-        <ReviewStep
-          config={config}
-          agents={agents}
-          drivers={drivers}
-          personas={personas}
-          onLaunched={onLaunched}
-          onEdit={() => setStep("agents")}
-          onAddMore={() => setStep("agents")}
-          onAgentsChanged={(a) => setAgents(a)}
-        />
-      )}
+      <div ref={stepContentRef} tabIndex={-1} style={{ outline: "none" }} aria-live="polite">
+        {step === "setup" && (
+          <SetupStep
+            initial={config}
+            currentBranch={currentBranch}
+            onDone={handleSetupDone}
+          />
+        )}
+        {step === "agents" && (
+          <AgentsStep
+            squadronName={config.name}
+            agents={agents}
+            drivers={drivers}
+            personas={personas}
+            onDone={handleAgentsDone}
+            onPickPersona={handlePickPersona}
+          />
+        )}
+        {step === "persona" && (
+          <PersonaStep
+            personas={personas}
+            onSelect={handlePersonaSelected}
+            onCancel={() => setStep("agents")}
+          />
+        )}
+        {step === "review" && (
+          <ReviewStep
+            config={config}
+            agents={agents}
+            drivers={drivers}
+            personas={personas}
+            onLaunched={onLaunched}
+            onEdit={() => setStep("agents")}
+            onAddMore={() => setStep("agents")}
+            onAgentsChanged={(a) => setAgents(a)}
+          />
+        )}
+      </div>
     </div>
   );
 }

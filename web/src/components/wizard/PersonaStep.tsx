@@ -31,6 +31,8 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
       </p>
 
       <div
+        role="list"
+        aria-label="Available personas"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
@@ -41,7 +43,9 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
         {personas.map((p) => (
           <button
             key={p.name}
+            role="listitem"
             onClick={() => onSelect(p.name)}
+            aria-label={`${p.displayName}: ${personaFlavors[p.name] || p.preamble || ""}`}
             style={{
               background: "var(--bg-secondary)",
               border: "1px solid var(--border)",
@@ -59,7 +63,7 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
               (e.currentTarget.style.borderColor = "var(--border)")
             }
           >
-            <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>
+            <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }} aria-hidden="true">
               {personaIcons[p.name] || "🤖"}
             </div>
             <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
@@ -73,7 +77,9 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
 
         {/* No Persona option */}
         <button
+          role="listitem"
           onClick={() => onSelect("")}
+          aria-label="No Persona: Default behavior, no personality overlay"
           style={{
             background: "var(--bg-secondary)",
             border: "1px solid var(--border)",
@@ -85,7 +91,7 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
             color: "var(--text-primary)",
           }}
         >
-          <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>—</div>
+          <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }} aria-hidden="true">—</div>
           <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>No Persona</div>
           <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
             Default behavior. No personality overlay.
