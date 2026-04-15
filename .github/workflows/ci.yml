@@ -18,6 +18,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Configure git user
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@fleet-commander"
+
       - name: Vet
         run: go vet ./...
 
