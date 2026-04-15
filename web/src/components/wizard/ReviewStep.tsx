@@ -16,6 +16,7 @@ interface ReviewStepProps {
   agents: SquadronAgent[];
   drivers: string[];
   personas: Persona[];
+  ghAvailable: boolean;
   onLaunched: (name: string, agents: SquadronAgent[], config: { consensus: string; autoMerge: boolean; mergeMaster?: string }) => void;
   onEdit: () => void;
   onAddMore: () => void;
@@ -97,6 +98,7 @@ export function ReviewStep({
   agents,
   drivers,
   personas,
+  ghAvailable,
   onLaunched,
   onAddMore,
   onAgentsChanged,
@@ -196,12 +198,17 @@ export function ReviewStep({
             type="checkbox"
             id="auto-pr"
             checked={state.autoPR}
+            disabled={!ghAvailable}
             onChange={(e) => dispatch({ type: "SET_AUTO_PR", enabled: e.target.checked })}
-            style={{ width: 18, height: 18 }}
+            style={{ width: 18, height: 18, opacity: ghAvailable ? 1 : 0.5 }}
           />
-          <label htmlFor="auto-pr">
+          <label htmlFor="auto-pr" style={{ opacity: ghAvailable ? 1 : 0.6 }}>
             Create pull request after merge
-            <HelpTooltip text="When enabled, the merge master will push the merged branch, create a GitHub PR, and monitor CI status until checks pass." />
+            <HelpTooltip text={
+              ghAvailable
+                ? "When enabled, the merge master will push the merged branch, create a GitHub PR, and monitor CI status until checks pass. This requires the gh CLI tool to be installed and authenticated."
+                : "Requires the gh CLI tool (https://cli.github.com). Install it and run `gh auth login` to enable this option."
+            } />
           </label>
         </div>
       )}

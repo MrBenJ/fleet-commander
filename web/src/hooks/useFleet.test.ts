@@ -30,7 +30,7 @@ describe("useFleet", () => {
   });
 
   it("loads fleet, personas, and drivers", async () => {
-    const fleet = { repoPath: "/repo", currentBranch: "main", agents: [] };
+    const fleet = { repoPath: "/repo", currentBranch: "main", ghAvailable: true, agents: [] };
     const personas = [{ name: "zen", displayName: "Zen Master", preamble: "be calm" }];
     const drivers = [{ name: "claude-code" }, { name: "aider" }];
 

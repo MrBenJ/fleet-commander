@@ -21,6 +21,7 @@ export interface SquadronData {
 export interface FleetInfo {
   repoPath: string;
   currentBranch: string;
+  ghAvailable: boolean;
   agents: AgentInfo[];
 }
 

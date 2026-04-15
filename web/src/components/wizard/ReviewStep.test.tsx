@@ -30,6 +30,7 @@ const defaultProps = {
   agents,
   drivers,
   personas,
+  ghAvailable: true,
   onLaunched: vi.fn(),
   onEdit: vi.fn(),
   onAddMore: vi.fn(),
@@ -90,6 +91,19 @@ describe("ReviewStep", () => {
     await userEvent.click(screen.getByLabelText(/Auto-merge/));
     // Auto-PR should be unchecked
     expect(screen.getByLabelText(/Create pull request after merge/)).not.toBeChecked();
+  });
+
+  it("disables auto-PR checkbox when ghAvailable is false", () => {
+    render(<ReviewStep {...defaultProps} ghAvailable={false} />);
+    const checkbox = screen.getByLabelText(/Create pull request after merge/);
+    expect(checkbox).toBeDisabled();
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it("enables auto-PR checkbox when ghAvailable is true", () => {
+    render(<ReviewStep {...defaultProps} ghAvailable={true} />);
+    const checkbox = screen.getByLabelText(/Create pull request after merge/);
+    expect(checkbox).not.toBeDisabled();
   });
 
   it("renders launch and add more buttons", () => {
