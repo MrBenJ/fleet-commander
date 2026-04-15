@@ -1,28 +1,6 @@
 import type { Persona, SquadronAgent } from "../../types";
 import { stopAgent } from "../../api";
-import { useState, useEffect } from "react";
-import Editor from "@monaco-editor/react";
-
-function useMonacoTheme(): "vs-dark" | "light" {
-  const [theme, setTheme] = useState<"vs-dark" | "light">(() => {
-    const attr = document.documentElement.getAttribute("data-theme");
-    return attr === "light" ? "light" : "vs-dark";
-  });
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const attr = document.documentElement.getAttribute("data-theme");
-      setTheme(attr === "light" ? "light" : "vs-dark");
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  return theme;
-}
+import { useState } from "react";
 
 interface AgentTooltipProps {
   agent: SquadronAgent;
@@ -52,7 +30,6 @@ export function AgentTooltip({
 }: AgentTooltipProps) {
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
-  const monacoTheme = useMonacoTheme();
 
   const handleStop = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -157,56 +134,30 @@ export function AgentTooltip({
         </div>
       </dl>
 
-      {/* Task — Monaco Editor (read-only) */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          marginBottom: "1rem",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      {/* Task */}
+      <div style={{ marginBottom: "1rem" }}>
         <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.8rem", marginBottom: "0.4rem" }}>
           Task
         </div>
-        <div
+        <pre
           style={{
-            flex: 1,
-            minHeight: 200,
-            maxHeight: "40vh",
+            margin: 0,
+            padding: "0.5rem 0.75rem",
+            background: "var(--bg-primary)",
             border: "1px solid var(--border)",
             borderRadius: 8,
-            overflow: "hidden",
+            fontSize: "0.8rem",
+            lineHeight: 1.5,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            maxHeight: "40vh",
+            overflowY: "auto",
+            color: "var(--text-primary)",
+            fontFamily: "inherit",
           }}
         >
-          <Editor
-            height="100%"
-            defaultLanguage="markdown"
-            value={agent.prompt}
-            theme={monacoTheme}
-            options={{
-              readOnly: true,
-              domReadOnly: true,
-              minimap: { enabled: false },
-              wordWrap: "on",
-              lineNumbers: "off",
-              scrollBeyondLastLine: false,
-              renderLineHighlight: "none",
-              overviewRulerLanes: 0,
-              hideCursorInOverviewRuler: true,
-              folding: false,
-              glyphMargin: false,
-              padding: { top: 8, bottom: 8 },
-              fontSize: 13,
-              scrollbar: {
-                vertical: "auto",
-                horizontal: "hidden",
-                verticalScrollbarSize: 8,
-              },
-            }}
-          />
-        </div>
+          {agent.prompt}
+        </pre>
       </div>
 
       {/* Error */}
