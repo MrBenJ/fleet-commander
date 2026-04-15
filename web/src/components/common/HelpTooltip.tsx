@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 
 interface HelpTooltipProps {
   text: string;
@@ -16,7 +16,7 @@ export function HelpTooltip({ text }: HelpTooltipProps) {
   const [above, setAbove] = useState(false);
   const iconRef = useRef<HTMLSpanElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (visible && iconRef.current) {
       const rect = iconRef.current.getBoundingClientRect();
       // If there's not enough room below, show above
@@ -57,30 +57,36 @@ export function HelpTooltip({ text }: HelpTooltipProps) {
       </svg>
       {visible && (
         <span
-          role="tooltip"
           style={{
             position: "absolute",
             left: "50%",
             transform: "translateX(-50%)",
             ...(above
-              ? { bottom: "calc(100% + 8px)" }
-              : { top: "calc(100% + 8px)" }),
-            background: "var(--bg-tertiary, #1a1a2e)",
-            color: "var(--text-primary)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            padding: "0.5rem 0.75rem",
-            fontSize: "0.75rem",
-            lineHeight: 1.4,
-            whiteSpace: "normal",
-            width: 220,
+              ? { bottom: "100%", paddingBottom: 8 }
+              : { top: "100%", paddingTop: 8 }),
             zIndex: 1000,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-            animation: "fc-tooltip-in 0.15s ease-out",
             pointerEvents: "none",
           }}
         >
-          {text}
+          <span
+            role="tooltip"
+            style={{
+              display: "block",
+              background: "var(--bg-tertiary, #1a1a2e)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: "0.5rem 0.75rem",
+              fontSize: "0.75rem",
+              lineHeight: 1.4,
+              whiteSpace: "normal",
+              width: 220,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+              animation: "fc-tooltip-in 0.15s ease-out",
+            }}
+          >
+            {text}
+          </span>
         </span>
       )}
     </span>
