@@ -6,7 +6,7 @@ build:
 	go install -ldflags "$(LDFLAGS)" ./cmd/fleet/
 
 build-web:
-	cd web && npm run build
+	cd web && npm install && npm run build
 
 # Copy dist into cmd/fleet/ for go:embed, then install to PATH
 build-all: build-web

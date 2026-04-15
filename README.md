@@ -340,6 +340,7 @@ The global directory stores the multi-repo index and cross-repo communication:
 ## Prerequisites
 
 - **[Go](https://go.dev/doc/install)** (1.21+) -- to build the binary
+- **[Node.js](https://nodejs.org/)** (18+) -- required for building the web UI (`make build-all`)
 - **[git](https://git-scm.com/)** -- worktree creation and branch management
 - **[tmux](https://github.com/tmux/tmux/wiki)** -- each agent runs in its own tmux session
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** -- the AI coding agent (`claude` must be on your `PATH`)
