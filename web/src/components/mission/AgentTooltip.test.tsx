@@ -53,12 +53,9 @@ describe("AgentTooltip", () => {
     expect(screen.getByText("waiting")).toBeInTheDocument();
   });
 
-  it("renders task prompt in a read-only Monaco editor", () => {
+  it("renders task prompt text", () => {
     render(<AgentTooltip {...defaultProps} />);
-    const editor = screen.getByTestId("monaco-editor");
-    expect(editor).toBeInTheDocument();
-    expect(editor).toHaveTextContent("Do some testing work");
-    expect(editor).toHaveAttribute("data-readonly", "true");
+    expect(screen.getByText("Do some testing work for the project")).toBeInTheDocument();
   });
 
   it("shows full prompt without truncation", () => {
@@ -69,8 +66,7 @@ describe("AgentTooltip", () => {
         agent={{ ...agent, prompt: longPrompt }}
       />
     );
-    const editor = screen.getByTestId("monaco-editor");
-    expect(editor).toHaveTextContent(longPrompt);
+    expect(screen.getByText(longPrompt)).toBeInTheDocument();
   });
 
   it("shows 'No Persona' when persona is undefined", () => {

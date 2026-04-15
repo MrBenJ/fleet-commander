@@ -1,28 +1,6 @@
 import type { Persona, SquadronAgent } from "../../types";
 import { stopAgent } from "../../api";
-import { useState, useEffect, useCallback } from "react";
-import Editor, { type OnMount } from "@monaco-editor/react";
-
-function useMonacoTheme(): "vs-dark" | "light" {
-  const [theme, setTheme] = useState<"vs-dark" | "light">(() => {
-    const attr = document.documentElement.getAttribute("data-theme");
-    return attr === "light" ? "light" : "vs-dark";
-  });
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const attr = document.documentElement.getAttribute("data-theme");
-      setTheme(attr === "light" ? "light" : "vs-dark");
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  return theme;
-}
+import { useState } from "react";
 
 interface AgentTooltipProps {
   agent: SquadronAgent;
@@ -45,17 +23,6 @@ const stateColors: Record<string, string> = {
   starting: "var(--text-muted)",
 };
 
-/** Injects a right-border on the line-number gutter so it visually separates from code. */
-function injectGutterSeparator(container: HTMLElement) {
-  const style = document.createElement("style");
-  style.textContent = `
-    .monaco-editor .margin {
-      border-right: 1px solid var(--border, rgba(128,128,128,0.35)) !important;
-    }
-  `;
-  container.appendChild(style);
-}
-
 export function AgentTooltip({
   agent,
   state,
@@ -63,13 +30,6 @@ export function AgentTooltip({
 }: AgentTooltipProps) {
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
-  const [showLineNumbers, setShowLineNumbers] = useState(false);
-  const monacoTheme = useMonacoTheme();
-
-  const handleEditorMount: OnMount = useCallback((editor) => {
-    const container = editor.getDomNode();
-    if (container) injectGutterSeparator(container);
-  }, []);
 
   const handleStop = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -179,78 +139,30 @@ export function AgentTooltip({
         </div>
       </dl>
 
-      {/* Task — Monaco Editor (read-only) */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          marginBottom: "1rem",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
-          <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.8rem" }}>
-            Task
-          </div>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setShowLineNumbers((v) => !v); }}
-            title={showLineNumbers ? "Hide line numbers" : "Show line numbers"}
-            style={{
-              background: "var(--bg-tertiary, #2d2d2d)",
-              border: "1px solid var(--border, #555)",
-              borderRadius: 4,
-              color: "var(--text-secondary, #aaa)",
-              fontSize: 11,
-              padding: "2px 6px",
-              cursor: "pointer",
-              lineHeight: "16px",
-              opacity: 0.8,
-            }}
-          >
-            {showLineNumbers ? "#" : "¶"}
-          </button>
+      {/* Task */}
+      <div style={{ marginBottom: "1rem" }}>
+        <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.8rem", marginBottom: "0.4rem" }}>
+          Task
         </div>
-        <div
+        <pre
           style={{
-            flex: 1,
-            minHeight: 200,
-            maxHeight: "40vh",
+            margin: 0,
+            padding: "0.5rem 0.75rem",
+            background: "var(--bg-primary)",
             border: "1px solid var(--border)",
             borderRadius: 8,
-            overflow: "hidden",
+            fontSize: "0.8rem",
+            lineHeight: 1.5,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            maxHeight: "40vh",
+            overflowY: "auto",
+            color: "var(--text-primary)",
+            fontFamily: "inherit",
           }}
         >
-          <Editor
-            height="100%"
-            defaultLanguage="markdown"
-            value={agent.prompt}
-            theme={monacoTheme}
-            onMount={handleEditorMount}
-            options={{
-              readOnly: true,
-              domReadOnly: true,
-              minimap: { enabled: false },
-              wordWrap: "on",
-              lineNumbers: showLineNumbers ? "on" : "off",
-              lineNumbersMinChars: 3,
-              scrollBeyondLastLine: false,
-              renderLineHighlight: "none",
-              overviewRulerLanes: 0,
-              hideCursorInOverviewRuler: true,
-              folding: false,
-              glyphMargin: false,
-              padding: { top: 8, bottom: 8 },
-              fontSize: 13,
-              scrollbar: {
-                vertical: "auto",
-                horizontal: "hidden",
-                verticalScrollbarSize: 8,
-              },
-            }}
-          />
-        </div>
+          {agent.prompt}
+        </pre>
       </div>
 
       {/* Error */}
