@@ -4,6 +4,14 @@ A CLI + TUI tool for managing parallel coding-agent sessions across multiple rep
 
 Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Aider, and arbitrary terminal-based agents are supported via the driver system.
 
+## Prerequisites
+
+- **[Go](https://go.dev/doc/install)** (1.21+) -- to build the binary
+- **[Node.js](https://nodejs.org/)** (18+) -- required for building the web UI (`make build-all`)
+- **[git](https://git-scm.com/)** -- worktree creation and branch management
+- **[tmux](https://github.com/tmux/tmux/wiki)** -- each agent runs in its own tmux session
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** -- the AI coding agent (`claude` must be on your `PATH`)
+
 ## How It Works
 
 Fleet Commander gives each agent its own git worktree and tmux session. You switch between agents using a TUI queue that shows which agents are working and which need your input. With multi-repo support, you can manage fleets across different repositories from a single interface.
@@ -336,14 +344,6 @@ The global directory stores the multi-repo index and cross-repo communication:
 ├── context.json             # Cross-repo shared log
 └── context.lock             # Exclusive flock for global context
 ```
-
-## Prerequisites
-
-- **[Go](https://go.dev/doc/install)** (1.21+) -- to build the binary
-- **[Node.js](https://nodejs.org/)** (18+) -- required for building the web UI (`make build-all`)
-- **[git](https://git-scm.com/)** -- worktree creation and branch management
-- **[tmux](https://github.com/tmux/tmux/wiki)** -- each agent runs in its own tmux session
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** -- the AI coding agent (`claude` must be on your `PATH`)
 
 ## Building
 
