@@ -1,6 +1,7 @@
 package hangar
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/fs"
@@ -10,11 +11,43 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/MrBenJ/fleet-commander/internal/hangar/api"
 	"github.com/MrBenJ/fleet-commander/internal/hangar/terminal"
 	"github.com/MrBenJ/fleet-commander/internal/hangar/ws"
 )
+
+// chanWriter routes log output to a channel instead of stderr,
+// so log messages display cleanly in the Bubble Tea TUI.
+type chanWriter struct {
+	ch  chan string
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (w *chanWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.buf.Write(p)
+	for {
+		line, err := w.buf.ReadString('\n')
+		if err != nil {
+			// incomplete line — put it back
+			w.buf.WriteString(line)
+			break
+		}
+		msg := strings.TrimRight(line, "\n")
+		if msg == "" {
+			continue
+		}
+		select {
+		case w.ch <- msg:
+		default:
+		}
+	}
+	return len(p), nil
+}
 
 type Server struct {
 	port     int
@@ -41,7 +74,9 @@ type Config struct {
 }
 
 func NewServer(cfg Config) *Server {
-	logger := log.New(log.Writer(), "[hangar] ", log.LstdFlags)
+	logCh := make(chan string, 100)
+	cw := &chanWriter{ch: logCh}
+	logger := log.New(cw, "[hangar] ", log.Ltime)
 	s := &Server{
 		port:     cfg.Port,
 		devMode:  cfg.DevMode,
@@ -52,7 +87,7 @@ func NewServer(cfg Config) *Server {
 		api:      api.NewHandlers(cfg.RepoPath, cfg.FleetDir),
 		hub:      ws.NewHub(cfg.FleetDir, cfg.RepoPath, cfg.TmuxPrefix, logger),
 		terminal: terminal.NewProxy(cfg.TmuxPrefix, logger),
-		LogCh:    make(chan string, 100),
+		LogCh:    logCh,
 	}
 	s.routes()
 	return s
@@ -148,8 +183,4 @@ func (s *Server) Port() int {
 
 func (s *Server) log(msg string) {
 	s.logger.Print(msg)
-	select {
-	case s.LogCh <- msg:
-	default:
-	}
 }

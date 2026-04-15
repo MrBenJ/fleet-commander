@@ -1,6 +1,9 @@
 import { useState, useRef } from "react";
 import type { Persona, SquadronAgent } from "../../types";
 import { AgentTooltip } from "./AgentTooltip";
+import { ClaudeCodeIcon } from "../icons/ClaudeCodeIcon";
+import { CodexIcon } from "../icons/CodexIcon";
+import { AiderIcon } from "../icons/AiderIcon";
 
 interface AgentPillProps {
   agent: SquadronAgent;
@@ -9,13 +12,6 @@ interface AgentPillProps {
   isMerger?: boolean;
 }
 
-const driverColors: Record<string, string> = {
-  "claude-code": "var(--blue)",
-  codex: "var(--green)",
-  aider: "var(--orange)",
-  generic: "var(--text-secondary)",
-};
-
 const stateColors: Record<string, string> = {
   working: "var(--green)",
   waiting: "var(--orange)",
@@ -23,33 +19,8 @@ const stateColors: Record<string, string> = {
   starting: "var(--text-muted)",
 };
 
-function ClaudeCodeIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <title>Claude Code</title>
-      <path
-        d="M16.1 3.4c-.3-.1-.7 0-.9.3l-7.6 13.2c-.2.3-.1.7.3.9.3.2.7.1.9-.3L16.4 4.3c.2-.3.1-.7-.3-.9zM8.5 7.1C8.3 7 7.9 7 7.7 7.2L2.2 11.6c-.3.2-.3.6-.1.9l5.5 5.2c.2.3.7.3.9 0 .3-.2.3-.6.1-.9L3.8 12l4.8-3.9c.3-.3.3-.7.1-1h-.2zM15.5 7.1c.2-.1.6-.1.8.1l5.5 4.4c.3.2.3.6.1.9l-5.5 5.2c-.2.3-.7.3-.9 0-.3-.2-.3-.6-.1-.9L20.2 12l-4.8-3.9c-.3-.3-.3-.7-.1-1h.2z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function CodexIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <title>OpenAI Codex</title>
-      <path
-        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 2.4a7.6 7.6 0 110 15.2 7.6 7.6 0 010-15.2zM12 7a5 5 0 100 10 5 5 0 000-10zm0 2a3 3 0 110 6 3 3 0 010-6z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
 export function DriverIcon({ driver, size = 14 }: { driver: string; size?: number }) {
-  const color = driverColors[driver] || "var(--text-secondary)";
-  const style = { color, display: "inline-flex", alignItems: "center" };
+  const style = { display: "inline-flex", alignItems: "center" };
 
   switch (driver) {
     case "claude-code":
@@ -57,17 +28,14 @@ export function DriverIcon({ driver, size = 14 }: { driver: string; size?: numbe
     case "codex":
       return <span style={style}><CodexIcon size={size} /></span>;
     case "aider":
-      return (
-        <span style={{ ...style, fontSize: "0.65rem", fontWeight: 600 }} title="Aider">
-          ai
-        </span>
-      );
+      return <span style={style}><AiderIcon size={size} /></span>;
     case "generic":
       return (
         <span
           title="Generic"
           style={{
             ...style,
+            color: "var(--text-secondary)",
             fontSize: "0.6rem",
             fontWeight: 700,
             background: "var(--bg-tertiary, rgba(255,255,255,0.08))",
@@ -82,7 +50,7 @@ export function DriverIcon({ driver, size = 14 }: { driver: string; size?: numbe
       );
     default:
       return (
-        <span style={{ ...style, fontSize: "0.65rem" }} title={driver}>
+        <span style={{ ...style, color: "var(--text-secondary)", fontSize: "0.65rem" }} title={driver}>
           {driver.slice(0, 2)}
         </span>
       );
