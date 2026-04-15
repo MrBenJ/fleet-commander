@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 
 interface CodeEditorProps {
@@ -32,15 +32,24 @@ function useTheme(): "vs-dark" | "light" {
   return theme;
 }
 
-/** Injects a right-border on the line-number gutter so it visually separates from code. */
-function injectGutterSeparator(container: HTMLElement) {
+/** Creates a style element for the gutter separator; returns it so callers can update it. */
+function createGutterStyle(container: HTMLElement): HTMLStyleElement {
   const style = document.createElement("style");
-  style.textContent = `
+  container.appendChild(style);
+  return style;
+}
+
+/** Returns the CSS text for the gutter separator based on whether line numbers are shown. */
+function gutterCSS(visible: boolean): string {
+  if (!visible) return "";
+  return `
     .monaco-editor .margin {
       border-right: 1px solid var(--border, rgba(128,128,128,0.35)) !important;
     }
+    .monaco-editor .lines-content.monaco-editor-background {
+      padding-left: 4px !important;
+    }
   `;
-  container.appendChild(style);
 }
 
 export function CodeEditor({
@@ -53,15 +62,29 @@ export function CodeEditor({
 }: CodeEditorProps) {
   const monacoTheme = useTheme();
   const [showLineNumbers, setShowLineNumbers] = useState(true);
+  const gutterStyleRef = useRef<HTMLStyleElement | null>(null);
   const showPlaceholder = placeholder && !value;
 
   const heightValue =
     typeof minHeight === "number" ? `${minHeight}px` : minHeight;
 
+  const showLineNumbersRef = useRef(showLineNumbers);
+  showLineNumbersRef.current = showLineNumbers;
+
   const handleMount: OnMount = useCallback((editor) => {
     const container = editor.getDomNode();
-    if (container) injectGutterSeparator(container);
+    if (container) {
+      const style = createGutterStyle(container);
+      style.textContent = gutterCSS(showLineNumbersRef.current);
+      gutterStyleRef.current = style;
+    }
   }, []);
+
+  useEffect(() => {
+    if (gutterStyleRef.current) {
+      gutterStyleRef.current.textContent = gutterCSS(showLineNumbers);
+    }
+  }, [showLineNumbers]);
 
   return (
     <div
