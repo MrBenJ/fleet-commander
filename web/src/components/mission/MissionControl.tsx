@@ -4,6 +4,8 @@ import { useWebSocket } from "../../hooks/useWebSocket";
 import { AgentPill } from "./AgentPill";
 import { AgentTooltip } from "./AgentTooltip";
 import { ContextLog } from "./ContextLog";
+import { MultiViewToggle } from "./MultiViewToggle";
+import { MultiView } from "./MultiView";
 
 interface MissionControlProps {
   squadronName: string;
@@ -32,6 +34,7 @@ export function MissionControl({
   const [messages, setMessages] = useState<ContextMessage[]>([]);
   const [agentStates, setAgentStates] = useState<Record<string, string>>({});
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [multiView, setMultiView] = useState(false);
 
   const agentColors = useMemo(() => {
     const colors: Record<string, string> = {};
@@ -115,6 +118,17 @@ export function MissionControl({
           alignItems: "center",
         }}
       >
+        <MultiViewToggle
+          active={multiView}
+          onToggle={() => setMultiView((v) => !v)}
+        />
+        <span
+          style={{
+            width: 1,
+            height: 16,
+            background: "var(--border)",
+          }}
+        />
         <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }} id="agents-label">
           Agents:
         </span>
@@ -131,12 +145,16 @@ export function MissionControl({
         </div>
       </nav>
 
-      {/* Context log */}
-      <ContextLog
-        messages={messages}
-        agentColors={agentColors}
-        onAgentClick={(name) => setSelectedAgent(name)}
-      />
+      {/* Main content: context log or multi-view */}
+      {multiView ? (
+        <MultiView agents={agents} />
+      ) : (
+        <ContextLog
+          messages={messages}
+          agentColors={agentColors}
+          onAgentClick={(name) => setSelectedAgent(name)}
+        />
+      )}
 
       {/* Agent tooltip modal */}
       {selectedAgent && selectedAgentData && (
