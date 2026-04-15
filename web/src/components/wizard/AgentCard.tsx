@@ -74,7 +74,7 @@ export function AgentCard({
             <div style={{ width: 150 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <label htmlFor={`edit-harness-${agent.name}`} style={labelStyle}>Harness</label>
-                <HelpTooltip text="The harness configures how the agent runs — including permissions, tools, and execution constraints." />
+                <HelpTooltip text="The harness configures how the agent runs. Valid values: claude-code (default), codex, aider, generic." />
               </div>
               <select
                 id={`edit-harness-${agent.name}`}
@@ -90,7 +90,7 @@ export function AgentCard({
             <div style={{ width: 180 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <label htmlFor={`edit-persona-${agent.name}`} style={labelStyle}>Persona</label>
-                <HelpTooltip text="A persona defines the agent's coding style, expertise areas, and approach to problem-solving." />
+                <HelpTooltip text="A persona defines the agent's coding style and approach. Valid values: overconfident-engineer, zen-master, paranoid-perfectionist, raging-jerk, peter-molyneux, or leave empty for no persona." />
               </div>
               <select
                 id={`edit-persona-${agent.name}`}

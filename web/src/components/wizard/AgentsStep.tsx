@@ -3,6 +3,7 @@ import type { SquadronAgent, Persona } from "../../types";
 import { AIGeneratePanel } from "./AIGeneratePanel";
 import { ManualAddForm } from "./ManualAddForm";
 import { AgentListItem } from "./AgentListItem";
+import { CSVUpload } from "./CSVUpload";
 
 interface AgentsStepProps {
   squadronName: string;
@@ -31,6 +32,10 @@ export function AgentsStep({
     setAgents((prev) => [...prev, agent]);
   };
 
+  const handleCSVAgents = (newAgents: SquadronAgent[]) => {
+    setAgents((prev) => [...prev, ...newAgents]);
+  };
+
   const handleRemove = (idx: number) => {
     setAgents((prev) => prev.filter((_, i) => i !== idx));
   };
@@ -41,6 +46,11 @@ export function AgentsStep({
       <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>
         Assemble your squad's agents
       </p>
+
+      <CSVUpload
+        squadronName={squadronName}
+        onAgentsParsed={handleCSVAgents}
+      />
 
       <div style={{ display: "flex", gap: "1.5rem", marginBottom: "2rem" }}>
         <AIGeneratePanel
