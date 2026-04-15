@@ -292,6 +292,24 @@ func TestBuildMergerSuffix_WithAutoPR(t *testing.T) {
 	}
 }
 
+func TestBuildMergerSuffix_WithAutoPR_ContainsAuthCheck(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "a", Branch: "squadron/alpha/a"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "main", agents, true)
+
+	mustContain := []string{
+		"gh auth status",
+		"GH_AUTH_FAILED",
+		"fleet context channel-send squadron-alpha",
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("autoPR merger suffix missing auth check content %q\n---\n%s", s, got)
+		}
+	}
+}
+
 func TestBuildMergerSuffix_WithoutAutoPR(t *testing.T) {
 	agents := []squadron.AgentBranch{
 		{Name: "a", Branch: "squadron/alpha/a"},
