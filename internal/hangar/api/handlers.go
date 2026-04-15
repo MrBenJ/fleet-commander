@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
@@ -110,6 +111,57 @@ func (h *Handlers) HandleGetDrivers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, drivers)
+}
+
+// HandleGetBranches handles GET /api/fleet/branches — returns available git branches,
+// excluding branches currently checked out in worktrees.
+func (h *Handlers) HandleGetBranches(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	// Get worktree branches to exclude.
+	worktreeBranches := make(map[string]bool)
+	wtCmd := exec.Command("git", "worktree", "list", "--porcelain")
+	wtCmd.Dir = h.repoPath
+	wtOut, err := wtCmd.Output()
+	if err == nil {
+		for _, line := range strings.Split(string(wtOut), "\n") {
+			if strings.HasPrefix(line, "branch ") {
+				ref := strings.TrimPrefix(line, "branch ")
+				branch := strings.TrimPrefix(ref, "refs/heads/")
+				worktreeBranches[branch] = true
+			}
+		}
+	}
+
+	// Get all local branches.
+	cmd := exec.Command("git", "branch", "--format=%(refname:short)")
+	cmd.Dir = h.repoPath
+	out, err := cmd.Output()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to list branches: %v", err))
+		return
+	}
+
+	var branches []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+		if worktreeBranches[name] {
+			continue
+		}
+		branches = append(branches, name)
+	}
+
+	if branches == nil {
+		branches = []string{}
+	}
+
+	writeJSON(w, http.StatusOK, branches)
 }
 
 // HandleLaunchSquadron handles POST /api/squadron/launch — validates and launches a squadron.

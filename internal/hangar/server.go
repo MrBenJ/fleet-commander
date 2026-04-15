@@ -65,6 +65,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/fleet", s.api.HandleGetFleet)
 	s.mux.HandleFunc("/api/fleet/personas", s.api.HandleGetPersonas)
 	s.mux.HandleFunc("/api/fleet/drivers", s.api.HandleGetDrivers)
+	s.mux.HandleFunc("/api/fleet/branches", s.api.HandleGetBranches)
 	s.mux.HandleFunc("/api/squadron/launch", s.api.HandleLaunchSquadron)
 	s.mux.HandleFunc("/api/squadron/generate", s.api.HandleGenerate)
 	s.mux.HandleFunc("/api/squadron/", func(w http.ResponseWriter, r *http.Request) {
