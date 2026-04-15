@@ -530,6 +530,12 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 		}
 	}
 
+	// When consensus is "none" but auto-merge is enabled, non-merger agents
+	// still need to poll for MERGE_COMPLETE/MERGE_FAILED.
+	if m.consensusType == "none" && m.autoMerge && m.mergeMaster != "" && agentName != m.mergeMaster {
+		result += "\n" + squadron.BuildNoConsensusAutoMergeSuffix(m.squadronName)
+	}
+
 	if m.autoMerge && agentName == m.mergeMaster && m.mergeMaster != "" {
 		agentBranches := make([]squadron.AgentBranch, 0, len(m.prompts))
 		for _, p := range m.prompts {

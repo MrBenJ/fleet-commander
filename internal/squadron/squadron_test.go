@@ -33,6 +33,9 @@ func TestBuildConsensusSuffix_Universal(t *testing.T) {
 		`"APPROVED:`,
 		`"CHANGES_REQUESTED:`,
 		`"REVISED:`,
+		"CRITICAL: Do NOT stop or exit after completing your review",
+		"continue polling the squadron channel every 30 seconds",
+		"MERGE_COMPLETE or MERGE_FAILED",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(got, s) {
@@ -42,10 +45,6 @@ func TestBuildConsensusSuffix_Universal(t *testing.T) {
 }
 
 func TestBuildConsensusSuffix_ReviewMaster_Reviewer(t *testing.T) {
-	// When the caller asks for the review master's own suffix — passing
-	// reviewMaster == "" signals "build for a non-reviewer". To build the
-	// reviewer's own suffix, pass their name in the `selfAgent` argument via
-	// the dedicated BuildReviewMasterReviewerSuffix helper.
 	got := squadron.BuildReviewMasterReviewerSuffix(
 		"alpha",
 		[]string{"a", "b", "c"},
@@ -59,6 +58,9 @@ func TestBuildConsensusSuffix_ReviewMaster_Reviewer(t *testing.T) {
 		"git diff main...<their-branch>",
 		`"ALL_APPROVED:`,
 		"Squadron members: a, b, c",
+		"CRITICAL: After posting ALL_APPROVED",
+		"MERGE_COMPLETE or MERGE_FAILED",
+		"Do NOT exit your session prematurely",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(got, s) {
@@ -93,6 +95,18 @@ func TestBuildConsensusSuffix_ReviewMaster_NonReviewer(t *testing.T) {
 	for _, s := range forbidden {
 		if strings.Contains(got, s) {
 			t.Errorf("non-reviewer suffix should not contain %q", s)
+		}
+	}
+
+	// Must contain CRITICAL polling instructions
+	pollingChecks := []string{
+		"CRITICAL: Do NOT stop after receiving approval",
+		"MERGE_COMPLETE or MERGE_FAILED",
+		"continue polling the squadron channel every 30 seconds",
+	}
+	for _, s := range pollingChecks {
+		if !strings.Contains(got, s) {
+			t.Errorf("non-reviewer suffix missing polling instruction %q\n---\n%s", s, got)
 		}
 	}
 }
@@ -202,6 +216,7 @@ func TestBuildMergerSuffix(t *testing.T) {
 		"c -> squadron/alpha/c",
 		`"MERGE_COMPLETE: squadron/alpha"`,
 		`"MERGE_FAILED:`,
+		"CRITICAL: Before starting the merge, verify ALL agents have reached consensus",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(got, s) {
@@ -215,5 +230,33 @@ func TestBuildMergerSuffix(t *testing.T) {
 	cIdx := strings.Index(got, "c -> squadron/alpha/c")
 	if !(aIdx < bIdx && bIdx < cIdx) {
 		t.Errorf("merge order not preserved: a=%d b=%d c=%d", aIdx, bIdx, cIdx)
+	}
+}
+
+func TestBuildNoConsensusAutoMergeSuffix(t *testing.T) {
+	got := squadron.BuildNoConsensusAutoMergeSuffix("alpha")
+
+	mustContain := []string{
+		"Squadron Merge Monitoring",
+		`squadron "alpha"`,
+		"squadron-alpha",
+		"CRITICAL: Do NOT stop after completing your work",
+		"MERGE_COMPLETE or MERGE_FAILED",
+		"continue polling the squadron channel every 30 seconds",
+		`fleet context channel-read squadron-alpha`,
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("no-consensus auto-merge suffix missing %q\n---\n%s", s, got)
+		}
+	}
+}
+
+func TestBuildConsensusSuffix_NoneStillEmpty(t *testing.T) {
+	// Verify that "none" consensus still returns empty string —
+	// the auto-merge polling is handled separately by the caller.
+	got := squadron.BuildConsensusSuffix("none", "alpha", []string{"a", "b"}, "", "main")
+	if got != "" {
+		t.Fatalf("expected empty suffix for 'none' consensus, got %q", got)
 	}
 }

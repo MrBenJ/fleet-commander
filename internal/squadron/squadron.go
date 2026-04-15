@@ -35,6 +35,10 @@ After completing your primary task, you MUST participate in the squadron review 
    - You have approved ALL other squadron members
    - ALL other squadron members have approved you
 
+CRITICAL: Do NOT stop or exit after completing your review. You MUST continue polling the squadron channel every 30 seconds until ALL reviews are complete and ALL agents have been approved. If you have completed your work and reviewed all other agents but not everyone has approved everyone yet, KEEP POLLING. Your session must remain active.
+
+If auto-merge is enabled, after all approvals are in, continue polling until the merge master posts MERGE_COMPLETE or MERGE_FAILED. Only then may you stop.
+
 Squadron members: %s
 `
 
@@ -73,6 +77,8 @@ After completing your own primary task:
 6. Once all agents are approved, post:
    fleet context channel-send squadron-%s "ALL_APPROVED: Squadron review complete"
 
+CRITICAL: After posting ALL_APPROVED, if auto-merge is enabled, you MUST continue polling the channel every 30 seconds to monitor merge progress. Only stop when you see MERGE_COMPLETE or MERGE_FAILED. Do NOT exit your session prematurely.
+
 Squadron members: %s
 `
 
@@ -96,6 +102,8 @@ After completing your primary task:
 
 4. Your work is complete when the review master posts APPROVED for you.
 
+CRITICAL: Do NOT stop after receiving approval. If auto-merge is enabled, continue polling the squadron channel every 30 seconds until the merge master posts MERGE_COMPLETE or MERGE_FAILED. Only then may you stop. If you are idle waiting, periodically run: fleet context channel-read squadron-%s
+
 Squadron members: %s
 Review master: %s
 `
@@ -117,6 +125,8 @@ const mergerTemplate = `---
 
 You are also the MERGE MASTER for squadron "%s". After the squadron reaches consensus (all APPROVED for review modes, or all COMPLETED for none mode), you must merge everyone's work into a single squadron branch.
 
+CRITICAL: Before starting the merge, verify ALL agents have reached consensus by reading the squadron channel. Do not begin merging until the review process is fully complete.
+
 1. Create the squadron branch from the base:
    git checkout %s
    git checkout -b squadron/%s
@@ -136,6 +146,25 @@ You are also the MERGE MASTER for squadron "%s". After the squadron reaches cons
 Agent branches to merge (in order):
 %s
 `
+
+const noConsensusAutoMergeTemplate = `---
+
+## Squadron Merge Monitoring
+
+You are a member of squadron "%s". Auto-merge is enabled for this squadron.
+
+After completing your primary task, announce completion:
+   fleet context channel-send squadron-%s "COMPLETED: <one-line summary of what you did>"
+
+CRITICAL: Do NOT stop after completing your work. The merge master will merge all agents' branches after everyone is done. You MUST continue polling the squadron channel every 30 seconds until the merge master posts MERGE_COMPLETE or MERGE_FAILED. Only then may you stop. If you are idle waiting, periodically run: fleet context channel-read squadron-%s
+`
+
+// BuildNoConsensusAutoMergeSuffix returns a minimal polling suffix for non-merger
+// agents when consensus is "none" but auto-merge is enabled. These agents need
+// to stay alive to monitor for MERGE_COMPLETE/MERGE_FAILED.
+func BuildNoConsensusAutoMergeSuffix(squadronName string) string {
+	return fmt.Sprintf(noConsensusAutoMergeTemplate, squadronName, squadronName, squadronName)
+}
 
 // BuildMergerSuffix returns the merger-duties suffix appended to the merge
 // master's prompt. Pass every agent in the squadron (including the merger
@@ -186,6 +215,7 @@ func BuildConsensusSuffix(consensusType, squadronName string, agents []string, r
 			reviewMasterNonReviewerTemplate,
 			squadronName, squadronName, reviewMaster,
 			squadronName, squadronName, squadronName,
+			squadronName,
 			strings.Join(agents, ", "),
 			reviewMaster,
 		)
