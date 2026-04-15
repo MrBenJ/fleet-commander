@@ -17,7 +17,7 @@ export function MultiViewToggle({ active, onToggle }: MultiViewToggleProps) {
         padding: "0.3rem 0.6rem",
         borderRadius: 8,
         border: `1px solid ${active ? "var(--blue)" : "var(--border)"}`,
-        background: active ? "var(--blue)" : "transparent",
+        background: active ? "var(--blue)" : "rgba(255,255,255,0.05)",
         color: active ? "#fff" : "var(--text-secondary)",
         cursor: "pointer",
         fontSize: "0.75rem",
