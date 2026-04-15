@@ -67,6 +67,31 @@ describe("ReviewStep", () => {
     expect(checkbox).toBeChecked();
   });
 
+  it("renders auto-PR checkbox when auto-merge is enabled", () => {
+    render(<ReviewStep {...defaultProps} />);
+    const checkbox = screen.getByLabelText(/Create pull request after merge/);
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it("hides auto-PR checkbox when auto-merge is disabled", async () => {
+    render(<ReviewStep {...defaultProps} />);
+    await userEvent.click(screen.getByLabelText(/Auto-merge/));
+    expect(screen.queryByLabelText(/Create pull request after merge/)).not.toBeInTheDocument();
+  });
+
+  it("unchecks auto-PR when auto-merge is unchecked and re-checked", async () => {
+    render(<ReviewStep {...defaultProps} />);
+    // Check auto-PR
+    await userEvent.click(screen.getByLabelText(/Create pull request after merge/));
+    expect(screen.getByLabelText(/Create pull request after merge/)).toBeChecked();
+    // Uncheck auto-merge (hides and resets autoPR)
+    await userEvent.click(screen.getByLabelText(/Auto-merge/));
+    // Re-check auto-merge
+    await userEvent.click(screen.getByLabelText(/Auto-merge/));
+    // Auto-PR should be unchecked
+    expect(screen.getByLabelText(/Create pull request after merge/)).not.toBeChecked();
+  });
+
   it("renders launch and add more buttons", () => {
     render(<ReviewStep {...defaultProps} />);
     expect(screen.getByText("Launch Squadron")).toBeInTheDocument();
@@ -145,6 +170,7 @@ describe("ReviewStep", () => {
           name: "test-squadron",
           consensus: "universal",
           autoMerge: true,
+          autoPR: undefined,
           agents,
         })
       );
@@ -152,6 +178,19 @@ describe("ReviewStep", () => {
         "test-squadron",
         agents,
         { consensus: "universal", autoMerge: true, mergeMaster: "agent-beta" }
+      );
+    });
+
+    it("sends autoPR=true when auto-PR checkbox is checked", async () => {
+      mockLaunchSquadron.mockResolvedValueOnce(undefined);
+      render(<ReviewStep {...defaultProps} />);
+      await userEvent.click(screen.getByLabelText(/Create pull request after merge/));
+      await userEvent.click(screen.getByText("Launch Squadron"));
+      expect(mockLaunchSquadron).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoMerge: true,
+          autoPR: true,
+        })
       );
     });
 

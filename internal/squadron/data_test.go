@@ -202,3 +202,39 @@ func TestParseAndValidate_MultipleErrorsReported(t *testing.T) {
 		t.Errorf("expected all errors reported at once, got %d: %v", len(errs), errs)
 	}
 }
+
+func TestParseAndValidate_AutoPRTrue(t *testing.T) {
+	payload := []byte(`{
+		"name": "alpha",
+		"consensus": "none",
+		"autoMerge": true,
+		"autoPR": true,
+		"agents": [
+			{"name": "a", "branch": "squadron/alpha/a", "prompt": "do a"}
+		]
+	}`)
+	data, errs := squadron.ParseAndValidate(payload)
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if !data.AutoPR {
+		t.Error("AutoPR should be true")
+	}
+}
+
+func TestParseAndValidate_AutoPRDefaultsFalse(t *testing.T) {
+	payload := []byte(`{
+		"name": "beta",
+		"consensus": "none",
+		"agents": [
+			{"name": "a", "branch": "squadron/beta/a", "prompt": "do a"}
+		]
+	}`)
+	data, errs := squadron.ParseAndValidate(payload)
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if data.AutoPR {
+		t.Error("AutoPR should default to false when unset")
+	}
+}

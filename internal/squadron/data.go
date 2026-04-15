@@ -21,6 +21,7 @@ type SquadronData struct {
 	ReviewMaster string          `json:"reviewMaster,omitempty"`
 	BaseBranch   string          `json:"baseBranch,omitempty"`
 	AutoMerge    bool            `json:"autoMerge"`
+	AutoPR       bool            `json:"autoPR,omitempty"`
 	MergeMaster  *string         `json:"mergeMaster,omitempty"`
 	UseJumpSh    bool            `json:"useJumpSh,omitempty"`
 	Agents       []SquadronAgent `json:"agents"`
@@ -40,6 +41,7 @@ type rawSquadronData struct {
 	ReviewMaster string          `json:"reviewMaster,omitempty"`
 	BaseBranch   string          `json:"baseBranch,omitempty"`
 	AutoMerge    *bool           `json:"autoMerge,omitempty"`
+	AutoPR       bool            `json:"autoPR,omitempty"`
 	MergeMaster  *string         `json:"mergeMaster,omitempty"`
 	UseJumpSh    bool            `json:"useJumpSh,omitempty"`
 	Agents       []SquadronAgent `json:"agents"`
@@ -58,6 +60,7 @@ func ParseAndValidate(jsonBytes []byte) (*SquadronData, []error) {
 		Consensus:    raw.Consensus,
 		ReviewMaster: raw.ReviewMaster,
 		BaseBranch:   raw.BaseBranch,
+		AutoPR:       raw.AutoPR,
 		MergeMaster:  raw.MergeMaster,
 		UseJumpSh:    raw.UseJumpSh,
 		Agents:       raw.Agents,

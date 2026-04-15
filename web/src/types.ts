@@ -12,6 +12,7 @@ export interface SquadronData {
   reviewMaster?: string;
   baseBranch?: string;
   autoMerge: boolean;
+  autoPR?: boolean;
   mergeMaster?: string;
   useJumpSh?: boolean;
   agents: SquadronAgent[];

@@ -31,6 +31,7 @@ type LaunchRequest struct {
 	ReviewMaster string             `json:"reviewMaster,omitempty"`
 	BaseBranch   string             `json:"baseBranch,omitempty"`
 	AutoMerge    bool               `json:"autoMerge"`
+	AutoPR       bool               `json:"autoPR,omitempty"`
 	MergeMaster  *string            `json:"mergeMaster,omitempty"`
 	UseJumpSh    bool               `json:"useJumpSh,omitempty"`
 	Agents       []LaunchAgentInput `json:"agents"`
