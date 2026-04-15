@@ -77,9 +77,15 @@ export function AgentTooltip({
     <div
       style={{
         position: "absolute",
-        top: "calc(100% + 8px)",
+        top: "100%",
         left: "50%",
         transform: "translateX(-50%)",
+        paddingTop: 8,
+        zIndex: 200,
+      }}
+    >
+    <div
+      style={{
         background: "var(--bg-tertiary)",
         border: "1px solid var(--border)",
         borderRadius: 12,
@@ -90,7 +96,6 @@ export function AgentTooltip({
         display: "flex",
         flexDirection: "column",
         boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-        zIndex: 200,
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -251,6 +256,7 @@ export function AgentTooltip({
           {stopping ? "Stopping..." : "Stop"}
         </button>
       </div>
+    </div>
     </div>
   );
 }
