@@ -15,9 +15,6 @@ interface WizardProps {
 interface SquadronConfig {
   name: string;
   baseBranch: string;
-  consensus: "universal" | "review_master" | "none";
-  reviewMaster: string;
-  autoMerge: boolean;
 }
 
 type Step = "setup" | "agents" | "persona" | "review";
@@ -32,9 +29,6 @@ export function WizardLayout({
   const [config, setConfig] = useState<SquadronConfig>({
     name: "",
     baseBranch: currentBranch,
-    consensus: "universal",
-    reviewMaster: "",
-    autoMerge: true,
   });
   const [agents, setAgents] = useState<SquadronAgent[]>([]);
   const [editingAgentIdx, setEditingAgentIdx] = useState<number | null>(null);

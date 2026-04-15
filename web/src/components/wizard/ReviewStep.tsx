@@ -5,10 +5,30 @@ import { launchSquadron } from "../../api";
 interface ReviewConfig {
   name: string;
   baseBranch: string;
-  consensus: "universal" | "review_master" | "none";
-  reviewMaster: string;
-  autoMerge: boolean;
 }
+
+type ConsensusType = "universal" | "review_master" | "none";
+
+const consensusInfo: Record<ConsensusType, { icon: string; label: string; description: string }> = {
+  universal: {
+    icon: "\u{1F91D}",
+    label: "Universal Consensus",
+    description:
+      "Every agent reviews every other agent's work. All agents must approve before merging. Best for high-stakes changes where multiple perspectives catch more issues.",
+  },
+  review_master: {
+    icon: "\u{1F464}",
+    label: "Single Reviewer",
+    description:
+      "One designated agent reviews all other agents' work. Streamlined review flow with a single point of approval. Best when one agent has the broadest context.",
+  },
+  none: {
+    icon: "\u{26A1}",
+    label: "None",
+    description:
+      "No review step. Agents complete their tasks and stop. Best for independent tasks that don't need cross-review.",
+  },
+};
 
 interface ReviewStepProps {
   config: ReviewConfig;
@@ -75,6 +95,9 @@ export function ReviewStep({
   const [error, setError] = useState<string | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<SquadronAgent | null>(null);
+  const [consensus, setConsensus] = useState<ConsensusType>("universal");
+  const [reviewMaster, setReviewMaster] = useState("");
+  const [autoMerge, setAutoMerge] = useState(true);
 
   const handleLaunch = async () => {
     setLaunching(true);
@@ -82,13 +105,13 @@ export function ReviewStep({
     try {
       await launchSquadron({
         name: config.name,
-        consensus: config.consensus,
-        reviewMaster: config.reviewMaster || undefined,
+        consensus,
+        reviewMaster: consensus === "review_master" ? reviewMaster || undefined : undefined,
         baseBranch: config.baseBranch || undefined,
-        autoMerge: config.autoMerge,
+        autoMerge,
         agents: agents,
       });
-      onLaunched(config.name, agents, { consensus: config.consensus, autoMerge: config.autoMerge });
+      onLaunched(config.name, agents, { consensus, autoMerge });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Launch failed");
     } finally {
@@ -126,18 +149,16 @@ export function ReviewStep({
     return p?.displayName || key;
   };
 
+  const info = consensusInfo[consensus];
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <div>
-          <span style={{ fontWeight: 600, fontSize: "1.1rem" }}>Squadron: </span>
-          <span style={{ color: "var(--blue)", fontSize: "1.1rem" }}>{config.name}</span>
-          <span style={{ color: "var(--text-secondary)", marginLeft: "1rem" }}>
-            {config.consensus} consensus · auto-merge {config.autoMerge ? "on" : "off"}
-          </span>
-        </div>
+      <div style={{ marginBottom: "1.5rem" }}>
+        <span style={{ fontWeight: 600, fontSize: "1.1rem" }}>Squadron: </span>
+        <span style={{ color: "var(--blue)", fontSize: "1.1rem" }}>{config.name}</span>
       </div>
 
+      {/* Agent cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem" }}>
         {agents.map((a, idx) => (
           <div
@@ -278,6 +299,86 @@ export function ReviewStep({
             )}
           </div>
         ))}
+      </div>
+
+      {/* Consensus description box */}
+      <div
+        style={{
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          padding: "1.5rem",
+          marginBottom: "0.75rem",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>{info.icon}</div>
+        <div style={{ fontWeight: 600, fontSize: "1.1rem", marginBottom: "0.5rem" }}>{info.label}</div>
+        <div style={{ color: "var(--text-secondary)", fontSize: "0.9rem", maxWidth: 500, margin: "0 auto", lineHeight: 1.5 }}>
+          {info.description}
+        </div>
+      </div>
+
+      {/* Consensus selector buttons */}
+      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem" }}>
+        {(Object.keys(consensusInfo) as ConsensusType[]).map((type) => (
+          <button
+            key={type}
+            onClick={() => {
+              setConsensus(type);
+              if (type !== "review_master") setReviewMaster("");
+            }}
+            style={{
+              flex: 1,
+              background: "var(--bg-secondary)",
+              border: consensus === type ? "2px solid var(--blue)" : "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "0.75rem 1rem",
+              color: consensus === type ? "var(--blue)" : "var(--text-primary)",
+              fontWeight: consensus === type ? 600 : 400,
+              cursor: "pointer",
+              textAlign: "center",
+              fontSize: "0.85rem",
+            }}
+          >
+            {consensusInfo[type].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Single reviewer agent dropdown */}
+      {consensus === "review_master" && (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <label style={{ ...labelStyle, marginBottom: "0.5rem" }}>Designated Reviewer</label>
+          <select
+            style={{
+              ...inputStyle,
+              borderRadius: 6,
+              padding: "0.75rem 1rem",
+              fontSize: "0.9rem",
+            }}
+            value={reviewMaster}
+            onChange={(e) => setReviewMaster(e.target.value)}
+          >
+            <option value="">Select an agent...</option>
+            {agents.map((a) => (
+              <option key={a.name} value={a.name}>{a.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Auto-merge checkbox */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
+        <input
+          type="checkbox"
+          checked={autoMerge}
+          onChange={(e) => setAutoMerge(e.target.checked)}
+          style={{ width: 18, height: 18 }}
+        />
+        <span>
+          Auto-merge all agent branches into <span style={{ color: "var(--blue)", fontWeight: 500 }}>'{config.name}-merged'</span>
+        </span>
       </div>
 
       {error && (

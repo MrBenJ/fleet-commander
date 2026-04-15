@@ -31,6 +31,9 @@ go.work
 *.swo
 *~
 
+# Playwright MCP
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db
