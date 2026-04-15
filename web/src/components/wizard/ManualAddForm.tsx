@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { SquadronAgent, Persona } from "../../types";
 import { CodeEditor } from "../common/CodeEditor";
+import { HelpTooltip } from "../common/HelpTooltip";
 
 interface ManualAddFormProps {
   squadronName: string;
@@ -60,11 +61,17 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div>
-          <label htmlFor="manual-agent-name" style={labelStyle}>Agent Name</label>
+          <label htmlFor="manual-agent-name" style={labelStyle}>
+            Agent Name
+            <HelpTooltip text="A short identifier for this agent. Used in branch names and tmux session names." />
+          </label>
           <input id="manual-agent-name" style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="auth-agent" />
         </div>
         <div>
-          <label htmlFor="manual-branch" style={labelStyle}>Branch</label>
+          <label htmlFor="manual-branch" style={labelStyle}>
+            Branch
+            <HelpTooltip text="The git branch name for this agent's worktree. Defaults to squadron/<name>/<agent> if left empty." />
+          </label>
           <input
             id="manual-branch"
             style={inputStyle}
@@ -84,7 +91,10 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
           />
         </div>
         <div>
-          <label htmlFor="manual-harness" style={labelStyle}>Harness</label>
+          <label htmlFor="manual-harness" style={labelStyle}>
+            Harness
+            <HelpTooltip text="The harness configures how the agent runs — including permissions, tools, and execution constraints." />
+          </label>
           <select
             id="manual-harness"
             style={inputStyle}
@@ -97,7 +107,10 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
           </select>
         </div>
         <div>
-          <label htmlFor="manual-persona" style={labelStyle}>Persona</label>
+          <label htmlFor="manual-persona" style={labelStyle}>
+            Persona
+            <HelpTooltip text="A persona defines the agent's coding style, expertise areas, and approach to problem-solving." />
+          </label>
           <select
             id="manual-persona"
             style={inputStyle}
