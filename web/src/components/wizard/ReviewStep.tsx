@@ -16,7 +16,7 @@ interface ReviewStepProps {
   agents: SquadronAgent[];
   drivers: string[];
   personas: Persona[];
-  onLaunched: (name: string, agents: SquadronAgent[], config: { consensus: string; autoMerge: boolean }) => void;
+  onLaunched: (name: string, agents: SquadronAgent[], config: { consensus: string; autoMerge: boolean; mergeMaster?: string }) => void;
   onEdit: () => void;
   onAddMore: () => void;
   onAgentsChanged: (agents: SquadronAgent[]) => void;
@@ -110,7 +110,11 @@ export function ReviewStep({
         agents: agents,
       });
       dispatch({ type: "LAUNCH_SUCCESS" });
-      onLaunched(config.name, agents, { consensus: state.consensus, autoMerge: state.autoMerge });
+      onLaunched(config.name, agents, {
+        consensus: state.consensus,
+        autoMerge: state.autoMerge,
+        mergeMaster: state.autoMerge && agents.length > 0 ? agents[0].name : undefined,
+      });
     } catch (err) {
       dispatch({ type: "LAUNCH_ERROR", error: err instanceof Error ? err.message : "Launch failed" });
     }

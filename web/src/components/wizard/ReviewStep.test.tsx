@@ -151,7 +151,7 @@ describe("ReviewStep", () => {
       expect(defaultProps.onLaunched).toHaveBeenCalledWith(
         "test-squadron",
         agents,
-        { consensus: "universal", autoMerge: true }
+        { consensus: "universal", autoMerge: true, mergeMaster: "agent-alpha" }
       );
     });
 
