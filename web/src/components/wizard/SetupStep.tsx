@@ -46,10 +46,10 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 500, width: "100%" }}>
         <div>
-          <label htmlFor="squadron-name" style={labelStyle}>
-            Squadron Name
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <label htmlFor="squadron-name" style={labelStyle}>Squadron Name</label>
             <HelpTooltip text="A unique name for this group of agents. Used to identify the squadron in logs and context channels." />
-          </label>
+          </div>
           <input
             id="squadron-name"
             style={inputStyle}
@@ -61,10 +61,10 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
         </div>
 
         <div>
-          <label htmlFor="base-branch" style={labelStyle}>
-            Base Branch
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <label htmlFor="base-branch" style={labelStyle}>Base Branch</label>
             <HelpTooltip text="The git branch that all agent worktrees will be created from. Each agent gets its own branch forked from this one." />
-          </label>
+          </div>
           <select
             id="base-branch"
             style={{ ...inputStyle, appearance: "auto" }}

@@ -66,10 +66,10 @@ export function ConsensusSelector({
       {/* Single reviewer agent dropdown */}
       {consensus === "review_master" && (
         <div style={{ marginBottom: "1.5rem" }}>
-          <label style={{ ...labelStyle, marginBottom: "0.5rem" }}>
-            Designated Reviewer
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.5rem" }}>
+            <label style={labelStyle}>Designated Reviewer</label>
             <HelpTooltip text="The agent responsible for reviewing all other agents' work. This agent will approve or request changes before merging." />
-          </label>
+          </div>
           <select
             style={{
               ...inputStyle,

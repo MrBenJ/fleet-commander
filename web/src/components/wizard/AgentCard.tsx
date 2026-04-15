@@ -48,10 +48,10 @@ export function AgentCard({
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`edit-name-${agent.name}`} style={labelStyle}>
-                Agent Name
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-name-${agent.name}`} style={labelStyle}>Agent Name</label>
                 <HelpTooltip text="A short identifier for this agent. Used in branch names and tmux session names." />
-              </label>
+              </div>
               <input
                 id={`edit-name-${agent.name}`}
                 style={inputStyle}
@@ -60,10 +60,10 @@ export function AgentCard({
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`edit-branch-${agent.name}`} style={labelStyle}>
-                Branch
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-branch-${agent.name}`} style={labelStyle}>Branch</label>
                 <HelpTooltip text="The git branch name for this agent's worktree. Each agent works in its own isolated branch." />
-              </label>
+              </div>
               <input
                 id={`edit-branch-${agent.name}`}
                 style={inputStyle}
@@ -72,10 +72,10 @@ export function AgentCard({
               />
             </div>
             <div style={{ width: 150 }}>
-              <label htmlFor={`edit-harness-${agent.name}`} style={labelStyle}>
-                Harness
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-harness-${agent.name}`} style={labelStyle}>Harness</label>
                 <HelpTooltip text="The harness configures how the agent runs — including permissions, tools, and execution constraints." />
-              </label>
+              </div>
               <select
                 id={`edit-harness-${agent.name}`}
                 style={inputStyle}
@@ -88,10 +88,10 @@ export function AgentCard({
               </select>
             </div>
             <div style={{ width: 180 }}>
-              <label htmlFor={`edit-persona-${agent.name}`} style={labelStyle}>
-                Persona
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <label htmlFor={`edit-persona-${agent.name}`} style={labelStyle}>Persona</label>
                 <HelpTooltip text="A persona defines the agent's coding style, expertise areas, and approach to problem-solving." />
-              </label>
+              </div>
               <select
                 id={`edit-persona-${agent.name}`}
                 style={inputStyle}
