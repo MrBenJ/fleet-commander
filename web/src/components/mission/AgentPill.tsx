@@ -33,6 +33,7 @@ export function AgentPill({ name, state, driver, onClick }: AgentPillProps) {
   return (
     <button
       onClick={onClick}
+      aria-label={`${name}, status: ${state}, harness: ${driver}`}
       style={{
         fontSize: "0.8rem",
         background: "var(--bg-secondary)",
@@ -47,6 +48,7 @@ export function AgentPill({ name, state, driver, onClick }: AgentPillProps) {
       }}
     >
       <span
+        aria-hidden="true"
         style={{
           width: 8,
           height: 8,
@@ -57,7 +59,7 @@ export function AgentPill({ name, state, driver, onClick }: AgentPillProps) {
         }}
       />
       <span>{name}</span>
-      <span style={{ fontSize: "0.65rem", color: driverColors[driver] || "var(--text-secondary)" }}>
+      <span style={{ fontSize: "0.65rem", color: driverColors[driver] || "var(--text-secondary)" }} aria-hidden="true">
         {driverAbbrev[driver] || driver.slice(0, 2)}
       </span>
     </button>

@@ -23,7 +23,6 @@ const inputStyle: React.CSSProperties = {
   color: "var(--text-primary)",
   width: "100%",
   fontSize: "0.9rem",
-  outline: "none",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -55,18 +54,21 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 500, width: "100%" }}>
         <div>
-          <label style={labelStyle}>Squadron Name</label>
+          <label htmlFor="squadron-name" style={labelStyle}>Squadron Name</label>
           <input
+            id="squadron-name"
             style={inputStyle}
             value={config.name}
             onChange={(e) => setConfig({ ...config, name: e.target.value })}
             placeholder="page/homepage-fixes"
+            aria-required="true"
           />
         </div>
 
         <div>
-          <label style={labelStyle}>Base Branch</label>
+          <label htmlFor="base-branch" style={labelStyle}>Base Branch</label>
           <select
+            id="base-branch"
             style={{ ...inputStyle, appearance: "auto" }}
             value={config.baseBranch}
             onChange={(e) => setConfig({ ...config, baseBranch: e.target.value })}
@@ -80,12 +82,14 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
           </select>
         </div>
 
-        <div>
-          <label style={labelStyle}>Consensus Type</label>
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+        <fieldset style={{ border: "none", padding: 0, margin: 0 }}>
+          <legend style={labelStyle}>Consensus Type</legend>
+          <div style={{ display: "flex", gap: "0.75rem" }} role="radiogroup">
             {consensusOptions.map((opt) => (
               <button
                 key={opt.value}
+                role="radio"
+                aria-checked={config.consensus === opt.value}
                 onClick={() => setConfig({ ...config, consensus: opt.value })}
                 style={{
                   flex: 1,
@@ -111,12 +115,13 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
               </button>
             ))}
           </div>
-        </div>
+        </fieldset>
 
         {config.consensus === "review_master" && (
           <div>
-            <label style={labelStyle}>Review Master Agent Name</label>
+            <label htmlFor="review-master" style={labelStyle}>Review Master Agent Name</label>
             <input
+              id="review-master"
               style={inputStyle}
               value={config.reviewMaster}
               onChange={(e) =>
@@ -130,18 +135,20 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <input
             type="checkbox"
+            id="auto-merge"
             checked={config.autoMerge}
             onChange={(e) =>
               setConfig({ ...config, autoMerge: e.target.checked })
             }
             style={{ width: 18, height: 18 }}
           />
-          <span>Auto-merge on completion</span>
+          <label htmlFor="auto-merge">Auto-merge on completion</label>
         </div>
 
         <button
           onClick={() => onDone(config)}
           disabled={!canContinue}
+          aria-disabled={!canContinue}
           style={{
             background: canContinue ? "var(--green)" : "var(--bg-secondary)",
             color: canContinue ? "#fff" : "var(--text-muted)",
