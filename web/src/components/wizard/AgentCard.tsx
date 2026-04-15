@@ -1,5 +1,6 @@
 import type { SquadronAgent, Persona } from "../../types";
 import { driverColors, driverTextColors, personaIcons, inputStyle, labelStyle } from "./review-constants";
+import { CodeEditor } from "../common/CodeEditor";
 
 interface AgentCardProps {
   agent: SquadronAgent;
@@ -92,12 +93,12 @@ export function AgentCard({
             </div>
           </div>
           <div>
-            <label htmlFor={`edit-prompt-${agent.name}`} style={labelStyle}>Prompt</label>
-            <textarea
-              id={`edit-prompt-${agent.name}`}
-              style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
+            <label id={`edit-prompt-label-${agent.name}`} style={labelStyle}>Prompt</label>
+            <CodeEditor
+              labelId={`edit-prompt-label-${agent.name}`}
               value={editDraft.prompt}
-              onChange={(e) => onDraftChange({ ...editDraft, prompt: e.target.value })}
+              onChange={(val) => onDraftChange({ ...editDraft, prompt: val })}
+              minHeight={200}
             />
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
