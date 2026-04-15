@@ -11,9 +11,10 @@ type View = "wizard" | "mission";
 export function App() {
   // If we're on a /terminal/ path, render the terminal directly
   if (window.location.pathname.startsWith("/terminal/")) {
+    const inIframe = window.self !== window.top;
     return (
       <>
-        <ThemeToggle />
+        {!inIframe && <ThemeToggle />}
         <TerminalPage />
       </>
     );
