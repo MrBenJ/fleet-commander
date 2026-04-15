@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { SquadronAgent, Persona } from "../../types";
+import { getBranches } from "../../api";
 import { SetupStep } from "./SetupStep";
 import { AgentsStep } from "./AgentsStep";
 import { PersonaStep } from "./PersonaStep";
@@ -38,6 +39,11 @@ export function WizardLayout({
   });
   const [agents, setAgents] = useState<SquadronAgent[]>([]);
   const [editingAgentIdx, setEditingAgentIdx] = useState<number | null>(null);
+  const [branches, setBranches] = useState<string[]>([]);
+
+  useEffect(() => {
+    getBranches().then(setBranches).catch(() => {});
+  }, []);
 
   const handleSetupDone = (c: SquadronConfig) => {
     setConfig(c);
@@ -122,6 +128,7 @@ export function WizardLayout({
         <SetupStep
           initial={config}
           currentBranch={currentBranch}
+          branches={branches}
           onDone={handleSetupDone}
         />
       )}
