@@ -32,8 +32,7 @@ vet:
 #   make release BUMP=minor # minor bump: v0.1.0 -> v0.2.0
 #   make release BUMP=major # major bump: v0.1.0 -> v1.0.0
 release:
-	@if [ ! -f VERSION ]; then echo "v0.1.0" > VERSION; fi
-	@CURRENT=$$(cat VERSION | tr -d '[:space:]'); \
+	@CURRENT=$$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"); \
 	MAJOR=$$(echo $$CURRENT | sed 's/^v//' | cut -d. -f1); \
 	MINOR=$$(echo $$CURRENT | sed 's/^v//' | cut -d. -f2); \
 	PATCH=$$(echo $$CURRENT | sed 's/^v//' | cut -d. -f3); \
@@ -44,8 +43,5 @@ release:
 		*) echo "Error: BUMP must be major, minor, or patch (got '$(BUMP)')"; exit 1 ;; \
 	esac; \
 	NEW="v$$MAJOR.$$MINOR.$$PATCH"; \
-	echo "$$NEW" > VERSION; \
-	git add VERSION; \
-	git commit -m "release: $$NEW"; \
 	git tag "$$NEW"; \
 	echo "Released $$NEW (was $$CURRENT)"
