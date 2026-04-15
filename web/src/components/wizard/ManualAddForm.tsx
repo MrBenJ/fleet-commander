@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { SquadronAgent, Persona } from "../../types";
+import { CodeEditor } from "../common/CodeEditor";
 
 interface ManualAddFormProps {
   squadronName: string;
@@ -73,13 +74,13 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
           />
         </div>
         <div>
-          <label htmlFor="manual-prompt" style={labelStyle}>Prompt</label>
-          <textarea
-            id="manual-prompt"
-            style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
+          <label id="manual-prompt-label" style={labelStyle}>Prompt</label>
+          <CodeEditor
+            labelId="manual-prompt-label"
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={setPrompt}
             placeholder="What should this agent do?"
+            minHeight={120}
           />
         </div>
         <div>

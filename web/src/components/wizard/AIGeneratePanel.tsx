@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { SquadronAgent } from "../../types";
 import { generateAgents } from "../../api";
+import { CodeEditor } from "../common/CodeEditor";
 
 const spinnerKeyframes = `@keyframes fc-spin { to { transform: rotate(360deg); } }`;
 
@@ -28,16 +29,6 @@ interface AIGeneratePanelProps {
   squadronName: string;
   onAgentsGenerated: (agents: SquadronAgent[]) => void;
 }
-
-const inputStyle: React.CSSProperties = {
-  background: "var(--bg-primary)",
-  border: "1px solid var(--border)",
-  borderRadius: 4,
-  padding: "0.5rem",
-  color: "var(--text-primary)",
-  width: "100%",
-  fontSize: "0.85rem",
-};
 
 export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGeneratePanelProps) {
   const [description, setDescription] = useState("");
@@ -78,19 +69,16 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
       <div id="ai-generate-heading" style={{ fontWeight: 600, color: "var(--purple)", marginBottom: "0.75rem" }}>
         AI Generate from Description
       </div>
-      <label htmlFor="ai-description" className="sr-only">Task description for AI generation</label>
-      <textarea
-        id="ai-description"
-        style={{
-          ...inputStyle,
-          minHeight: "75%",
-          resize: "vertical",
-          marginBottom: "1rem",
-        }}
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder={"List out all of the tasks you need to get done.\n\nEach task will be given their own agent. 1 agent, 1 task\n\nUse a numbered list for best results"}
-      />
+      <label id="ai-description-label" className="sr-only">Task description for AI generation</label>
+      <div style={{ marginBottom: "1rem" }}>
+        <CodeEditor
+          labelId="ai-description-label"
+          value={description}
+          onChange={setDescription}
+          placeholder={"List out all of the tasks you need to get done.\n\nEach task will be given their own agent. 1 agent, 1 task\n\nUse a numbered list for best results"}
+          minHeight={300}
+        />
+      </div>
       <button
         onClick={handleGenerate}
         disabled={generating || !description.trim()}
