@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
@@ -41,41 +40,24 @@ type claudeResultMsg struct {
 }
 
 // LaunchModel is the Bubble Tea model for the fleet launch flow.
-//
-// Field usage by mode:
-//   All modes:        fleet, tmux, mode, width, height, quitting, aborted, statusMsg, log
-//   Input:            inputArea
-//   YoloConfirm:      pendingYoloInput
-//   Generating:       spinner
-//   Review:           prompts, currentIdx, promptViewport, promptViewportIdx, launched, skipped
-//   EditName:         prompts, currentIdx, nameInput
-//   EditBranch:       prompts, currentIdx, branchInput
-//   EditPrompt:       prompts, currentIdx, promptEdit
-//   launchCurrent():  systemPrompt, systemPromptLoaded, yoloMode, noAutoMerge, targetBranch, useJumpSh
+// Phase-specific state is held in the phase structs (InputPhase,
+// GeneratingPhase, ReviewPhase, SquadronPhase) so that each mode's
+// state is self-contained. Shared state lives directly on the model.
 type LaunchModel struct {
 	fleet *fleet.Fleet
 	tmux  *tmux.Manager
 
 	mode launchMode
 
-	// Input phase
-	inputArea textarea.Model
+	// Phase-specific state
+	input      InputPhase
+	generating GeneratingPhase
+	review     ReviewPhase
+	squadron   SquadronPhase
 
-	// Parsed prompts (used in Review and Edit modes, populated after Generating)
+	// Parsed prompts (populated after Generating, used in Review and launch)
 	prompts    []LaunchItem
 	currentIdx int
-
-	// Generating phase
-	spinner spinner.Model
-
-	// Edit phase
-	nameInput   textinput.Model
-	branchInput textinput.Model
-	promptEdit  textarea.Model
-
-	// Review phase — scrollable prompt viewport
-	promptViewport    viewport.Model
-	promptViewportIdx int // tracks which prompt index the viewport was built for
 
 	// Results (accumulated across launches)
 	launched []string
@@ -91,11 +73,10 @@ type LaunchModel struct {
 	statusMsg string
 
 	// YOLO mode flags (set once at creation, read during launch)
-	yoloMode         bool
-	skipYoloConfirm  bool   // --i-know-what-im-doing flag
-	noAutoMerge      bool   // --no-auto-merge flag
-	targetBranch     string // root repo's current branch, resolved at launch time
-	pendingYoloInput string // input saved from first CTRL+D, waiting for confirmation
+	yoloMode        bool
+	skipYoloConfirm bool   // --i-know-what-im-doing flag
+	noAutoMerge     bool   // --no-auto-merge flag
+	targetBranch    string // root repo's current branch, resolved at launch time
 
 	// System prompt (lazy-loaded on first launchCurrent call)
 	systemPrompt       string
@@ -114,10 +95,6 @@ type LaunchModel struct {
 	baseBranch             string
 	squadronChannelCreated bool
 	personas               map[string]string // agent name -> persona key
-
-	// Squadron consensus selector cursor (TUI state)
-	squadronConsensusCursor int
-	squadronNameInput       textinput.Model
 
 	// Debug logger
 	log *LaunchLogger
@@ -159,15 +136,21 @@ func newLaunchModel(f *fleet.Fleet, yoloMode bool, skipYoloConfirm bool, noAutoM
 	log.Log("Mode: yolo=%v, skipConfirm=%v, noAutoMerge=%v, useJumpSh=%v", yoloMode, skipYoloConfirm, noAutoMerge, useJumpSh)
 
 	return LaunchModel{
-		fleet:             f,
-		tmux:              tm,
-		mode:              launchModeInput,
-		inputArea:         ta,
-		spinner:           sp,
-		nameInput:         ni,
-		branchInput:       bi,
-		promptEdit:        pe,
-		promptViewportIdx: -1,
+		fleet: f,
+		tmux:  tm,
+		mode:  launchModeInput,
+		input: InputPhase{
+			area: ta,
+		},
+		generating: GeneratingPhase{
+			spinner: sp,
+		},
+		review: ReviewPhase{
+			nameInput:   ni,
+			branchInput: bi,
+			promptEdit:  pe,
+			viewportIdx: -1,
+		},
 		yoloMode:        yoloMode,
 		skipYoloConfirm: skipYoloConfirm,
 		noAutoMerge:     noAutoMerge,
@@ -185,7 +168,7 @@ func newSquadronLaunchModel(f *fleet.Fleet, useJumpSh bool) LaunchModel {
 	ni := textinput.New()
 	ni.Placeholder = "alpha"
 	ni.CharLimit = 30
-	m.squadronNameInput = ni
+	m.squadron.nameInput = ni
 
 	m.mode = launchModeSquadronConsensus
 	return m
@@ -200,12 +183,12 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.inputArea.SetWidth(min(msg.Width-4, 80))
-		m.inputArea.SetHeight(max(msg.Height-10, 5))
-		m.promptEdit.SetWidth(min(msg.Width-4, 80))
-		m.promptEdit.SetHeight(max(msg.Height-10, 5))
+		m.input.area.SetWidth(min(msg.Width-4, 80))
+		m.input.area.SetHeight(max(msg.Height-10, 5))
+		m.review.promptEdit.SetWidth(min(msg.Width-4, 80))
+		m.review.promptEdit.SetHeight(max(msg.Height-10, 5))
 		// Reset viewport so it gets rebuilt with new dimensions
-		m.promptViewportIdx = -1
+		m.review.viewportIdx = -1
 		return m, nil
 	}
 
@@ -215,7 +198,7 @@ func (m LaunchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.log.Log("ERROR: Claude generation failed: %s", result.err)
 			m.mode = launchModeInput
 			m.statusMsg = fmt.Sprintf("Claude generation failed: %s", result.err)
-			m.inputArea.Focus()
+			m.input.area.Focus()
 			return m, nil
 		}
 		m.log.Log("Claude generated %d prompt(s)", len(result.items))
@@ -275,7 +258,7 @@ func (m LaunchModel) launchAll() (tea.Model, tea.Cmd) {
 			m.log.Log("ERROR: Failed to detect current branch: %s", err)
 			m.statusMsg = fmt.Sprintf("Failed to detect current branch: %s", err)
 			m.mode = launchModeInput
-			m.inputArea.Focus()
+			m.input.area.Focus()
 			return m, nil
 		}
 		m.targetBranch = targetBranch
@@ -516,7 +499,7 @@ func (m LaunchModel) advance() (tea.Model, tea.Cmd) {
 	}
 	m.mode = launchModeReview
 	// Rebuild viewport immediately so View() shows the new prompt content
-	m.promptViewportIdx = -1
+	m.review.viewportIdx = -1
 	m.setupPromptViewport()
 	return m, nil
 }

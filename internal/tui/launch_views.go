@@ -63,7 +63,7 @@ func (m LaunchModel) viewInput() string {
 
 	b.WriteString(titleStyle.Render("⚓ Fleet Launch") + "\n\n")
 	b.WriteString("  Enter your tasks:\n\n")
-	b.WriteString(m.inputArea.View() + "\n\n")
+	b.WriteString(m.input.area.View() + "\n\n")
 
 	if m.statusMsg != "" {
 		b.WriteString("  " + stoppedStyle.Render("❌ "+m.statusMsg) + "\n")
@@ -100,7 +100,7 @@ func (m LaunchModel) viewYoloConfirm() string {
 func (m LaunchModel) viewGenerating() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("⚓ Fleet Launch") + "\n\n")
-	b.WriteString(fmt.Sprintf("  %s Generating prompts, agent names, and branches...\n\n", m.spinner.View()))
+	b.WriteString(fmt.Sprintf("  %s Generating prompts, agent names, and branches...\n\n", m.generating.spinner.View()))
 	b.WriteString(helpStyle.Render("  Esc: cancel"))
 	return b.String()
 }
@@ -121,11 +121,11 @@ func (m LaunchModel) viewReview() string {
 
 	// Prompt section — scrollable viewport
 	b.WriteString(fmt.Sprintf("  %s\n", labelStyle.Render("Prompt:")))
-	b.WriteString(m.promptViewport.View() + "\n")
+	b.WriteString(m.review.viewport.View() + "\n")
 
 	scrollInfo := ""
-	if m.promptViewport.TotalLineCount() > m.promptViewport.VisibleLineCount() {
-		scrollInfo = fmt.Sprintf(" (scroll: ↑↓/jk • %.0f%%)", m.promptViewport.ScrollPercent()*100)
+	if m.review.viewport.TotalLineCount() > m.review.viewport.VisibleLineCount() {
+		scrollInfo = fmt.Sprintf(" (scroll: ↑↓/jk • %.0f%%)", m.review.viewport.ScrollPercent()*100)
 	}
 
 	b.WriteString("\n")
@@ -158,7 +158,7 @@ func (m LaunchModel) viewReview() string {
 func (m LaunchModel) viewEditName() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("⚓ Edit Agent Name") + "\n\n")
-	b.WriteString("  " + selectedItemStyle.Render("> Agent name: ") + m.nameInput.View() + "\n")
+	b.WriteString("  " + selectedItemStyle.Render("> Agent name: ") + m.review.nameInput.View() + "\n")
 	if m.statusMsg != "" {
 		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
 	}
@@ -170,7 +170,7 @@ func (m LaunchModel) viewEditBranch() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("⚓ Edit Branch Name") + "\n\n")
 	b.WriteString("  Agent name:  " + m.prompts[m.currentIdx].AgentName + "\n")
-	b.WriteString("  " + selectedItemStyle.Render("> Branch name: ") + m.branchInput.View() + "\n")
+	b.WriteString("  " + selectedItemStyle.Render("> Branch name: ") + m.review.branchInput.View() + "\n")
 	if m.statusMsg != "" {
 		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
 	}
@@ -183,7 +183,7 @@ func (m LaunchModel) viewEditPrompt() string {
 	b.WriteString(titleStyle.Render("⚓ Edit Prompt") + "\n\n")
 	b.WriteString("  Agent: " + m.prompts[m.currentIdx].AgentName + "\n")
 	b.WriteString("  Branch: " + m.prompts[m.currentIdx].Branch + "\n\n")
-	b.WriteString(m.promptEdit.View() + "\n")
+	b.WriteString(m.review.promptEdit.View() + "\n")
 	if m.statusMsg != "" {
 		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
 	}
@@ -202,7 +202,7 @@ func (m LaunchModel) viewSquadronConsensus() string {
 	for i, opt := range squadronConsensusOptions {
 		marker := "  "
 		style := normal
-		if i == m.squadronConsensusCursor {
+		if i == m.squadron.consensusCursor {
 			marker = "▸ "
 			style = selected
 		}
@@ -210,7 +210,7 @@ func (m LaunchModel) viewSquadronConsensus() string {
 	}
 
 	b.WriteString("\n")
-	desc := squadronConsensusOptions[m.squadronConsensusCursor].Desc
+	desc := squadronConsensusOptions[m.squadron.consensusCursor].Desc
 	b.WriteString("  " + lipgloss.NewStyle().Italic(true).Render(desc) + "\n\n")
 	b.WriteString(helpStyle.Render("  ↑↓/jk: move • Enter: select • Esc: abort"))
 	return b.String()
@@ -221,7 +221,7 @@ func (m LaunchModel) viewSquadronName() string {
 	b.WriteString(titleStyle.Render("⚓ Squadron — Name") + "\n\n")
 	b.WriteString("  " + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render("Consensus: ") +
 		lipgloss.NewStyle().Bold(true).Render(m.consensusType) + "\n\n")
-	b.WriteString("  " + selectedItemStyle.Render("> Squadron name: ") + m.squadronNameInput.View() + "\n")
+	b.WriteString("  " + selectedItemStyle.Render("> Squadron name: ") + m.squadron.nameInput.View() + "\n")
 	if m.statusMsg != "" {
 		b.WriteString("\n  " + stoppedStyle.Render("❌ "+m.statusMsg))
 	}
