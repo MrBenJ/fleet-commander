@@ -14,6 +14,7 @@ interface MissionControlProps {
   personas: Persona[];
   consensus: string;
   autoMerge: boolean;
+  mergeMaster?: string;
 }
 
 const agentColorPalette = [
@@ -31,6 +32,7 @@ export function MissionControl({
   personas,
   consensus,
   autoMerge,
+  mergeMaster,
 }: MissionControlProps) {
   const [messages, setMessages] = useState<ContextMessage[]>([]);
   const [agentStates, setAgentStates] = useState<Record<string, string>>({});
@@ -151,6 +153,7 @@ export function MissionControl({
               name={a.name}
               state={agentStates[a.name] || "starting"}
               driver={a.driver}
+              isMerger={!!mergeMaster && a.name === mergeMaster}
               onClick={() => setSelectedAgent(a.name)}
             />
           ))}

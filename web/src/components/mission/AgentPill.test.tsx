@@ -16,19 +16,28 @@ describe("AgentPill", () => {
     expect(screen.getByText("test-agent")).toBeInTheDocument();
   });
 
-  it("shows driver abbreviation for claude-code", () => {
+  it("renders SVG icon with tooltip for claude-code driver", () => {
     render(<AgentPill {...defaultProps} driver="claude-code" />);
-    expect(screen.getByText("cc")).toBeInTheDocument();
+    const svg = screen.getByTitle("Claude Code");
+    expect(svg).toBeInTheDocument();
   });
 
-  it("shows driver abbreviation for aider", () => {
+  it("renders SVG icon with tooltip for codex driver", () => {
+    render(<AgentPill {...defaultProps} driver="codex" />);
+    const svg = screen.getByTitle("OpenAI Codex");
+    expect(svg).toBeInTheDocument();
+  });
+
+  it("renders text badge with tooltip for generic driver", () => {
+    render(<AgentPill {...defaultProps} driver="generic" />);
+    expect(screen.getByText("G")).toBeInTheDocument();
+    expect(screen.getByTitle("Generic")).toBeInTheDocument();
+  });
+
+  it("renders text abbreviation with tooltip for aider driver", () => {
     render(<AgentPill {...defaultProps} driver="aider" />);
     expect(screen.getByText("ai")).toBeInTheDocument();
-  });
-
-  it("shows driver abbreviation for codex", () => {
-    render(<AgentPill {...defaultProps} driver="codex" />);
-    expect(screen.getByText("cx")).toBeInTheDocument();
+    expect(screen.getByTitle("Aider")).toBeInTheDocument();
   });
 
   it("truncates unknown driver to first 2 chars", () => {
@@ -62,5 +71,20 @@ describe("AgentPill", () => {
     render(<AgentPill {...defaultProps} state="working" />);
     const button = screen.getByRole("button");
     expect(button.style.border).toContain("var(--border)");
+  });
+
+  it("renders MERGE badge when isMerger is true", () => {
+    render(<AgentPill {...defaultProps} isMerger={true} />);
+    expect(screen.getByText("MERGE")).toBeInTheDocument();
+  });
+
+  it("does not render MERGE badge when isMerger is false", () => {
+    render(<AgentPill {...defaultProps} isMerger={false} />);
+    expect(screen.queryByText("MERGE")).not.toBeInTheDocument();
+  });
+
+  it("does not render MERGE badge when isMerger is undefined", () => {
+    render(<AgentPill {...defaultProps} />);
+    expect(screen.queryByText("MERGE")).not.toBeInTheDocument();
   });
 });

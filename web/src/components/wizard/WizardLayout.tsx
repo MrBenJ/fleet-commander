@@ -10,7 +10,7 @@ interface WizardProps {
   personas: Persona[];
   drivers: string[];
   currentBranch: string;
-  onLaunched: (name: string, agents: SquadronAgent[], config: { consensus: string; autoMerge: boolean }) => void;
+  onLaunched: (name: string, agents: SquadronAgent[], config: { consensus: string; autoMerge: boolean; mergeMaster?: string }) => void;
 }
 
 interface SquadronConfig {
