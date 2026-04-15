@@ -35,6 +35,11 @@ func NewHub(fleetDir string, logger *log.Logger) *Hub {
 }
 
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if !websocket.IsWebSocketUpgrade(r) {
+		http.Error(w, "WebSocket upgrade required", http.StatusUpgradeRequired)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Printf("WebSocket upgrade failed: %v", err)
