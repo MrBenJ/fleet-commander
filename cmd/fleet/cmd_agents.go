@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
@@ -106,8 +107,9 @@ var listCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Println("AGENT\t\tBRANCH\t\t\tSTATUS\t\tHOOKS\tPID")
-		fmt.Println("─────\t\t──────\t\t\t──────\t\t─────\t───")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "AGENT\tBRANCH\tSTATUS\tHOOKS\tPID")
+		fmt.Fprintln(w, "─────\t──────\t──────\t─────\t───")
 		for _, a := range f.Agents {
 			pid := "-"
 			if a.PID != 0 {
@@ -117,8 +119,9 @@ var listCmd = &cobra.Command{
 			if a.HooksOK {
 				hooksStatus = "✓"
 			}
-			fmt.Printf("%-15s %-23s %-10s %-7s %s\n", a.Name, a.Branch, a.Status, hooksStatus, pid)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", a.Name, a.Branch, a.Status, hooksStatus, pid)
 		}
+		w.Flush()
 		return nil
 	},
 }
@@ -153,7 +156,8 @@ func listAllRepos(agentListOnly bool) error {
 		if len(f.Agents) == 0 {
 			fmt.Println("  (no agents)")
 		} else {
-			fmt.Println("  AGENT\t\t\tBRANCH\t\t\tSTATUS\t\tHOOKS\tPID")
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+			fmt.Fprintln(w, "  AGENT\tBRANCH\tSTATUS\tHOOKS\tPID")
 			for _, a := range f.Agents {
 				pid := "-"
 				if a.PID != 0 {
@@ -163,8 +167,9 @@ func listAllRepos(agentListOnly bool) error {
 				if a.HooksOK {
 					hooksStatus = "✓"
 				}
-				fmt.Printf("  %-15s %-23s %-10s %-7s %s\n", a.Name, a.Branch, a.Status, hooksStatus, pid)
+				fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%s\n", a.Name, a.Branch, a.Status, hooksStatus, pid)
 			}
+			w.Flush()
 		}
 		totalAgents += len(f.Agents)
 		fmt.Println()
