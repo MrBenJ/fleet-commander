@@ -1,8 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { SquadronAgent } from "../../types";
 import { generateAgents } from "../../api";
 
-const spinnerKeyframes = `@keyframes fc-spin { to { transform: rotate(360deg); } }`;
+const loadingMessages = [
+  "Compilerizing",
+  "Turning it off and on again",
+  "On my way!",
+  "Generatin'",
+  "Still workin'",
+  "Thank you for your patience",
+  "Dodging car extended warranty calls",
+  "You look lovely today!",
+  "Hydrating",
+  "Your prompts are being generated n stuff",
+];
+
+const loadingKeyframes = `
+@keyframes fc-spin { to { transform: rotate(360deg); } }
+@keyframes fc-wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+`;
 
 function Spinner() {
   return (
@@ -22,6 +41,39 @@ function Spinner() {
       }}
     />
   );
+}
+
+function WavyText({ text }: { text: string }) {
+  return (
+    <span aria-label={text} style={{ display: "inline-flex" }}>
+      {text.split("").map((char, i) => (
+        <span
+          key={`${text}-${i}`}
+          style={{
+            display: "inline-block",
+            animation: "fc-wave 0.8s ease-in-out infinite",
+            animationDelay: `${i * 0.04}s`,
+            whiteSpace: char === " " ? "pre" : undefined,
+          }}
+        >
+          {char}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function RotatingLoadingText() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % loadingMessages.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return <WavyText text={loadingMessages[index]} />;
 }
 
 interface AIGeneratePanelProps {
@@ -74,7 +126,7 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
         background: "var(--bg-secondary)",
       }}
     >
-      <style>{spinnerKeyframes}</style>
+      <style>{loadingKeyframes}</style>
       <div id="ai-generate-heading" style={{ fontWeight: 600, color: "var(--purple)", marginBottom: "0.75rem" }}>
         AI Generate from Description
       </div>
@@ -106,7 +158,7 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
           opacity: generating || !description.trim() ? 0.6 : 1,
         }}
       >
-        {generating ? <><Spinner />Generating...</> : "Generate Agent Breakdown"}
+        {generating ? <><Spinner /><RotatingLoadingText /></> : "Generate Agent Breakdown"}
       </button>
       {genError && (
         <div role="alert" style={{ color: "var(--red)", fontSize: "0.8rem", marginTop: "0.5rem" }}>
