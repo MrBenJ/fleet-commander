@@ -174,7 +174,7 @@ func TestBuildConsensusSuffix_ReviewMasterSingleAgent(t *testing.T) {
 }
 
 func TestBuildMergerSuffix_EmptyAgents(t *testing.T) {
-	got := squadron.BuildMergerSuffix("alpha", "main", nil)
+	got := squadron.BuildMergerSuffix("alpha", "main", nil, false)
 	if !strings.Contains(got, "Squadron Merge Duties") {
 		t.Error("should still produce merger suffix even with no agents")
 	}
@@ -187,7 +187,7 @@ func TestBuildMergerSuffix_SingleAgent(t *testing.T) {
 	agents := []squadron.AgentBranch{
 		{Name: "solo", Branch: "squadron/alpha/solo"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "develop", agents)
+	got := squadron.BuildMergerSuffix("alpha", "develop", agents, false)
 	if !strings.Contains(got, "git checkout develop") {
 		t.Error("base branch should be 'develop'")
 	}
@@ -202,7 +202,7 @@ func TestBuildMergerSuffix(t *testing.T) {
 		{Name: "b", Branch: "squadron/alpha/b"},
 		{Name: "c", Branch: "squadron/alpha/c"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "main", agents)
+	got := squadron.BuildMergerSuffix("alpha", "main", agents, false)
 
 	mustContain := []string{
 		"Squadron Merge Duties",
@@ -258,5 +258,56 @@ func TestBuildConsensusSuffix_NoneStillEmpty(t *testing.T) {
 	got := squadron.BuildConsensusSuffix("none", "alpha", []string{"a", "b"}, "", "main")
 	if got != "" {
 		t.Fatalf("expected empty suffix for 'none' consensus, got %q", got)
+	}
+}
+
+func TestBuildMergerSuffix_WithAutoPR(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "a", Branch: "squadron/alpha/a"},
+		{Name: "b", Branch: "squadron/alpha/b"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "main", agents, true)
+
+	// Must contain standard merger content
+	if !strings.Contains(got, "Squadron Merge Duties") {
+		t.Error("should contain merger duties header")
+	}
+
+	// Must contain autoPR-specific instructions
+	mustContain := []string{
+		"git push -u origin squadron/alpha",
+		"gh pr create",
+		"Squadron alpha:",
+		"--base main",
+		"gh pr checks",
+		`"PR_READY:`,
+		`"PR_BLOCKED:`,
+		"squadron-alpha",
+		"You are NOT done until the PR exists and CI is passing",
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("autoPR merger suffix missing %q\n---\n%s", s, got)
+		}
+	}
+}
+
+func TestBuildMergerSuffix_WithoutAutoPR(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "a", Branch: "squadron/alpha/a"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "main", agents, false)
+
+	// Must NOT contain autoPR-specific instructions
+	forbidden := []string{
+		"gh pr create",
+		"PR_READY:",
+		"PR_BLOCKED:",
+		"gh pr checks",
+	}
+	for _, s := range forbidden {
+		if strings.Contains(got, s) {
+			t.Errorf("non-autoPR merger suffix should not contain %q", s)
+		}
 	}
 }

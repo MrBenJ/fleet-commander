@@ -190,6 +190,7 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 		ReviewMaster: req.ReviewMaster,
 		BaseBranch:   req.BaseBranch,
 		AutoMerge:    req.AutoMerge,
+		AutoPR:       req.AutoPR,
 		MergeMaster:  req.MergeMaster,
 		UseJumpSh:    req.UseJumpSh,
 	}
