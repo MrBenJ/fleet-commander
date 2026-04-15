@@ -97,6 +97,91 @@ func TestBuildConsensusSuffix_ReviewMaster_NonReviewer(t *testing.T) {
 	}
 }
 
+func TestBuildConsensusSuffix_UnknownType(t *testing.T) {
+	got := squadron.BuildConsensusSuffix("bogus", "alpha", []string{"a"}, "", "main")
+	if got != "" {
+		t.Fatalf("expected empty suffix for unknown consensus type, got %q", got)
+	}
+}
+
+func TestBuildConsensusSuffix_EmptyAgents(t *testing.T) {
+	got := squadron.BuildConsensusSuffix("universal", "alpha", []string{}, "", "main")
+	if !strings.Contains(got, "Squadron Consensus Protocol (UNIVERSAL)") {
+		t.Error("should still produce universal suffix even with empty agents")
+	}
+	if !strings.Contains(got, "Squadron members: ") {
+		t.Error("should contain 'Squadron members:' with empty list")
+	}
+}
+
+func TestBuildConsensusSuffix_SpecialCharsInNames(t *testing.T) {
+	got := squadron.BuildConsensusSuffix(
+		"universal",
+		"my-squad_123",
+		[]string{"agent-one", "agent_two"},
+		"",
+		"develop",
+	)
+	if !strings.Contains(got, "squadron-my-squad_123") {
+		t.Error("squadron channel name should preserve hyphens/underscores")
+	}
+	if !strings.Contains(got, "git diff develop") {
+		t.Error("base branch should be 'develop'")
+	}
+	if !strings.Contains(got, "agent-one, agent_two") {
+		t.Error("agent names should be preserved verbatim")
+	}
+}
+
+func TestBuildReviewMasterReviewerSuffix_EmptyAgents(t *testing.T) {
+	got := squadron.BuildReviewMasterReviewerSuffix("alpha", []string{}, "main")
+	if !strings.Contains(got, "You are the REVIEW MASTER") {
+		t.Error("should still produce reviewer suffix with empty agents")
+	}
+	if !strings.Contains(got, "Squadron members: ") {
+		t.Error("should contain 'Squadron members:' with empty list")
+	}
+}
+
+func TestBuildConsensusSuffix_ReviewMasterSingleAgent(t *testing.T) {
+	got := squadron.BuildConsensusSuffix(
+		"review_master",
+		"solo",
+		[]string{"only-one"},
+		"only-one",
+		"main",
+	)
+	if !strings.Contains(got, `Agent "only-one" is the designated review master`) {
+		t.Error("review master name should appear in non-reviewer suffix")
+	}
+	if !strings.Contains(got, "Review master: only-one") {
+		t.Error("review master footer should be present")
+	}
+}
+
+func TestBuildMergerSuffix_EmptyAgents(t *testing.T) {
+	got := squadron.BuildMergerSuffix("alpha", "main", nil)
+	if !strings.Contains(got, "Squadron Merge Duties") {
+		t.Error("should still produce merger suffix even with no agents")
+	}
+	if !strings.Contains(got, "MERGE MASTER") {
+		t.Error("should contain MERGE MASTER header")
+	}
+}
+
+func TestBuildMergerSuffix_SingleAgent(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "solo", Branch: "squadron/alpha/solo"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "develop", agents)
+	if !strings.Contains(got, "git checkout develop") {
+		t.Error("base branch should be 'develop'")
+	}
+	if !strings.Contains(got, "solo -> squadron/alpha/solo") {
+		t.Error("single agent branch should appear")
+	}
+}
+
 func TestBuildMergerSuffix(t *testing.T) {
 	agents := []squadron.AgentBranch{
 		{Name: "a", Branch: "squadron/alpha/a"},

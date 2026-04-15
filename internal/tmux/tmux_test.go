@@ -3,6 +3,7 @@ package tmux
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -486,6 +487,153 @@ func TestSwitchClient_RejectsUnsafeName(t *testing.T) {
 	}
 	if len(f.calls) != 0 {
 		t.Error("no tmux commands should execute for invalid names")
+	}
+}
+
+// --- Attach ---
+
+func TestAttach_Success(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.Attach("auth")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// First call is has-session (from SessionExists), second is attach
+	if len(f.calls) != 2 {
+		t.Fatalf("expected 2 calls, got %d", len(f.calls))
+	}
+	c := f.calls[1]
+	if c.Name != "tmux" {
+		t.Errorf("expected command 'tmux', got %q", c.Name)
+	}
+	if !contains(c.Args, "attach") {
+		t.Error("expected args to contain 'attach'")
+	}
+	if !contains(c.Args, "fleet-auth") {
+		t.Error("expected args to contain session name 'fleet-auth'")
+	}
+}
+
+func TestAttach_SessionNotExist(t *testing.T) {
+	f := &fakeRunner{runErr: errors.New("no session")}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.Attach("ghost")
+	if err == nil {
+		t.Fatal("expected error when session doesn't exist")
+	}
+}
+
+// --- SendKeys ---
+
+func TestSendKeys_Success(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.SendKeys("worker", "echo hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(f.calls))
+	}
+	c := f.calls[0]
+	if !contains(c.Args, "send-keys") {
+		t.Error("expected args to contain 'send-keys'")
+	}
+	if !contains(c.Args, "fleet-worker") {
+		t.Error("expected args to contain session name")
+	}
+	if !contains(c.Args, "echo hello") {
+		t.Error("expected args to contain keys")
+	}
+}
+
+// --- Detach ---
+
+func TestDetach(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.Detach()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(f.calls))
+	}
+	c := f.calls[0]
+	if c.Name != "tmux" || !contains(c.Args, "detach") {
+		t.Error("expected tmux detach command")
+	}
+}
+
+// --- SwitchClient ---
+
+func TestSwitchClient_Success(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.SwitchClient("worker")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(f.calls))
+	}
+	c := f.calls[0]
+	if !contains(c.Args, "switch-client") {
+		t.Error("expected args to contain 'switch-client'")
+	}
+	if !contains(c.Args, "fleet-worker") {
+		t.Error("expected args to contain session name")
+	}
+}
+
+// --- CreateSession error propagation ---
+
+func TestCreateSession_RunError(t *testing.T) {
+	f := &fakeRunner{runErr: errors.New("tmux failed")}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.CreateSession("worker", "/tmp/wt", nil, "")
+	if err == nil {
+		t.Fatal("expected error when Run fails")
+	}
+	if !strings.Contains(err.Error(), "failed to create tmux session") {
+		t.Errorf("expected wrapped error message, got: %v", err)
+	}
+}
+
+func TestCreateSession_WithCommandAndStateFile(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.CreateSession("worker", "/tmp/wt", []string{"bash", "-c", "echo hi"}, "/tmp/state.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	c := f.calls[0]
+	// Should have both env vars and the command
+	if !contains(c.Args, "FLEET_AGENT_NAME=worker") {
+		t.Error("expected FLEET_AGENT_NAME env var")
+	}
+	if !contains(c.Args, "FLEET_STATE_FILE=/tmp/state.json") {
+		t.Error("expected FLEET_STATE_FILE env var")
+	}
+	if !contains(c.Args, "bash") {
+		t.Error("expected 'bash' in command args")
+	}
+}
+
+// --- NewManager ---
+
+func TestNewManager_DefaultPrefix(t *testing.T) {
+	m := NewManager("")
+	if m.SessionPrefix != "fleet" {
+		t.Errorf("expected default prefix 'fleet', got %q", m.SessionPrefix)
+	}
+}
+
+func TestNewManager_CustomPrefix(t *testing.T) {
+	m := NewManager("custom")
+	if m.SessionPrefix != "custom" {
+		t.Errorf("expected prefix 'custom', got %q", m.SessionPrefix)
 	}
 }
 
