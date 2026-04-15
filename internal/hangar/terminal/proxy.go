@@ -31,6 +31,11 @@ func NewProxy(tmuxPrefix string, logger *log.Logger) *Proxy {
 }
 
 func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
+	if !websocket.IsWebSocketUpgrade(r) {
+		http.Error(w, "WebSocket upgrade required", http.StatusUpgradeRequired)
+		return
+	}
+
 	// Extract agent name from path: /ws/terminal/{agent}
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 {
