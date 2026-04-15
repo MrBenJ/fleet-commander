@@ -18,7 +18,7 @@ func testLaunchModel(yoloMode, skipConfirm bool) LaunchModel {
 		yoloMode:        yoloMode,
 		skipYoloConfirm: skipConfirm,
 	}
-	m.inputArea = newTestTextarea("Fix the login bug")
+	m.input.area = newTestTextarea("Fix the login bug")
 	return m
 }
 
@@ -38,7 +38,7 @@ func TestYoloModeCtrlDShowsConfirmation(t *testing.T) {
 	if updated.mode != launchModeYoloConfirm {
 		t.Errorf("expected mode launchModeYoloConfirm (%d), got %d", launchModeYoloConfirm, updated.mode)
 	}
-	if updated.pendingYoloInput == "" {
+	if updated.input.pendingYoloInput == "" {
 		t.Error("expected pendingYoloInput to be set, got empty string")
 	}
 }
@@ -70,7 +70,7 @@ func TestNonYoloModeCtrlDGoesDirectToGenerating(t *testing.T) {
 func TestYoloConfirmEscReturnsToInput(t *testing.T) {
 	m := testLaunchModel(true, false)
 	m.mode = launchModeYoloConfirm
-	m.pendingYoloInput = "Fix the login bug"
+	m.input.pendingYoloInput = "Fix the login bug"
 
 	msg := tea.KeyMsg{Type: tea.KeyEsc}
 	result, _ := m.Update(msg)
@@ -84,7 +84,7 @@ func TestYoloConfirmEscReturnsToInput(t *testing.T) {
 func TestYoloConfirmCtrlDProceeds(t *testing.T) {
 	m := testLaunchModel(true, false)
 	m.mode = launchModeYoloConfirm
-	m.pendingYoloInput = "Fix the login bug"
+	m.input.pendingYoloInput = "Fix the login bug"
 
 	msg := tea.KeyMsg{Type: tea.KeyCtrlD}
 	result, _ := m.Update(msg)
@@ -98,7 +98,7 @@ func TestYoloConfirmCtrlDProceeds(t *testing.T) {
 func TestYoloConfirmIgnoresOtherKeys(t *testing.T) {
 	m := testLaunchModel(true, false)
 	m.mode = launchModeYoloConfirm
-	m.pendingYoloInput = "Fix the login bug"
+	m.input.pendingYoloInput = "Fix the login bug"
 
 	for _, key := range []string{"a", "enter", "l", "y"} {
 		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
@@ -116,7 +116,7 @@ func TestEmptyInputCtrlDDoesNotProceed(t *testing.T) {
 		mode:     launchModeInput,
 		yoloMode: true,
 	}
-	m.inputArea = newTestTextarea("")
+	m.input.area = newTestTextarea("")
 
 	msg := tea.KeyMsg{Type: tea.KeyCtrlD}
 	result, _ := m.Update(msg)
@@ -140,11 +140,11 @@ func testLaunchModelInReview() LaunchModel {
 			{Prompt: "Fix login bug", AgentName: "fix-login", Branch: "fleet/fix-login"},
 			{Prompt: "Add OAuth", AgentName: "add-oauth", Branch: "fleet/add-oauth"},
 		},
-		currentIdx:  0,
-		nameInput:   textinput.New(),
-		branchInput: textinput.New(),
-		promptEdit:  textarea.New(),
+		currentIdx: 0,
 	}
+	m.review.nameInput = textinput.New()
+	m.review.branchInput = textinput.New()
+	m.review.promptEdit = textarea.New()
 	return m
 }
 
@@ -210,9 +210,9 @@ func TestReview_A_Aborts(t *testing.T) {
 func TestEditName_Enter_MovesToBranch(t *testing.T) {
 	m := testLaunchModelInReview()
 	m.mode = launchModeEditName
-	m.nameInput = textinput.New()
-	m.nameInput.SetValue("new-name")
-	m.branchInput = textinput.New()
+	m.review.nameInput = textinput.New()
+	m.review.nameInput.SetValue("new-name")
+	m.review.branchInput = textinput.New()
 
 	msg := tea.KeyMsg{Type: tea.KeyEnter}
 	result, _ := m.Update(msg)
@@ -229,8 +229,8 @@ func TestEditName_Enter_MovesToBranch(t *testing.T) {
 func TestEditName_EmptyRejected(t *testing.T) {
 	m := testLaunchModelInReview()
 	m.mode = launchModeEditName
-	m.nameInput = textinput.New()
-	m.nameInput.SetValue("")
+	m.review.nameInput = textinput.New()
+	m.review.nameInput.SetValue("")
 
 	msg := tea.KeyMsg{Type: tea.KeyEnter}
 	result, _ := m.Update(msg)
@@ -247,7 +247,7 @@ func TestEditName_EmptyRejected(t *testing.T) {
 func TestEditName_Esc_GoesBackToReview(t *testing.T) {
 	m := testLaunchModelInReview()
 	m.mode = launchModeEditName
-	m.nameInput = textinput.New()
+	m.review.nameInput = textinput.New()
 
 	msg := tea.KeyMsg{Type: tea.KeyEsc}
 	result, _ := m.Update(msg)
@@ -263,9 +263,9 @@ func TestEditName_Esc_GoesBackToReview(t *testing.T) {
 func TestEditBranch_Enter_MovesToPrompt(t *testing.T) {
 	m := testLaunchModelInReview()
 	m.mode = launchModeEditBranch
-	m.branchInput = textinput.New()
-	m.branchInput.SetValue("fleet/new-branch")
-	m.promptEdit = textarea.New()
+	m.review.branchInput = textinput.New()
+	m.review.branchInput.SetValue("fleet/new-branch")
+	m.review.promptEdit = textarea.New()
 
 	msg := tea.KeyMsg{Type: tea.KeyEnter}
 	result, _ := m.Update(msg)
@@ -282,8 +282,8 @@ func TestEditBranch_Enter_MovesToPrompt(t *testing.T) {
 func TestEditBranch_EmptyRejected(t *testing.T) {
 	m := testLaunchModelInReview()
 	m.mode = launchModeEditBranch
-	m.branchInput = textinput.New()
-	m.branchInput.SetValue("")
+	m.review.branchInput = textinput.New()
+	m.review.branchInput.SetValue("")
 
 	msg := tea.KeyMsg{Type: tea.KeyEnter}
 	result, _ := m.Update(msg)
@@ -302,8 +302,8 @@ func TestEditBranch_EmptyRejected(t *testing.T) {
 func TestEditPrompt_CtrlD_Confirms(t *testing.T) {
 	m := testLaunchModelInReview()
 	m.mode = launchModeEditPrompt
-	m.promptEdit = textarea.New()
-	m.promptEdit.SetValue("Updated prompt text")
+	m.review.promptEdit = textarea.New()
+	m.review.promptEdit.SetValue("Updated prompt text")
 
 	msg := tea.KeyMsg{Type: tea.KeyCtrlD}
 	result, _ := m.Update(msg)
@@ -320,8 +320,8 @@ func TestEditPrompt_CtrlD_Confirms(t *testing.T) {
 func TestEditPrompt_EmptyRejected(t *testing.T) {
 	m := testLaunchModelInReview()
 	m.mode = launchModeEditPrompt
-	m.promptEdit = textarea.New()
-	m.promptEdit.SetValue("   ")
+	m.review.promptEdit = textarea.New()
+	m.review.promptEdit.SetValue("   ")
 
 	msg := tea.KeyMsg{Type: tea.KeyCtrlD}
 	result, _ := m.Update(msg)
@@ -644,14 +644,14 @@ func TestSquadronConsensus_Navigation(t *testing.T) {
 	f := &fleet.Fleet{}
 	m := newSquadronLaunchModel(f, false)
 
-	if m.squadronConsensusCursor != 0 {
-		t.Fatalf("cursor start = %d, want 0", m.squadronConsensusCursor)
+	if m.squadron.consensusCursor != 0 {
+		t.Fatalf("cursor start = %d, want 0", m.squadron.consensusCursor)
 	}
 
 	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = model.(LaunchModel)
-	if m.squadronConsensusCursor != 1 {
-		t.Errorf("after down: cursor = %d, want 1", m.squadronConsensusCursor)
+	if m.squadron.consensusCursor != 1 {
+		t.Errorf("after down: cursor = %d, want 1", m.squadron.consensusCursor)
 	}
 
 	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -669,9 +669,9 @@ func TestSquadronName_ValidatesAndAdvances(t *testing.T) {
 	m := newSquadronLaunchModel(f, false)
 	m.consensusType = "none"
 	m.mode = launchModeSquadronName
-	m.squadronNameInput.Focus()
+	m.squadron.nameInput.Focus()
 
-	m.squadronNameInput.SetValue("!!!")
+	m.squadron.nameInput.SetValue("!!!")
 	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = model.(LaunchModel)
 	if m.mode != launchModeSquadronName {
@@ -682,7 +682,7 @@ func TestSquadronName_ValidatesAndAdvances(t *testing.T) {
 	}
 
 	m.statusMsg = ""
-	m.squadronNameInput.SetValue("alpha")
+	m.squadron.nameInput.SetValue("alpha")
 	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = model.(LaunchModel)
 	if m.squadronName != "alpha" {
