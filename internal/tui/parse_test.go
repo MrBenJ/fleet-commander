@@ -195,3 +195,86 @@ func TestGenerateNamesEmptySlug(t *testing.T) {
 		t.Errorf("expected branch 'fleet/agent', got %q", branch)
 	}
 }
+
+func TestGenerateNamesEmptyString(t *testing.T) {
+	name, branch := GenerateNames("", nil)
+	if name != "agent" {
+		t.Errorf("expected fallback 'agent' for empty input, got %q", name)
+	}
+	if branch != "fleet/agent" {
+		t.Errorf("expected branch 'fleet/agent', got %q", branch)
+	}
+}
+
+func TestGenerateNamesDeduplicationChain(t *testing.T) {
+	// Simulate a long chain of deduplication
+	existing := []string{"agent", "agent-2", "agent-3", "agent-4"}
+	name, _ := GenerateNames("", existing)
+	if name != "agent-5" {
+		t.Errorf("expected agent-5, got %q", name)
+	}
+}
+
+func TestGenerateNamesNoConflict(t *testing.T) {
+	name, branch := GenerateNames("Fix login bug", []string{"add-oauth", "refactor-db"})
+	if name != "fix-login-bug" {
+		t.Errorf("expected fix-login-bug (no conflict), got %q", name)
+	}
+	if branch != "fleet/fix-login-bug" {
+		t.Errorf("expected fleet/fix-login-bug, got %q", branch)
+	}
+}
+
+func TestContains(t *testing.T) {
+	tests := []struct {
+		name  string
+		slice []string
+		item  string
+		want  bool
+	}{
+		{"found", []string{"a", "b", "c"}, "b", true},
+		{"not found", []string{"a", "b", "c"}, "d", false},
+		{"empty slice", []string{}, "a", false},
+		{"nil slice", nil, "a", false},
+		{"empty item", []string{"a", "", "c"}, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := contains(tt.slice, tt.item)
+			if got != tt.want {
+				t.Errorf("contains(%v, %q) = %v, want %v", tt.slice, tt.item, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParsePrompts_DeduplicatesNames(t *testing.T) {
+	// Two identical prompts should get deduplicated names
+	input := "Fix login bug\nFix login bug"
+	items := ParsePrompts(input)
+
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+	if items[0].AgentName == items[1].AgentName {
+		t.Errorf("expected deduplicated names, both are %q", items[0].AgentName)
+	}
+	if items[1].AgentName != "fix-login-bug-2" {
+		t.Errorf("expected fix-login-bug-2, got %q", items[1].AgentName)
+	}
+}
+
+func TestSlugify_OnlySpecialChars(t *testing.T) {
+	got := Slugify("!@#$%^&*()")
+	if got != "" {
+		t.Errorf("expected empty slug for only special chars, got %q", got)
+	}
+}
+
+func TestSlugify_LeadingTrailingWhitespace(t *testing.T) {
+	got := Slugify("  fix something  ")
+	if got != "fix-something" {
+		t.Errorf("expected 'fix-something', got %q", got)
+	}
+}
