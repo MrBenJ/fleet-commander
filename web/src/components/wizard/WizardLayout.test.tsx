@@ -53,17 +53,17 @@ describe("WizardLayout", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the progress indicator with three steps", () => {
+  it("renders the progress indicator with three steps", async () => {
     renderWizard();
-    expect(screen.getByRole("navigation", { name: /wizard progress/i })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("navigation", { name: /wizard progress/i })).toBeInTheDocument());
     expect(screen.getByText("Setup")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
     expect(screen.getByText("Review")).toBeInTheDocument();
   });
 
-  it("starts on the Setup step", () => {
+  it("starts on the Setup step", async () => {
     renderWizard();
-    expect(screen.getByText("Squadron Setup")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Squadron Setup")).toBeInTheDocument());
     // Setup step should be current
     const setupItem = screen.getByText("Setup").closest("li");
     expect(setupItem).toHaveAttribute("aria-current", "step");
@@ -203,15 +203,17 @@ describe("WizardLayout", () => {
     expect(setupLi).not.toHaveAttribute("aria-current", "step");
   });
 
-  it("uses an ordered list for progress steps", () => {
+  it("uses an ordered list for progress steps", async () => {
     renderWizard();
     const nav = screen.getByRole("navigation", { name: /wizard progress/i });
     expect(nav.querySelector("ol")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Squadron Setup")).toBeInTheDocument());
   });
 
-  it("has aria-live on the step content area", () => {
+  it("has aria-live on the step content area", async () => {
     const { container } = renderWizard();
     const liveRegion = container.querySelector("[aria-live='polite']");
     expect(liveRegion).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Squadron Setup")).toBeInTheDocument());
   });
 });
