@@ -37,7 +37,7 @@ export async function getBranches(): Promise<string[]> {
 
 export async function launchSquadron(
   data: SquadronData
-): Promise<void> {
+): Promise<{ mergeMaster?: string }> {
   const resp = await fetch("/api/squadron/launch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -47,6 +47,7 @@ export async function launchSquadron(
     const body = await resp.json().catch(() => ({ error: resp.statusText }));
     throw new Error(body.error || resp.statusText);
   }
+  return resp.json();
 }
 
 export async function generateAgents(

@@ -10,6 +10,7 @@ interface WizardProps {
   personas: Persona[];
   drivers: string[];
   currentBranch: string;
+  ghAvailable: boolean;
   onLaunched: (name: string, agents: SquadronAgent[], config: { consensus: string; autoMerge: boolean; mergeMaster?: string }) => void;
 }
 
@@ -24,6 +25,7 @@ export function WizardLayout({
   personas,
   drivers,
   currentBranch,
+  ghAvailable,
   onLaunched,
 }: WizardProps) {
   const [step, setStep] = useState<Step>("setup");
@@ -166,6 +168,7 @@ export function WizardLayout({
             agents={agents}
             drivers={drivers}
             personas={personas}
+            ghAvailable={ghAvailable}
             onLaunched={onLaunched}
             onEdit={() => setStep("agents")}
             onAddMore={() => setStep("agents")}

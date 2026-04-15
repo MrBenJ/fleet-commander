@@ -16,6 +16,7 @@ interface ReviewStepProps {
   agents: SquadronAgent[];
   drivers: string[];
   personas: Persona[];
+  ghAvailable: boolean;
   onLaunched: (name: string, agents: SquadronAgent[], config: { consensus: string; autoMerge: boolean; mergeMaster?: string }) => void;
   onEdit: () => void;
   onAddMore: () => void;
@@ -32,6 +33,7 @@ type ReviewState = {
   consensus: ConsensusType;
   reviewMaster: string;
   autoMerge: boolean;
+  autoPR: boolean;
 };
 
 type ReviewAction =
@@ -44,7 +46,8 @@ type ReviewAction =
   | { type: "CANCEL_EDIT" }
   | { type: "SET_CONSENSUS"; consensus: ConsensusType }
   | { type: "SET_REVIEW_MASTER"; name: string }
-  | { type: "SET_AUTO_MERGE"; enabled: boolean };
+  | { type: "SET_AUTO_MERGE"; enabled: boolean }
+  | { type: "SET_AUTO_PR"; enabled: boolean };
 
 const initialState: ReviewState = {
   launching: false,
@@ -54,6 +57,7 @@ const initialState: ReviewState = {
   consensus: "universal",
   reviewMaster: "",
   autoMerge: true,
+  autoPR: false,
 };
 
 function reviewReducer(state: ReviewState, action: ReviewAction): ReviewState {
@@ -81,7 +85,9 @@ function reviewReducer(state: ReviewState, action: ReviewAction): ReviewState {
     case "SET_REVIEW_MASTER":
       return { ...state, reviewMaster: action.name };
     case "SET_AUTO_MERGE":
-      return { ...state, autoMerge: action.enabled };
+      return { ...state, autoMerge: action.enabled, autoPR: action.enabled ? state.autoPR : false };
+    case "SET_AUTO_PR":
+      return { ...state, autoPR: action.enabled };
   }
 }
 
@@ -92,6 +98,7 @@ export function ReviewStep({
   agents,
   drivers,
   personas,
+  ghAvailable,
   onLaunched,
   onAddMore,
   onAgentsChanged,
@@ -101,19 +108,20 @@ export function ReviewStep({
   const handleLaunch = async () => {
     dispatch({ type: "LAUNCH_START" });
     try {
-      await launchSquadron({
+      const result = await launchSquadron({
         name: config.name,
         consensus: state.consensus,
         reviewMaster: state.consensus === "review_master" ? state.reviewMaster || undefined : undefined,
         baseBranch: config.baseBranch || undefined,
         autoMerge: state.autoMerge,
+        autoPR: state.autoMerge && state.autoPR ? true : undefined,
         agents: agents,
       });
       dispatch({ type: "LAUNCH_SUCCESS" });
       onLaunched(config.name, agents, {
         consensus: state.consensus,
         autoMerge: state.autoMerge,
-        mergeMaster: state.autoMerge && agents.length > 0 ? agents[0].name : undefined,
+        mergeMaster: result.mergeMaster || undefined,
       });
     } catch (err) {
       dispatch({ type: "LAUNCH_ERROR", error: err instanceof Error ? err.message : "Launch failed" });
@@ -169,7 +177,7 @@ export function ReviewStep({
       />
 
       {/* Auto-merge checkbox */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: state.autoMerge ? "0.5rem" : "1.5rem" }}>
         <input
           type="checkbox"
           id="auto-merge"
@@ -182,6 +190,28 @@ export function ReviewStep({
           <HelpTooltip text="When enabled, all agent branches will be automatically merged into a single combined branch after the squadron completes." />
         </label>
       </div>
+
+      {/* Auto PR checkbox (only visible when auto-merge is enabled) */}
+      {state.autoMerge && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem", marginLeft: "2rem" }}>
+          <input
+            type="checkbox"
+            id="auto-pr"
+            checked={state.autoPR}
+            disabled={!ghAvailable}
+            onChange={(e) => dispatch({ type: "SET_AUTO_PR", enabled: e.target.checked })}
+            style={{ width: 18, height: 18, opacity: ghAvailable ? 1 : 0.5 }}
+          />
+          <label htmlFor="auto-pr" style={{ opacity: ghAvailable ? 1 : 0.6 }}>
+            Create pull request after merge
+            <HelpTooltip text={
+              ghAvailable
+                ? "When enabled, the merge master will push the merged branch, create a GitHub PR, and monitor CI status until checks pass. This requires the gh CLI tool to be installed and authenticated."
+                : "Requires the gh CLI tool (https://cli.github.com). Install it and run `gh auth login` to enable this option."
+            } />
+          </label>
+        </div>
+      )}
 
       <div role="alert" aria-live="assertive">
         {state.error && (

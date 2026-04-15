@@ -12,6 +12,7 @@ export interface SquadronData {
   reviewMaster?: string;
   baseBranch?: string;
   autoMerge: boolean;
+  autoPR?: boolean;
   mergeMaster?: string;
   useJumpSh?: boolean;
   agents: SquadronAgent[];
@@ -20,6 +21,7 @@ export interface SquadronData {
 export interface FleetInfo {
   repoPath: string;
   currentBranch: string;
+  ghAvailable: boolean;
   agents: AgentInfo[];
 }
 

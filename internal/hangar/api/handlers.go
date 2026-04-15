@@ -67,9 +67,12 @@ func (h *Handlers) HandleGetFleet(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	_, ghErr := exec.LookPath("gh")
+
 	writeJSON(w, http.StatusOK, FleetResponse{
 		RepoPath:      f.RepoPath,
 		CurrentBranch: branch,
+		GHAvailable:   ghErr == nil,
 		Agents:        agents,
 	})
 }
@@ -190,6 +193,7 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 		ReviewMaster: req.ReviewMaster,
 		BaseBranch:   req.BaseBranch,
 		AutoMerge:    req.AutoMerge,
+		AutoPR:       req.AutoPR,
 		MergeMaster:  req.MergeMaster,
 		UseJumpSh:    req.UseJumpSh,
 	}
@@ -224,18 +228,28 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Pre-flight: autoPR requires the gh CLI.
+	if data.AutoPR {
+		if _, err := exec.LookPath("gh"); err != nil {
+			writeError(w, http.StatusBadRequest,
+				"autoPR requires the gh CLI (https://cli.github.com) — install it and run `gh auth login`")
+			return
+		}
+	}
+
 	f, err := fleet.Load(h.repoPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to load fleet: %v", err))
 		return
 	}
 
-	if err := squadron.RunHeadless(f, data); err != nil {
+	mergeMaster, err := squadron.RunHeadless(f, data)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("launch failed: %v", err))
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, LaunchResponse{MergeMaster: mergeMaster})
 }
 
 // HandleStopAgent handles POST /api/agent/{name}/stop — stops a named agent.

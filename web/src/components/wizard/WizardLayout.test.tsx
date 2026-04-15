@@ -40,6 +40,7 @@ const defaultProps = {
   personas: mockPersonas,
   drivers: ["claude-code", "aider"],
   currentBranch: "main",
+  ghAvailable: true,
   onLaunched: vi.fn(),
 };
 

@@ -67,6 +67,7 @@ export function App() {
             personas={personas}
             drivers={drivers}
             currentBranch={fleet.currentBranch}
+            ghAvailable={fleet.ghAvailable ?? false}
             onLaunched={handleLaunched}
           />
         )}

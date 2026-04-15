@@ -166,17 +166,53 @@ func BuildNoConsensusAutoMergeSuffix(squadronName string) string {
 	return fmt.Sprintf(noConsensusAutoMergeTemplate, squadronName, squadronName, squadronName)
 }
 
+const autoPRTemplate = `
+After all branches are merged successfully into the squadron branch:
+
+**Step 0 — Verify gh CLI authentication:**
+Run: gh auth status
+If this command fails, STOP IMMEDIATELY and announce:
+   fleet context channel-send squadron-%s "GH_AUTH_FAILED: gh CLI is not authenticated — run gh auth login"
+Do NOT proceed with any of the steps below if auth fails.
+
+1. Push the squadron branch to the remote: git push -u origin squadron/%s
+   If the push fails, announce the error and stop:
+   fleet context channel-send squadron-%s "PR_BLOCKED: git push failed: <error>"
+
+2. Create a pull request on GitHub using the gh CLI:
+   - Title: "Squadron %s: <brief summary of all agent work>"
+   - Body: Include a summary section listing what each agent accomplished (use their original prompts and branch names as context), and a test plan section
+   - Base branch: %s
+   - Use: gh pr create --title "..." --body "..." --base %s
+   If PR creation fails, announce the error and stop:
+   fleet context channel-send squadron-%s "PR_BLOCKED: gh pr create failed: <error>"
+
+3. After the PR is created, poll for CI/CD status:
+   - Run: gh pr checks <pr-number> --watch
+   - If checks fail, investigate the failure, fix the issue in the squadron branch, push the fix, and wait for checks to pass again
+   - Continue polling until all required checks pass
+
+4. Once CI passes, announce in the squadron channel:
+   fleet context channel-send squadron-%s "PR_READY: <pr-url> - All CI checks passing"
+
+5. If you cannot fix a CI failure after reasonable attempts, announce:
+   fleet context channel-send squadron-%s "PR_BLOCKED: <pr-url> - CI failing: <reason>"
+
+You are NOT done until the PR exists and CI is passing (or you've announced PR_BLOCKED).
+`
+
 // BuildMergerSuffix returns the merger-duties suffix appended to the merge
 // master's prompt. Pass every agent in the squadron (including the merger
-// itself) in the order they should be merged.
-func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch) string {
+// itself) in the order they should be merged. When autoPR is true, additional
+// instructions for creating a GitHub pull request and monitoring CI are appended.
+func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch, autoPR bool) string {
 	var lines []string
 	for _, ab := range agents {
 		lines = append(lines, fmt.Sprintf("%s -> %s", ab.Name, ab.Branch))
 	}
 	list := strings.Join(lines, "\n")
 
-	return fmt.Sprintf(
+	result := fmt.Sprintf(
 		mergerTemplate,
 		squadronName,
 		baseBranch, squadronName,
@@ -184,6 +220,22 @@ func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch) st
 		squadronName,
 		list,
 	)
+
+	if autoPR {
+		result += fmt.Sprintf(
+			autoPRTemplate,
+			squadronName, // Step 0: auth fail channel-send
+			squadronName, // Step 1: push
+			squadronName, // Step 1: push fail channel-send
+			squadronName, // Step 2: PR title
+			baseBranch, baseBranch, // Step 2: base branch (text + flag)
+			squadronName, // Step 2: PR fail channel-send
+			squadronName, // Step 4: PR_READY channel-send
+			squadronName, // Step 5: PR_BLOCKED channel-send
+		)
+	}
+
+	return result
 }
 
 // BuildConsensusSuffix returns the prompt suffix appended to every agent's

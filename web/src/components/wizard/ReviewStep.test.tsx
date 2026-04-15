@@ -30,6 +30,7 @@ const defaultProps = {
   agents,
   drivers,
   personas,
+  ghAvailable: true,
   onLaunched: vi.fn(),
   onEdit: vi.fn(),
   onAddMore: vi.fn(),
@@ -65,6 +66,44 @@ describe("ReviewStep", () => {
     render(<ReviewStep {...defaultProps} />);
     const checkbox = screen.getByLabelText(/Auto-merge/);
     expect(checkbox).toBeChecked();
+  });
+
+  it("renders auto-PR checkbox when auto-merge is enabled", () => {
+    render(<ReviewStep {...defaultProps} />);
+    const checkbox = screen.getByLabelText(/Create pull request after merge/);
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it("hides auto-PR checkbox when auto-merge is disabled", async () => {
+    render(<ReviewStep {...defaultProps} />);
+    await userEvent.click(screen.getByLabelText(/Auto-merge/));
+    expect(screen.queryByLabelText(/Create pull request after merge/)).not.toBeInTheDocument();
+  });
+
+  it("unchecks auto-PR when auto-merge is unchecked and re-checked", async () => {
+    render(<ReviewStep {...defaultProps} />);
+    // Check auto-PR
+    await userEvent.click(screen.getByLabelText(/Create pull request after merge/));
+    expect(screen.getByLabelText(/Create pull request after merge/)).toBeChecked();
+    // Uncheck auto-merge (hides and resets autoPR)
+    await userEvent.click(screen.getByLabelText(/Auto-merge/));
+    // Re-check auto-merge
+    await userEvent.click(screen.getByLabelText(/Auto-merge/));
+    // Auto-PR should be unchecked
+    expect(screen.getByLabelText(/Create pull request after merge/)).not.toBeChecked();
+  });
+
+  it("disables auto-PR checkbox when ghAvailable is false", () => {
+    render(<ReviewStep {...defaultProps} ghAvailable={false} />);
+    const checkbox = screen.getByLabelText(/Create pull request after merge/);
+    expect(checkbox).toBeDisabled();
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it("enables auto-PR checkbox when ghAvailable is true", () => {
+    render(<ReviewStep {...defaultProps} ghAvailable={true} />);
+    const checkbox = screen.getByLabelText(/Create pull request after merge/);
+    expect(checkbox).not.toBeDisabled();
   });
 
   it("renders launch and add more buttons", () => {
@@ -137,7 +176,7 @@ describe("ReviewStep", () => {
 
   describe("launch", () => {
     it("calls launchSquadron and onLaunched on success", async () => {
-      mockLaunchSquadron.mockResolvedValueOnce(undefined);
+      mockLaunchSquadron.mockResolvedValueOnce({ mergeMaster: "agent-beta" });
       render(<ReviewStep {...defaultProps} />);
       await userEvent.click(screen.getByText("Launch Squadron"));
       expect(mockLaunchSquadron).toHaveBeenCalledWith(
@@ -145,13 +184,27 @@ describe("ReviewStep", () => {
           name: "test-squadron",
           consensus: "universal",
           autoMerge: true,
+          autoPR: undefined,
           agents,
         })
       );
       expect(defaultProps.onLaunched).toHaveBeenCalledWith(
         "test-squadron",
         agents,
-        { consensus: "universal", autoMerge: true, mergeMaster: "agent-alpha" }
+        { consensus: "universal", autoMerge: true, mergeMaster: "agent-beta" }
+      );
+    });
+
+    it("sends autoPR=true when auto-PR checkbox is checked", async () => {
+      mockLaunchSquadron.mockResolvedValueOnce({});
+      render(<ReviewStep {...defaultProps} />);
+      await userEvent.click(screen.getByLabelText(/Create pull request after merge/));
+      await userEvent.click(screen.getByText("Launch Squadron"));
+      expect(mockLaunchSquadron).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoMerge: true,
+          autoPR: true,
+        })
       );
     });
 

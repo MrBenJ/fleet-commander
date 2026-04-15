@@ -3,6 +3,7 @@ package api
 type FleetResponse struct {
 	RepoPath      string          `json:"repoPath"`
 	CurrentBranch string          `json:"currentBranch"`
+	GHAvailable   bool            `json:"ghAvailable"`
 	Agents        []AgentResponse `json:"agents"`
 }
 
@@ -31,6 +32,7 @@ type LaunchRequest struct {
 	ReviewMaster string             `json:"reviewMaster,omitempty"`
 	BaseBranch   string             `json:"baseBranch,omitempty"`
 	AutoMerge    bool               `json:"autoMerge"`
+	AutoPR       bool               `json:"autoPR,omitempty"`
 	MergeMaster  *string            `json:"mergeMaster,omitempty"`
 	UseJumpSh    bool               `json:"useJumpSh,omitempty"`
 	Agents       []LaunchAgentInput `json:"agents"`
@@ -42,6 +44,10 @@ type LaunchAgentInput struct {
 	Prompt  string `json:"prompt"`
 	Driver  string `json:"driver,omitempty"`
 	Persona string `json:"persona,omitempty"`
+}
+
+type LaunchResponse struct {
+	MergeMaster string `json:"mergeMaster,omitempty"`
 }
 
 type GenerateRequest struct {

@@ -92,6 +92,7 @@ type LaunchModel struct {
 	reviewMaster           string
 	mergeMaster            string
 	autoMerge              bool
+	autoPR                 bool
 	baseBranch             string
 	squadronChannelCreated bool
 	personas               map[string]string // agent name -> persona key
@@ -541,7 +542,7 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 		for _, p := range m.prompts {
 			agentBranches = append(agentBranches, squadron.AgentBranch{Name: p.AgentName, Branch: p.Branch})
 		}
-		result += "\n" + squadron.BuildMergerSuffix(m.squadronName, m.baseBranch, agentBranches)
+		result += "\n" + squadron.BuildMergerSuffix(m.squadronName, m.baseBranch, agentBranches, m.autoPR)
 	}
 
 	if key, ok := m.personas[agentName]; ok && key != "" {
