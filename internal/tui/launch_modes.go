@@ -15,7 +15,7 @@ func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "ctrl+d":
-			input := m.inputArea.Value()
+			input := m.input.area.Value()
 			if strings.TrimSpace(input) == "" {
 				m.statusMsg = "No prompts found. Enter at least one task."
 				return m, nil
@@ -23,7 +23,7 @@ func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// In yolo mode, show confirmation unless --i-know-what-im-doing
 			if m.yoloMode && !m.skipYoloConfirm {
-				m.pendingYoloInput = input
+				m.input.pendingYoloInput = input
 				m.mode = launchModeYoloConfirm
 				m.statusMsg = ""
 				return m, nil
@@ -38,7 +38,7 @@ func (m LaunchModel) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.inputArea, cmd = m.inputArea.Update(msg)
+	m.input.area, cmd = m.input.area.Update(msg)
 	return m, cmd
 }
 
@@ -62,18 +62,18 @@ func (m LaunchModel) submitInput(input string) (tea.Model, tea.Cmd) {
 		items, err := GenerateWithClaude(input, existingNames, drv, log)
 		return claudeResultMsg{items: items, err: err}
 	}
-	return m, tea.Batch(m.spinner.Tick, claudeCmd)
+	return m, tea.Batch(m.generating.spinner.Tick, claudeCmd)
 }
 
 func (m LaunchModel) updateYoloConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "ctrl+d":
-			return m.submitInput(m.pendingYoloInput)
+			return m.submitInput(m.input.pendingYoloInput)
 		case "esc", "ctrl+c":
 			m.mode = launchModeInput
 			m.statusMsg = ""
-			m.inputArea.Focus()
+			m.input.area.Focus()
 			return m, nil
 		}
 	}
@@ -90,13 +90,13 @@ func (m LaunchModel) updateGenerating(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.spinner, cmd = m.spinner.Update(msg)
+	m.generating.spinner, cmd = m.generating.spinner.Update(msg)
 	return m, cmd
 }
 
 // setupPromptViewport initializes or updates the prompt viewport for the current prompt.
 func (m *LaunchModel) setupPromptViewport() {
-	if m.promptViewportIdx == m.currentIdx && m.promptViewport.Width > 0 {
+	if m.review.viewportIdx == m.currentIdx && m.review.viewport.Width > 0 {
 		return // already set up for this prompt
 	}
 
@@ -121,8 +121,8 @@ func (m *LaunchModel) setupPromptViewport() {
 	vp.Style = lipgloss.NewStyle().PaddingLeft(4)
 	vp.SetContent(wrapped)
 
-	m.promptViewport = vp
-	m.promptViewportIdx = m.currentIdx
+	m.review.viewport = vp
+	m.review.viewportIdx = m.currentIdx
 }
 
 func (m LaunchModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -136,11 +136,11 @@ func (m LaunchModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "e", "E":
 			item := m.prompts[m.currentIdx]
-			m.nameInput.SetValue(item.AgentName)
-			m.nameInput.Focus()
+			m.review.nameInput.SetValue(item.AgentName)
+			m.review.nameInput.Focus()
 			m.mode = launchModeEditName
 			m.statusMsg = ""
-			return m, m.nameInput.Focus()
+			return m, m.review.nameInput.Focus()
 
 		case "s", "S":
 			m.skipped++
@@ -154,10 +154,10 @@ func (m LaunchModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Scroll the prompt viewport
 		case "j", "down":
-			m.promptViewport.LineDown(1)
+			m.review.viewport.LineDown(1)
 			return m, nil
 		case "k", "up":
-			m.promptViewport.LineUp(1)
+			m.review.viewport.LineUp(1)
 			return m, nil
 		case "h", "left":
 			// no-op for horizontal (content is wrapped)
@@ -166,7 +166,7 @@ func (m LaunchModel) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.promptViewport, cmd = m.promptViewport.Update(msg)
+	m.review.viewport, cmd = m.review.viewport.Update(msg)
 	return m, cmd
 }
 
@@ -174,18 +174,18 @@ func (m LaunchModel) updateEditName(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "enter":
-			val := m.nameInput.Value()
+			val := m.review.nameInput.Value()
 			if val == "" {
 				m.statusMsg = "Name cannot be empty"
 				return m, nil
 			}
 			m.prompts[m.currentIdx].AgentName = val
 			// Move to branch edit
-			m.branchInput.SetValue(m.prompts[m.currentIdx].Branch)
-			m.branchInput.Focus()
+			m.review.branchInput.SetValue(m.prompts[m.currentIdx].Branch)
+			m.review.branchInput.Focus()
 			m.mode = launchModeEditBranch
 			m.statusMsg = ""
-			return m, m.branchInput.Focus()
+			return m, m.review.branchInput.Focus()
 
 		case "esc":
 			m.mode = launchModeReview
@@ -195,7 +195,7 @@ func (m LaunchModel) updateEditName(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.nameInput, cmd = m.nameInput.Update(msg)
+	m.review.nameInput, cmd = m.review.nameInput.Update(msg)
 	return m, cmd
 }
 
@@ -203,18 +203,18 @@ func (m LaunchModel) updateEditBranch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "enter":
-			val := m.branchInput.Value()
+			val := m.review.branchInput.Value()
 			if val == "" {
 				m.statusMsg = "Branch cannot be empty"
 				return m, nil
 			}
 			m.prompts[m.currentIdx].Branch = val
 			// Move to prompt edit
-			m.promptEdit.SetValue(m.prompts[m.currentIdx].Prompt)
-			m.promptEdit.Focus()
+			m.review.promptEdit.SetValue(m.prompts[m.currentIdx].Prompt)
+			m.review.promptEdit.Focus()
 			m.mode = launchModeEditPrompt
 			m.statusMsg = ""
-			return m, m.promptEdit.Focus()
+			return m, m.review.promptEdit.Focus()
 
 		case "esc":
 			m.mode = launchModeReview
@@ -224,7 +224,7 @@ func (m LaunchModel) updateEditBranch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.branchInput, cmd = m.branchInput.Update(msg)
+	m.review.branchInput, cmd = m.review.branchInput.Update(msg)
 	return m, cmd
 }
 
@@ -240,19 +240,19 @@ func (m LaunchModel) updateSquadronConsensus(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "up", "k":
-			if m.squadronConsensusCursor > 0 {
-				m.squadronConsensusCursor--
+			if m.squadron.consensusCursor > 0 {
+				m.squadron.consensusCursor--
 			}
 			return m, nil
 		case "down", "j":
-			if m.squadronConsensusCursor < len(squadronConsensusOptions)-1 {
-				m.squadronConsensusCursor++
+			if m.squadron.consensusCursor < len(squadronConsensusOptions)-1 {
+				m.squadron.consensusCursor++
 			}
 			return m, nil
 		case "enter":
-			m.consensusType = squadronConsensusOptions[m.squadronConsensusCursor].Key
+			m.consensusType = squadronConsensusOptions[m.squadron.consensusCursor].Key
 			m.mode = launchModeSquadronName
-			return m, m.squadronNameInput.Focus()
+			return m, m.squadron.nameInput.Focus()
 		case "esc", "ctrl+c":
 			m.quitting = true
 			m.aborted = true
@@ -266,7 +266,7 @@ func (m LaunchModel) updateSquadronName(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "enter":
-			val := strings.TrimSpace(m.squadronNameInput.Value())
+			val := strings.TrimSpace(m.squadron.nameInput.Value())
 			if !squadron.ValidName(val) {
 				m.statusMsg = "Invalid name (alphanumeric, hyphens/underscores, max 30 chars, must start with letter or digit)"
 				return m, nil
@@ -274,7 +274,7 @@ func (m LaunchModel) updateSquadronName(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.squadronName = val
 			m.statusMsg = ""
 			m.mode = launchModeInput
-			m.inputArea.Focus()
+			m.input.area.Focus()
 			return m, textarea.Blink
 		case "esc":
 			m.statusMsg = ""
@@ -284,7 +284,7 @@ func (m LaunchModel) updateSquadronName(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.squadronNameInput, cmd = m.squadronNameInput.Update(msg)
+	m.squadron.nameInput, cmd = m.squadron.nameInput.Update(msg)
 	return m, cmd
 }
 
@@ -292,13 +292,13 @@ func (m LaunchModel) updateEditPrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "ctrl+d":
-			val := m.promptEdit.Value()
+			val := m.review.promptEdit.Value()
 			if strings.TrimSpace(val) == "" {
 				m.statusMsg = "Prompt cannot be empty"
 				return m, nil
 			}
 			m.prompts[m.currentIdx].Prompt = strings.TrimSpace(val)
-			m.promptViewportIdx = -1 // force viewport rebuild with new content
+			m.review.viewportIdx = -1 // force viewport rebuild with new content
 			m.mode = launchModeReview
 			m.statusMsg = ""
 			return m, nil
@@ -311,6 +311,6 @@ func (m LaunchModel) updateEditPrompt(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.promptEdit, cmd = m.promptEdit.Update(msg)
+	m.review.promptEdit, cmd = m.review.promptEdit.Update(msg)
 	return m, cmd
 }
