@@ -162,7 +162,7 @@ export function MissionControl({
 
       {/* Main content: context log or multi-view */}
       {multiView ? (
-        <MultiView agents={agents} />
+        <MultiView agents={agents} mergeMaster={mergeMaster} />
       ) : (
         <ContextLog
           messages={messages}
