@@ -831,6 +831,51 @@ func TestHandleLaunchSquadron_AutoPR_NoGH(t *testing.T) {
 	}
 }
 
+func TestHandleGetFleet_GHAvailable(t *testing.T) {
+	repoPath, fleetDir := createTestFleet(t, []agentFixture{})
+
+	h := NewHandlers(repoPath, fleetDir)
+	req := httptest.NewRequest(http.MethodGet, "/api/fleet", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleGetFleet(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	// In CI or dev environments, gh may or may not be installed.
+	// We just verify the field is present in the JSON (not its value).
+	raw := make(map[string]interface{})
+	json.Unmarshal(w.Body.Bytes(), &raw)
+	if _, ok := raw["ghAvailable"]; !ok {
+		t.Error("expected 'ghAvailable' field in fleet response")
+	}
+}
+
+func TestHandleGetFleet_GHUnavailable(t *testing.T) {
+	repoPath, fleetDir := createTestFleet(t, []agentFixture{})
+
+	// Override PATH so gh is not found.
+	t.Setenv("PATH", t.TempDir())
+
+	h := NewHandlers(repoPath, fleetDir)
+	req := httptest.NewRequest(http.MethodGet, "/api/fleet", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleGetFleet(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FleetResponse
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.GHAvailable {
+		t.Error("expected ghAvailable=false when gh is not in PATH")
+	}
+}
+
 func TestHandleLaunchSquadron_AutoPR_False_NoGHCheck(t *testing.T) {
 	repoPath, fleetDir := createTestFleet(t, []agentFixture{})
 

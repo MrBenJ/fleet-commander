@@ -67,9 +67,12 @@ func (h *Handlers) HandleGetFleet(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	_, ghErr := exec.LookPath("gh")
+
 	writeJSON(w, http.StatusOK, FleetResponse{
 		RepoPath:      f.RepoPath,
 		CurrentBranch: branch,
+		GHAvailable:   ghErr == nil,
 		Agents:        agents,
 	})
 }

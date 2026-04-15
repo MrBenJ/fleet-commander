@@ -3,6 +3,7 @@ package api
 type FleetResponse struct {
 	RepoPath      string          `json:"repoPath"`
 	CurrentBranch string          `json:"currentBranch"`
+	GHAvailable   bool            `json:"ghAvailable"`
 	Agents        []AgentResponse `json:"agents"`
 }
 
