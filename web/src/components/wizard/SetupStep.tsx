@@ -8,6 +8,7 @@ interface SetupConfig {
 interface SetupStepProps {
   initial: SetupConfig;
   currentBranch: string;
+  branches: string[];
   onDone: (config: SetupConfig) => void;
 }
 
@@ -31,37 +32,43 @@ const labelStyle: React.CSSProperties = {
   display: "block",
 };
 
-export function SetupStep({ initial, currentBranch, onDone }: SetupStepProps) {
+export function SetupStep({ initial, currentBranch, branches, onDone }: SetupStepProps) {
   const [config, setConfig] = useState<SetupConfig>(initial);
 
   const canContinue = config.name.trim().length > 0;
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <h2 style={{ marginBottom: "0.5rem" }}>Squadron Setup</h2>
       <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>
         Tell us about your squadron
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 500 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 500, width: "100%" }}>
         <div>
           <label style={labelStyle}>Squadron Name</label>
           <input
             style={inputStyle}
             value={config.name}
             onChange={(e) => setConfig({ ...config, name: e.target.value })}
-            placeholder="alpha-strike"
+            placeholder="page/homepage-fixes"
           />
         </div>
 
         <div>
           <label style={labelStyle}>Base Branch</label>
-          <input
-            style={inputStyle}
+          <select
+            style={{ ...inputStyle, appearance: "auto" }}
             value={config.baseBranch}
             onChange={(e) => setConfig({ ...config, baseBranch: e.target.value })}
-            placeholder={currentBranch}
-          />
+          >
+            {branches.length === 0 && (
+              <option value={currentBranch}>{currentBranch}</option>
+            )}
+            {branches.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
         </div>
 
         <button
