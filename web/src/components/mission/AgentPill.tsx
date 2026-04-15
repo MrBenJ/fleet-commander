@@ -1,9 +1,12 @@
+import { useState, useRef } from "react";
+import type { Persona, SquadronAgent } from "../../types";
+import { AgentTooltip } from "./AgentTooltip";
+
 interface AgentPillProps {
-  name: string;
+  agent: SquadronAgent;
   state: string;
-  driver: string;
+  persona?: Persona;
   isMerger?: boolean;
-  onClick: () => void;
 }
 
 const driverColors: Record<string, string> = {
@@ -86,56 +89,86 @@ function DriverIcon({ driver }: { driver: string }) {
   }
 }
 
-export function AgentPill({ name, state, driver, isMerger, onClick }: AgentPillProps) {
+export function AgentPill({ agent, state, persona, isMerger }: AgentPillProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const dotColor = stateColors[state] || stateColors.starting;
   const isWaiting = state === "waiting";
 
+  const handleMouseEnter = () => {
+    if (hideTimeout.current) {
+      clearTimeout(hideTimeout.current);
+      hideTimeout.current = null;
+    }
+    setShowTooltip(true);
+  };
+
+  const handleMouseLeave = () => {
+    hideTimeout.current = setTimeout(() => {
+      setShowTooltip(false);
+    }, 200);
+  };
+
   return (
-    <button
-      onClick={onClick}
-      aria-label={`${name}, status: ${state}, harness: ${driver}`}
-      style={{
-        fontSize: "0.8rem",
-        background: "var(--bg-secondary)",
-        border: `1px solid ${isWaiting ? "var(--orange)" : "var(--border)"}`,
-        borderRadius: 16,
-        padding: "0.3rem 0.75rem",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: "0.4rem",
-        color: "var(--text-primary)",
-      }}
+    <div
+      style={{ position: "relative", display: "inline-flex" }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      <span
-        aria-hidden="true"
+      <button
+        aria-label={`${agent.name}, status: ${state}, harness: ${agent.driver}`}
         style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: dotColor,
-          display: "inline-block",
-          animation: isWaiting ? "pulse 2s infinite" : undefined,
+          fontSize: "0.8rem",
+          background: "var(--bg-secondary)",
+          border: `1px solid ${isWaiting ? "var(--orange)" : "var(--border)"}`,
+          borderRadius: 16,
+          padding: "0.3rem 0.75rem",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.4rem",
+          color: "var(--text-primary)",
         }}
-      />
-      <span>{name}</span>
-      <DriverIcon driver={driver} />
-      {isMerger && (
+      >
         <span
+          aria-hidden="true"
           style={{
-            fontSize: "0.55rem",
-            fontWeight: 700,
-            background: "#a855f7",
-            color: "#fff",
-            padding: "0.1rem 0.35rem",
-            borderRadius: 8,
-            letterSpacing: "0.03em",
-            lineHeight: 1,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: dotColor,
+            display: "inline-block",
+            animation: isWaiting ? "pulse 2s infinite" : undefined,
           }}
-        >
-          MERGE
-        </span>
+        />
+        <span>{agent.name}</span>
+        <DriverIcon driver={agent.driver} />
+        {isMerger && (
+          <span
+            style={{
+              fontSize: "0.55rem",
+              fontWeight: 700,
+              background: "#a855f7",
+              color: "#fff",
+              padding: "0.1rem 0.35rem",
+              borderRadius: 8,
+              letterSpacing: "0.03em",
+              lineHeight: 1,
+            }}
+          >
+            MERGE
+          </span>
+        )}
+      </button>
+
+      {showTooltip && (
+        <AgentTooltip
+          agent={agent}
+          state={state}
+          persona={persona}
+        />
       )}
-    </button>
+    </div>
   );
 }

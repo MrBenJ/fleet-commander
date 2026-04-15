@@ -29,7 +29,6 @@ const defaultProps = {
   agent,
   state: "working",
   persona,
-  onClose: vi.fn(),
 };
 
 beforeEach(() => {
@@ -73,32 +72,6 @@ describe("AgentTooltip", () => {
   it("shows 'No Persona' when persona is undefined", () => {
     render(<AgentTooltip {...defaultProps} persona={undefined} />);
     expect(screen.getByText("No Persona")).toBeInTheDocument();
-  });
-
-  it("has a dialog role with aria-modal", () => {
-    render(<AgentTooltip {...defaultProps} />);
-    const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveAttribute("aria-label", "Agent details: test-agent");
-  });
-
-  it("calls onClose when backdrop is clicked", async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    render(<AgentTooltip {...defaultProps} onClose={onClose} />);
-
-    const backdrop = screen.getByRole("presentation");
-    await user.click(backdrop);
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it("calls onClose on Escape key", async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    render(<AgentTooltip {...defaultProps} onClose={onClose} />);
-
-    await user.keyboard("{Escape}");
-    expect(onClose).toHaveBeenCalled();
   });
 
   it("renders Assume Control and Stop buttons", () => {

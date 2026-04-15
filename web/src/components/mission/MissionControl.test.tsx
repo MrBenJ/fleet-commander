@@ -77,23 +77,24 @@ describe("MissionControl", () => {
     expect(screen.getByRole("button", { name: /beta/ })).toBeInTheDocument();
   });
 
-  it("opens agent tooltip when an agent pill is clicked", async () => {
+  it("shows agent tooltip on hover over an agent pill", async () => {
     const user = userEvent.setup();
     renderMission();
-    await user.click(screen.getByRole("button", { name: /alpha/ }));
-    expect(screen.getByRole("dialog", { name: /alpha/ })).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: /alpha/ }));
+    expect(screen.getByText("Assume Control")).toBeInTheDocument();
   });
 
-  it("closes agent tooltip when backdrop is clicked", async () => {
+  it("hides agent tooltip when mouse leaves the pill", async () => {
     const user = userEvent.setup();
     renderMission();
-    await user.click(screen.getByRole("button", { name: /alpha/ }));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: /alpha/ }));
+    expect(screen.getByText("Assume Control")).toBeInTheDocument();
 
-    // Click the backdrop
-    const backdrop = screen.getByRole("presentation");
-    await user.click(backdrop);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.unhover(screen.getByRole("button", { name: /alpha/ }));
+    // Tooltip hides after a 200ms delay
+    await vi.waitFor(() => {
+      expect(screen.queryByText("Assume Control")).not.toBeInTheDocument();
+    });
   });
 
   it("displays context messages when received via WebSocket", () => {
@@ -152,10 +153,10 @@ describe("MissionControl", () => {
     expect(screen.getByRole("log", { name: /context messages/ })).toBeInTheDocument();
   });
 
-  it("shows agent tooltip with persona info", async () => {
+  it("shows agent tooltip with persona info on hover", async () => {
     const user = userEvent.setup();
     renderMission();
-    await user.click(screen.getByRole("button", { name: /alpha/ }));
+    await user.hover(screen.getByRole("button", { name: /alpha/ }));
     expect(screen.getByText("Zen Master")).toBeInTheDocument();
   });
 
