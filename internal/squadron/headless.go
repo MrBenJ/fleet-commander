@@ -135,7 +135,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 			_ = tm.KillSession(agent.Name)
 		}
 
-		if err := tm.CreateSession(agent.Name, agent.WorktreePath, []string{launcherFile}, stateFilePath); err != nil {
+		if err := tm.CreateSession(agent.Name, agent.WorktreePath, []string{launcherFile}, stateFilePath, data.Name); err != nil {
 			return fmt.Errorf("create tmux session %q: %w", agent.Name, err)
 		}
 		f.UpdateAgentStateFile(agent.Name, stateFilePath)

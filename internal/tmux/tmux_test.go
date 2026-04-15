@@ -166,7 +166,7 @@ func TestKillSession_Args(t *testing.T) {
 func TestCreateSession_DefaultCommand(t *testing.T) {
 	f := &fakeRunner{}
 	m := NewManagerWithRunner("fleet", f)
-	err := m.CreateSession("auth", "/tmp/worktree", nil, "")
+	err := m.CreateSession("auth", "/tmp/worktree", nil, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestCreateSession_DefaultCommand(t *testing.T) {
 func TestCreateSession_WithStateFile(t *testing.T) {
 	f := &fakeRunner{}
 	m := NewManagerWithRunner("fleet", f)
-	err := m.CreateSession("auth", "/tmp/worktree", nil, "/tmp/state.json")
+	err := m.CreateSession("auth", "/tmp/worktree", nil, "/tmp/state.json", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestCreateSession_WithStateFile(t *testing.T) {
 func TestCreateSession_CustomCommand(t *testing.T) {
 	f := &fakeRunner{}
 	m := NewManagerWithRunner("fleet", f)
-	err := m.CreateSession("worker", "/tmp/worktree", []string{"bash", "-c", "echo hello"}, "")
+	err := m.CreateSession("worker", "/tmp/worktree", []string{"bash", "-c", "echo hello"}, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -250,9 +250,58 @@ func TestCreateSession_NoCommandStartsShell(t *testing.T) {
 		},
 	}
 	m := NewManagerWithRunner("fleet", f)
-	err := m.CreateSession("auth", "/tmp/worktree", nil, "")
+	err := m.CreateSession("auth", "/tmp/worktree", nil, "", "")
 	if err != nil {
 		t.Fatalf("expected no error when no command given (tmux uses default shell), got: %v", err)
+	}
+}
+
+func TestCreateSession_WindowTitleWithSquadron(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.CreateSession("auth", "/tmp/worktree", nil, "", "my-squad")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Find the rename-window call
+	found := false
+	for _, c := range f.calls {
+		if c.Name == "tmux" && len(c.Args) >= 3 && c.Args[0] == "rename-window" {
+			found = true
+			if c.Args[2] != "fleet-auth" {
+				t.Errorf("rename-window target = %q, want %q", c.Args[2], "fleet-auth")
+			}
+			if c.Args[3] != "auth[my-squad]" {
+				t.Errorf("window title = %q, want %q", c.Args[3], "auth[my-squad]")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected a rename-window call when squadronName is set")
+	}
+}
+
+func TestCreateSession_WindowTitleWithoutSquadron(t *testing.T) {
+	f := &fakeRunner{}
+	m := NewManagerWithRunner("fleet", f)
+	err := m.CreateSession("auth", "/tmp/worktree", nil, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Find the rename-window call — should use just the agent name
+	found := false
+	for _, c := range f.calls {
+		if c.Name == "tmux" && len(c.Args) >= 3 && c.Args[0] == "rename-window" {
+			found = true
+			if c.Args[3] != "auth" {
+				t.Errorf("window title = %q, want %q", c.Args[3], "auth")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected a rename-window call even without squadron name")
 	}
 }
 
@@ -396,7 +445,7 @@ func TestCreateSession_RejectsUnsafeName(t *testing.T) {
 		"has$dollar",
 	}
 	for _, name := range badNames {
-		err := m.CreateSession(name, "/tmp/worktree", nil, "")
+		err := m.CreateSession(name, "/tmp/worktree", nil, "", "")
 		if err == nil {
 			t.Errorf("expected error for agent name %q, got nil", name)
 		}
