@@ -64,7 +64,7 @@ export function CodeEditor({
           style={{
             position: "absolute",
             top: 8,
-            left: 14,
+            left: 50,
             color: "var(--text-muted)",
             fontSize: 13,
             fontFamily: "'SF Mono', 'Fira Code', 'Fira Mono', monospace",
@@ -86,7 +86,8 @@ export function CodeEditor({
         options={{
           minimap: { enabled: false },
           wordWrap: "on",
-          lineNumbers: "off",
+          lineNumbers: "on",
+          lineNumbersMinChars: 3,
           scrollBeyondLastLine: false,
           renderLineHighlight: "none",
           overviewRulerLanes: 0,
