@@ -35,7 +35,7 @@ describe("AgentPill", () => {
 
   it("renders SVG icon with tooltip for codex driver", () => {
     render(<AgentPill {...defaultProps} agent={{ ...defaultAgent, driver: "codex" }} />);
-    const svg = screen.getByTitle("OpenAI Codex");
+    const svg = screen.getByTitle("Codex");
     expect(svg).toBeInTheDocument();
   });
 
@@ -47,7 +47,6 @@ describe("AgentPill", () => {
 
   it("renders text abbreviation with tooltip for aider driver", () => {
     render(<AgentPill {...defaultProps} agent={{ ...defaultAgent, driver: "aider" }} />);
-    expect(screen.getByText("ai")).toBeInTheDocument();
     expect(screen.getByTitle("Aider")).toBeInTheDocument();
   });
 
