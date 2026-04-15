@@ -13,6 +13,21 @@
   --purple: #d2a8ff;
 }
 
+[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --border: #d0d7de;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #8c959f;
+  --blue: #0969da;
+  --green: #1a7f37;
+  --orange: #bc4c00;
+  --red: #cf222e;
+  --purple: #8250df;
+}
+
 * {
   margin: 0;
   padding: 0;
