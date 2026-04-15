@@ -50,7 +50,7 @@ func NewServer(cfg Config) *Server {
 		mux:      http.NewServeMux(),
 		logger:   logger,
 		api:      api.NewHandlers(cfg.RepoPath, cfg.FleetDir),
-		hub:      ws.NewHub(cfg.FleetDir, logger),
+		hub:      ws.NewHub(cfg.FleetDir, cfg.RepoPath, cfg.TmuxPrefix, logger),
 		terminal: terminal.NewProxy(cfg.TmuxPrefix, logger),
 		LogCh:    make(chan string, 100),
 	}

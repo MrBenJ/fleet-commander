@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import type { ContextMessage, SquadronAgent, Persona, WSEvent } from "../../types";
 import { useWebSocket } from "../../hooks/useWebSocket";
+import { getFleet } from "../../api";
 import { AgentPill } from "./AgentPill";
 import { AgentTooltip } from "./AgentTooltip";
 import { ContextLog } from "./ContextLog";
@@ -62,6 +63,17 @@ export function MissionControl({
   }, []);
 
   const { connected } = useWebSocket("/ws/events", { onEvent: handleEvent });
+
+  // Seed initial agent states from the REST API so dots aren't gray on load.
+  useEffect(() => {
+    getFleet().then((info) => {
+      const states: Record<string, string> = {};
+      for (const a of info.agents) {
+        if (a.status) states[a.name] = a.status;
+      }
+      setAgentStates((prev) => ({ ...states, ...prev }));
+    }).catch(() => {});
+  }, []);
 
   const selectedAgentData = agents.find((a) => a.name === selectedAgent);
   const selectedPersona = selectedAgentData

@@ -11,6 +11,9 @@ import (
 	"github.com/gorilla/websocket"
 
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
+	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/monitor"
+	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
 var upgrader = websocket.Upgrader{
@@ -18,19 +21,26 @@ var upgrader = websocket.Upgrader{
 }
 
 type Hub struct {
-	clients    map[*websocket.Conn]bool
-	mu         sync.RWMutex
-	fleetDir   string
-	logger     *log.Logger
-	lastLogLen map[string]int
+	clients      map[*websocket.Conn]bool
+	mu           sync.RWMutex
+	fleetDir     string
+	repoPath     string
+	logger       *log.Logger
+	lastLogLen   map[string]int
+	monitor      *monitor.Monitor
+	lastStates   map[string]string
 }
 
-func NewHub(fleetDir string, logger *log.Logger) *Hub {
+func NewHub(fleetDir, repoPath, tmuxPrefix string, logger *log.Logger) *Hub {
+	tm := tmux.NewManager(tmuxPrefix)
 	return &Hub{
 		clients:    make(map[*websocket.Conn]bool),
 		fleetDir:   fleetDir,
+		repoPath:   repoPath,
 		logger:     logger,
 		lastLogLen: make(map[string]int),
+		monitor:    monitor.NewMonitor(tm),
+		lastStates: make(map[string]string),
 	}
 }
 
@@ -101,6 +111,29 @@ func (h *Hub) PollLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			h.pollChannels()
+			h.pollAgentStates()
+		}
+	}
+}
+
+func (h *Hub) pollAgentStates() {
+	f, err := fleet.Load(h.repoPath)
+	if err != nil {
+		return
+	}
+
+	for _, a := range f.Agents {
+		snap := h.monitor.CheckWithStateFile(a.Name, a.StateFilePath)
+		state := string(snap.State)
+
+		if prev, ok := h.lastStates[a.Name]; !ok || prev != state {
+			h.lastStates[a.Name] = state
+			h.Broadcast(Event{
+				Type:      "agent_state",
+				Agent:     a.Name,
+				State:     state,
+				Timestamp: snap.Timestamp.Format(time.RFC3339),
+			})
 		}
 	}
 }
