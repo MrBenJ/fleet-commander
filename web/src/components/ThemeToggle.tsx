@@ -27,9 +27,9 @@ export function ThemeToggle() {
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
       style={{
         position: 'fixed',
-        top: '1rem',
-        right: '1rem',
-        zIndex: 9999,
+        bottom: '16px',
+        left: '16px',
+        zIndex: 50,
         background: 'var(--bg-tertiary)',
         border: '1px solid var(--border)',
         borderRadius: '8px',
