@@ -1,0 +1,7 @@
+agent_name,branch,prompt,harness,persona
+auth-refactor,squadron/demo/auth-refactor,Refactor the authentication module to use JWT tokens,claude-code,overconfident-engineer
+api-docs,squadron/demo/api-docs,Generate OpenAPI documentation for all REST endpoints,codex,zen-master
+security-audit,squadron/demo/security-audit,Audit the codebase for OWASP top 10 vulnerabilities,aider,paranoid-perfectionist
+lint-cleanup,squadron/demo/lint-cleanup,Fix all linting errors and enforce consistent code style,generic,raging-jerk
+feature-flags,squadron/demo/feature-flags,Add feature flag support using environment variables,claude-code,peter-molyneux
+db-migration,squadron/demo/db-migration,Create database migration scripts for the new schema,codex,
