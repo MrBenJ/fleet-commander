@@ -92,6 +92,12 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 			}
 		}
 
+		// When consensus is "none" but auto-merge is enabled, non-merger agents
+		// still need to poll for MERGE_COMPLETE/MERGE_FAILED.
+		if data.Consensus == "none" && data.AutoMerge && mergeMaster != "" && a.Name != mergeMaster {
+			fullPrompt += "\n" + BuildNoConsensusAutoMergeSuffix(data.Name)
+		}
+
 		if data.AutoMerge && a.Name == mergeMaster {
 			fullPrompt += "\n" + BuildMergerSuffix(data.Name, baseBranch, agentBranches)
 		}
@@ -135,7 +141,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) error {
 			_ = tm.KillSession(agent.Name)
 		}
 
-		if err := tm.CreateSession(agent.Name, agent.WorktreePath, []string{launcherFile}, stateFilePath); err != nil {
+		if err := tm.CreateSession(agent.Name, agent.WorktreePath, []string{launcherFile}, stateFilePath, data.Name); err != nil {
 			return fmt.Errorf("create tmux session %q: %w", agent.Name, err)
 		}
 		f.UpdateAgentStateFile(agent.Name, stateFilePath)

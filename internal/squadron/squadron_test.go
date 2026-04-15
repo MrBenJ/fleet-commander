@@ -33,6 +33,9 @@ func TestBuildConsensusSuffix_Universal(t *testing.T) {
 		`"APPROVED:`,
 		`"CHANGES_REQUESTED:`,
 		`"REVISED:`,
+		"CRITICAL: Do NOT stop or exit after completing your review",
+		"continue polling the squadron channel every 30 seconds",
+		"MERGE_COMPLETE or MERGE_FAILED",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(got, s) {
@@ -42,10 +45,6 @@ func TestBuildConsensusSuffix_Universal(t *testing.T) {
 }
 
 func TestBuildConsensusSuffix_ReviewMaster_Reviewer(t *testing.T) {
-	// When the caller asks for the review master's own suffix — passing
-	// reviewMaster == "" signals "build for a non-reviewer". To build the
-	// reviewer's own suffix, pass their name in the `selfAgent` argument via
-	// the dedicated BuildReviewMasterReviewerSuffix helper.
 	got := squadron.BuildReviewMasterReviewerSuffix(
 		"alpha",
 		[]string{"a", "b", "c"},
@@ -59,6 +58,9 @@ func TestBuildConsensusSuffix_ReviewMaster_Reviewer(t *testing.T) {
 		"git diff main...<their-branch>",
 		`"ALL_APPROVED:`,
 		"Squadron members: a, b, c",
+		"CRITICAL: After posting ALL_APPROVED",
+		"MERGE_COMPLETE or MERGE_FAILED",
+		"Do NOT exit your session prematurely",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(got, s) {
@@ -95,6 +97,103 @@ func TestBuildConsensusSuffix_ReviewMaster_NonReviewer(t *testing.T) {
 			t.Errorf("non-reviewer suffix should not contain %q", s)
 		}
 	}
+
+	// Must contain CRITICAL polling instructions
+	pollingChecks := []string{
+		"CRITICAL: Do NOT stop after receiving approval",
+		"MERGE_COMPLETE or MERGE_FAILED",
+		"continue polling the squadron channel every 30 seconds",
+	}
+	for _, s := range pollingChecks {
+		if !strings.Contains(got, s) {
+			t.Errorf("non-reviewer suffix missing polling instruction %q\n---\n%s", s, got)
+		}
+	}
+}
+
+func TestBuildConsensusSuffix_UnknownType(t *testing.T) {
+	got := squadron.BuildConsensusSuffix("bogus", "alpha", []string{"a"}, "", "main")
+	if got != "" {
+		t.Fatalf("expected empty suffix for unknown consensus type, got %q", got)
+	}
+}
+
+func TestBuildConsensusSuffix_EmptyAgents(t *testing.T) {
+	got := squadron.BuildConsensusSuffix("universal", "alpha", []string{}, "", "main")
+	if !strings.Contains(got, "Squadron Consensus Protocol (UNIVERSAL)") {
+		t.Error("should still produce universal suffix even with empty agents")
+	}
+	if !strings.Contains(got, "Squadron members: ") {
+		t.Error("should contain 'Squadron members:' with empty list")
+	}
+}
+
+func TestBuildConsensusSuffix_SpecialCharsInNames(t *testing.T) {
+	got := squadron.BuildConsensusSuffix(
+		"universal",
+		"my-squad_123",
+		[]string{"agent-one", "agent_two"},
+		"",
+		"develop",
+	)
+	if !strings.Contains(got, "squadron-my-squad_123") {
+		t.Error("squadron channel name should preserve hyphens/underscores")
+	}
+	if !strings.Contains(got, "git diff develop") {
+		t.Error("base branch should be 'develop'")
+	}
+	if !strings.Contains(got, "agent-one, agent_two") {
+		t.Error("agent names should be preserved verbatim")
+	}
+}
+
+func TestBuildReviewMasterReviewerSuffix_EmptyAgents(t *testing.T) {
+	got := squadron.BuildReviewMasterReviewerSuffix("alpha", []string{}, "main")
+	if !strings.Contains(got, "You are the REVIEW MASTER") {
+		t.Error("should still produce reviewer suffix with empty agents")
+	}
+	if !strings.Contains(got, "Squadron members: ") {
+		t.Error("should contain 'Squadron members:' with empty list")
+	}
+}
+
+func TestBuildConsensusSuffix_ReviewMasterSingleAgent(t *testing.T) {
+	got := squadron.BuildConsensusSuffix(
+		"review_master",
+		"solo",
+		[]string{"only-one"},
+		"only-one",
+		"main",
+	)
+	if !strings.Contains(got, `Agent "only-one" is the designated review master`) {
+		t.Error("review master name should appear in non-reviewer suffix")
+	}
+	if !strings.Contains(got, "Review master: only-one") {
+		t.Error("review master footer should be present")
+	}
+}
+
+func TestBuildMergerSuffix_EmptyAgents(t *testing.T) {
+	got := squadron.BuildMergerSuffix("alpha", "main", nil)
+	if !strings.Contains(got, "Squadron Merge Duties") {
+		t.Error("should still produce merger suffix even with no agents")
+	}
+	if !strings.Contains(got, "MERGE MASTER") {
+		t.Error("should contain MERGE MASTER header")
+	}
+}
+
+func TestBuildMergerSuffix_SingleAgent(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "solo", Branch: "squadron/alpha/solo"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "develop", agents)
+	if !strings.Contains(got, "git checkout develop") {
+		t.Error("base branch should be 'develop'")
+	}
+	if !strings.Contains(got, "solo -> squadron/alpha/solo") {
+		t.Error("single agent branch should appear")
+	}
 }
 
 func TestBuildMergerSuffix(t *testing.T) {
@@ -117,6 +216,7 @@ func TestBuildMergerSuffix(t *testing.T) {
 		"c -> squadron/alpha/c",
 		`"MERGE_COMPLETE: squadron/alpha"`,
 		`"MERGE_FAILED:`,
+		"CRITICAL: Before starting the merge, verify ALL agents have reached consensus",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(got, s) {
@@ -130,5 +230,33 @@ func TestBuildMergerSuffix(t *testing.T) {
 	cIdx := strings.Index(got, "c -> squadron/alpha/c")
 	if !(aIdx < bIdx && bIdx < cIdx) {
 		t.Errorf("merge order not preserved: a=%d b=%d c=%d", aIdx, bIdx, cIdx)
+	}
+}
+
+func TestBuildNoConsensusAutoMergeSuffix(t *testing.T) {
+	got := squadron.BuildNoConsensusAutoMergeSuffix("alpha")
+
+	mustContain := []string{
+		"Squadron Merge Monitoring",
+		`squadron "alpha"`,
+		"squadron-alpha",
+		"CRITICAL: Do NOT stop after completing your work",
+		"MERGE_COMPLETE or MERGE_FAILED",
+		"continue polling the squadron channel every 30 seconds",
+		`fleet context channel-read squadron-alpha`,
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("no-consensus auto-merge suffix missing %q\n---\n%s", s, got)
+		}
+	}
+}
+
+func TestBuildConsensusSuffix_NoneStillEmpty(t *testing.T) {
+	// Verify that "none" consensus still returns empty string —
+	// the auto-merge polling is handled separately by the caller.
+	got := squadron.BuildConsensusSuffix("none", "alpha", []string{"a", "b"}, "", "main")
+	if got != "" {
+		t.Fatalf("expected empty suffix for 'none' consensus, got %q", got)
 	}
 }

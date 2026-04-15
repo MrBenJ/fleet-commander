@@ -63,6 +63,79 @@ func TestReadMalformedJSON(t *testing.T) {
 	}
 }
 
+func TestWriteInvalidState(t *testing.T) {
+	tmpDir := t.TempDir()
+	testPath := filepath.Join(tmpDir, "state.json")
+
+	err := state.Write(testPath, "test-agent", "invalid")
+	if err == nil {
+		t.Fatal("Write should reject invalid state string")
+	}
+
+	err = state.Write(testPath, "test-agent", "")
+	if err == nil {
+		t.Fatal("Write should reject empty state string")
+	}
+}
+
+func TestWriteOverwrite(t *testing.T) {
+	tmpDir := t.TempDir()
+	testPath := filepath.Join(tmpDir, "state.json")
+
+	// Write waiting, then overwrite with working
+	if err := state.Write(testPath, "agent", "waiting"); err != nil {
+		t.Fatalf("first write failed: %v", err)
+	}
+	if err := state.Write(testPath, "agent", "working"); err != nil {
+		t.Fatalf("second write failed: %v", err)
+	}
+
+	s, err := state.Read(testPath)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+	if s.State != "working" {
+		t.Errorf("State = %q, want %q", s.State, "working")
+	}
+}
+
+func TestWriteCreatesParentDirs(t *testing.T) {
+	tmpDir := t.TempDir()
+	testPath := filepath.Join(tmpDir, "nested", "deep", "state.json")
+
+	if err := state.Write(testPath, "agent", "waiting"); err != nil {
+		t.Fatalf("Write should create parent directories: %v", err)
+	}
+
+	s, err := state.Read(testPath)
+	if err != nil {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if s.Agent != "agent" {
+		t.Errorf("Agent = %q, want %q", s.Agent, "agent")
+	}
+}
+
+func TestWriteWorkingState(t *testing.T) {
+	tmpDir := t.TempDir()
+	testPath := filepath.Join(tmpDir, "state.json")
+
+	if err := state.Write(testPath, "my-agent", "working"); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	s, err := state.Read(testPath)
+	if err != nil {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if s.State != "working" {
+		t.Errorf("State = %q, want %q", s.State, "working")
+	}
+	if s.Agent != "my-agent" {
+		t.Errorf("Agent = %q, want %q", s.Agent, "my-agent")
+	}
+}
+
 func TestIsStale(t *testing.T) {
 	// Test with 2 minutes old state and 90 second TTL (should be stale)
 	staleState := &state.AgentState{

@@ -128,7 +128,8 @@ func findFleetTmuxConf() string {
 // CreateSession creates a new tmux session for an agent.
 // command is the command and arguments to run in the session.
 // If nil/empty, tmux starts the user's default shell.
-func (m *Manager) CreateSession(agentName, worktreePath string, command []string, stateFilePath string) error {
+// squadronName, when non-empty, sets the tmux window title to agentName[squadronName].
+func (m *Manager) CreateSession(agentName, worktreePath string, command []string, stateFilePath string, squadronName string) error {
 	if err := validateAgentName(agentName); err != nil {
 		return err
 	}
@@ -165,6 +166,13 @@ func (m *Manager) CreateSession(agentName, worktreePath string, command []string
 	if err := m.runner.Run("tmux", args...); err != nil {
 		return fmt.Errorf("failed to create tmux session (args=%v): %w", debugArgs, err)
 	}
+
+	// Set the window title
+	windowTitle := agentName
+	if squadronName != "" {
+		windowTitle = fmt.Sprintf("%s[%s]", agentName, squadronName)
+	}
+	_ = m.runner.Run("tmux", "rename-window", "-t", sessionName, windowTitle)
 
 	// Source the fleet tmux config if available
 	confPath := findFleetTmuxConf()

@@ -164,6 +164,23 @@ describe("MissionControl", () => {
     expect(screen.getByRole("navigation", { name: /squadron agents/i })).toBeInTheDocument();
   });
 
+  it("renders MERGE badge on the merge master agent", () => {
+    renderMission({ autoMerge: true, mergeMaster: "alpha" });
+    expect(screen.getByText("MERGE")).toBeInTheDocument();
+  });
+
+  it("does not render MERGE badge when no mergeMaster is set", () => {
+    renderMission({ autoMerge: true });
+    expect(screen.queryByText("MERGE")).not.toBeInTheDocument();
+  });
+
+  it("does not render MERGE badge on non-merger agents", () => {
+    renderMission({ autoMerge: true, mergeMaster: "alpha" });
+    // Only one MERGE badge should exist (on alpha, not beta)
+    const badges = screen.getAllByText("MERGE");
+    expect(badges).toHaveLength(1);
+  });
+
   it("renders multi-view toggle in the agents nav bar", () => {
     renderMission();
     expect(screen.getByRole("button", { name: /multi-view/i })).toBeInTheDocument();

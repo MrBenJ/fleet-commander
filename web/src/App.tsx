@@ -26,6 +26,7 @@ export function App() {
   const [launchConfig, setLaunchConfig] = useState<{
     consensus: string;
     autoMerge: boolean;
+    mergeMaster?: string;
   }>({ consensus: "universal", autoMerge: true });
 
   if (loading) {
@@ -47,7 +48,7 @@ export function App() {
   const handleLaunched = (
     name: string,
     agents: SquadronAgent[],
-    config: { consensus: string; autoMerge: boolean }
+    config: { consensus: string; autoMerge: boolean; mergeMaster?: string }
   ) => {
     setActiveSquadron(name);
     setLaunchedAgents(agents);
@@ -75,6 +76,7 @@ export function App() {
             personas={personas}
             consensus={launchConfig.consensus}
             autoMerge={launchConfig.autoMerge}
+            mergeMaster={launchConfig.mergeMaster}
           />
         )}
       </main>

@@ -112,6 +112,24 @@ describe("ContextLog", () => {
     expect(screen.getByText("unknown-agent")).toBeInTheDocument();
   });
 
+  it("applies alternating background to even-indexed rows", () => {
+    const messages = [
+      makeMsg("alpha", "First", 10, 0),
+      makeMsg("beta", "Second", 10, 1),
+      makeMsg("alpha", "Third", 10, 2),
+    ];
+    const { container } = render(
+      <ContextLog messages={messages} agentColors={agentColors} onAgentClick={vi.fn()} />
+    );
+    const rows = container.querySelectorAll('[role="log"] > div') as NodeListOf<HTMLElement>;
+    // rows[0] = even (idx 0), rows[1] = odd (idx 1), rows[2] = even (idx 2)
+    expect(rows[0].style.background).toBe("rgba(255, 255, 255, 0.03)");
+    expect(rows[1].style.background).toBe("transparent");
+    expect(rows[2].style.background).toBe("rgba(255, 255, 255, 0.03)");
+    expect(rows[0].style.borderRadius).toBe("4px");
+    expect(rows[1].style.borderRadius).toBe("0px");
+  });
+
   it("auto-scrolls when new messages arrive", () => {
     const scrollIntoViewMock = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoViewMock;

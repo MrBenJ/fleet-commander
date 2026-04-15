@@ -48,6 +48,102 @@ func TestHubBroadcast(t *testing.T) {
 	}
 }
 
+func TestHubHandleWebSocket_NonUpgradeRequest(t *testing.T) {
+	logger := log.New(log.Writer(), "[test] ", 0)
+	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)
+
+	// Send a plain HTTP request (not a WebSocket upgrade)
+	req := httptest.NewRequest(http.MethodGet, "/ws/events", nil)
+	w := httptest.NewRecorder()
+
+	hub.HandleWebSocket(w, req)
+
+	if w.Code != http.StatusUpgradeRequired {
+		t.Fatalf("expected 426 Upgrade Required, got %d", w.Code)
+	}
+}
+
+func TestHubClientCount_Empty(t *testing.T) {
+	logger := log.New(log.Writer(), "[test] ", 0)
+	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)
+
+	if hub.ClientCount() != 0 {
+		t.Fatalf("expected 0 clients on new hub, got %d", hub.ClientCount())
+	}
+}
+
+func TestHubBroadcast_NoClients(t *testing.T) {
+	logger := log.New(log.Writer(), "[test] ", 0)
+	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)
+
+	// Should not panic when broadcasting to empty hub
+	hub.Broadcast(Event{Type: "test", Message: "no one is listening"})
+}
+
+func TestHubClientDisconnect(t *testing.T) {
+	logger := log.New(log.Writer(), "[test] ", 0)
+	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)
+
+	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if hub.ClientCount() != 1 {
+		t.Fatalf("expected 1 client, got %d", hub.ClientCount())
+	}
+
+	conn.Close()
+	time.Sleep(100 * time.Millisecond)
+
+	if hub.ClientCount() != 0 {
+		t.Fatalf("expected 0 clients after disconnect, got %d", hub.ClientCount())
+	}
+}
+
+func TestHubBroadcast_MultipleEventTypes(t *testing.T) {
+	logger := log.New(log.Writer(), "[test] ", 0)
+	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)
+
+	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	events := []Event{
+		{Type: "context_message", Agent: "a", Message: "hello"},
+		{Type: "agent_state", Agent: "b", State: "working"},
+		{Type: "agent_stopped", Agent: "c"},
+	}
+
+	for _, ev := range events {
+		hub.Broadcast(ev)
+	}
+
+	for i, expected := range events {
+		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("read %d failed: %v", i, err)
+		}
+		if !strings.Contains(string(msg), expected.Type) {
+			t.Errorf("event %d: expected type %q, got: %s", i, expected.Type, msg)
+		}
+	}
+}
+
 func TestHubMultipleClients(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
 	hub := NewHub("/tmp/fake", "/tmp/fake", "fleet", logger)

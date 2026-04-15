@@ -53,7 +53,13 @@ export function ContextLog({ messages, agentColors, onAgentClick }: ContextLogPr
         const color = getColor(msg.agent);
 
         return (
-          <div key={idx} style={{ display: "flex", gap: "0.75rem", padding: "0.25rem 0" }}>
+          <div key={idx} style={{
+            display: "flex",
+            gap: "0.75rem",
+            padding: "0.25rem 0.5rem",
+            background: idx % 2 === 0 ? "rgba(255,255,255,0.03)" : "transparent",
+            borderRadius: idx % 2 === 0 ? 4 : 0,
+          }}>
             <span style={{ color: "var(--text-muted)", minWidth: 55 }}><time>{timeStr}</time></span>
             <span
               role="button"

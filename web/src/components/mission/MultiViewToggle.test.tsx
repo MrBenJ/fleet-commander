@@ -28,4 +28,10 @@ describe("MultiViewToggle", () => {
     const btn = screen.getByRole("button", { name: /multi-view/i });
     expect(btn.getAttribute("aria-pressed")).toBe("false");
   });
+
+  it("has subtle background when inactive for visibility", () => {
+    render(<MultiViewToggle active={false} onToggle={() => {}} />);
+    const btn = screen.getByRole("button", { name: /multi-view/i });
+    expect(btn.style.background).toBe("rgba(255, 255, 255, 0.05)");
+  });
 });
