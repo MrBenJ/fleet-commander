@@ -121,14 +121,20 @@ func (h *Handlers) HandleGetBranches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get worktree branches to exclude.
+	// Get worktree branches to exclude (skip the main worktree so its
+	// branch — typically "main" — stays available as a base branch).
 	worktreeBranches := make(map[string]bool)
 	wtCmd := exec.Command("git", "worktree", "list", "--porcelain")
 	wtCmd.Dir = h.repoPath
 	wtOut, err := wtCmd.Output()
 	if err == nil {
+		isMainWorktree := true
 		for _, line := range strings.Split(string(wtOut), "\n") {
-			if strings.HasPrefix(line, "branch ") {
+			if line == "" {
+				isMainWorktree = false
+				continue
+			}
+			if !isMainWorktree && strings.HasPrefix(line, "branch ") {
 				ref := strings.TrimPrefix(line, "branch ")
 				branch := strings.TrimPrefix(ref, "refs/heads/")
 				worktreeBranches[branch] = true
