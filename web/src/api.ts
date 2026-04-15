@@ -31,6 +31,10 @@ export async function getDrivers(): Promise<{ name: string }[]> {
   return fetchJSON("/api/fleet/drivers");
 }
 
+export async function getBranches(): Promise<string[]> {
+  return fetchJSON("/api/fleet/branches");
+}
+
 export async function launchSquadron(
   data: SquadronData
 ): Promise<void> {

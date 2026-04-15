@@ -7,6 +7,8 @@ const spinnerKeyframes = `@keyframes fc-spin { to { transform: rotate(360deg); }
 function Spinner() {
   return (
     <span
+      role="status"
+      aria-label="Generating agents"
       style={{
         display: "inline-block",
         width: 14,
@@ -39,7 +41,6 @@ const inputStyle: React.CSSProperties = {
   color: "var(--text-primary)",
   width: "100%",
   fontSize: "0.85rem",
-  outline: "none",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -132,7 +133,8 @@ export function AgentsStep({
 
       <div style={{ display: "flex", gap: "1.5rem", marginBottom: "2rem" }}>
         {/* AI Generate panel */}
-        <div
+        <section
+          aria-labelledby="ai-generate-heading"
           style={{
             flex: 1,
             border: "1px solid var(--border)",
@@ -141,10 +143,12 @@ export function AgentsStep({
             background: "var(--bg-secondary)",
           }}
         >
-          <div style={{ fontWeight: 600, color: "var(--purple)", marginBottom: "0.75rem" }}>
+          <div id="ai-generate-heading" style={{ fontWeight: 600, color: "var(--purple)", marginBottom: "0.75rem" }}>
             AI Generate from Description
           </div>
+          <label htmlFor="ai-description" className="sr-only">Task description for AI generation</label>
           <textarea
+            id="ai-description"
             style={{
               ...inputStyle,
               minHeight: "75%",
@@ -158,6 +162,7 @@ export function AgentsStep({
           <button
             onClick={handleGenerate}
             disabled={generating || !description.trim()}
+            aria-disabled={generating || !description.trim()}
             style={{
               background: "var(--green)",
               color: "#fff",
@@ -172,14 +177,15 @@ export function AgentsStep({
             {generating ? <><Spinner />Generating...</> : "Generate Agent Breakdown"}
           </button>
           {genError && (
-            <div style={{ color: "var(--red)", fontSize: "0.8rem", marginTop: "0.5rem" }}>
+            <div role="alert" style={{ color: "var(--red)", fontSize: "0.8rem", marginTop: "0.5rem" }}>
               {genError}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Manual panel */}
-        <div
+        <section
+          aria-labelledby="manual-add-heading"
           style={{
             flex: 1,
             border: "1px solid var(--border)",
@@ -188,17 +194,18 @@ export function AgentsStep({
             background: "var(--bg-secondary)",
           }}
         >
-          <div style={{ fontWeight: 600, color: "var(--blue)", marginBottom: "0.75rem" }}>
+          <div id="manual-add-heading" style={{ fontWeight: 600, color: "var(--blue)", marginBottom: "0.75rem" }}>
             Add Manually
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             <div>
-              <label style={labelStyle}>Agent Name</label>
-              <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="auth-agent" />
+              <label htmlFor="manual-agent-name" style={labelStyle}>Agent Name</label>
+              <input id="manual-agent-name" style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="auth-agent" />
             </div>
             <div>
-              <label style={labelStyle}>Branch</label>
+              <label htmlFor="manual-branch" style={labelStyle}>Branch</label>
               <input
+                id="manual-branch"
                 style={inputStyle}
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
@@ -206,8 +213,9 @@ export function AgentsStep({
               />
             </div>
             <div>
-              <label style={labelStyle}>Prompt</label>
+              <label htmlFor="manual-prompt" style={labelStyle}>Prompt</label>
               <textarea
+                id="manual-prompt"
                 style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -215,8 +223,9 @@ export function AgentsStep({
               />
             </div>
             <div>
-              <label style={labelStyle}>Harness</label>
+              <label htmlFor="manual-harness" style={labelStyle}>Harness</label>
               <select
+                id="manual-harness"
                 style={inputStyle}
                 value={selectedDriver}
                 onChange={(e) => setSelectedDriver(e.target.value)}
@@ -227,8 +236,9 @@ export function AgentsStep({
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Persona</label>
+              <label htmlFor="manual-persona" style={labelStyle}>Persona</label>
               <select
+                id="manual-persona"
                 style={inputStyle}
                 value={manualPersona}
                 onChange={(e) => setManualPersona(e.target.value)}
@@ -242,6 +252,7 @@ export function AgentsStep({
             <button
               onClick={handleAddManual}
               disabled={!name || !prompt}
+              aria-disabled={!name || !prompt}
               style={{
                 background: "var(--bg-tertiary)",
                 color: "var(--text-primary)",
@@ -255,16 +266,16 @@ export function AgentsStep({
               + Add Agent
             </button>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Agent list */}
       {agents.length > 0 && (
         <div style={{ marginBottom: "1.5rem" }}>
           <h3 style={{ marginBottom: "0.75rem" }}>Agents ({agents.length})</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "0.5rem", listStyle: "none", padding: 0 }} aria-label="Agent list">
             {agents.map((a, idx) => (
-              <div
+              <li
                 key={idx}
                 style={{
                   display: "flex",
@@ -296,6 +307,7 @@ export function AgentsStep({
                 </div>
                 <button
                   onClick={() => onPickPersona(idx, agents)}
+                  aria-label={`Select persona for ${a.name}`}
                   style={{
                     background: "none",
                     border: "1px solid var(--border)",
@@ -310,6 +322,7 @@ export function AgentsStep({
                 </button>
                 <button
                   onClick={() => handleRemove(idx)}
+                  aria-label={`Remove agent ${a.name}`}
                   style={{
                     background: "none",
                     border: "none",
@@ -320,15 +333,16 @@ export function AgentsStep({
                 >
                   X
                 </button>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
 
       <button
         onClick={() => onDone(agents)}
         disabled={agents.length === 0}
+        aria-disabled={agents.length === 0}
         style={{
           background: agents.length > 0 ? "var(--green)" : "var(--bg-secondary)",
           color: agents.length > 0 ? "#fff" : "var(--text-muted)",

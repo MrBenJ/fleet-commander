@@ -107,7 +107,7 @@ export function TerminalPage() {
       }}
     >
       {/* Title bar */}
-      <div
+      <header
         style={{
           background: "var(--bg-secondary)",
           padding: "0.5rem 1rem",
@@ -117,11 +117,12 @@ export function TerminalPage() {
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-          {agentName}
-        </span>
+        <h1 style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 400, margin: 0 }}>
+          Terminal: {agentName}
+        </h1>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.4rem" }}>
           <span
+            aria-hidden="true"
             style={{
               width: 8,
               height: 8,
@@ -131,6 +132,8 @@ export function TerminalPage() {
             }}
           />
           <span
+            role="status"
+            aria-live="polite"
             style={{
               fontSize: "0.75rem",
               color: connected ? "var(--green)" : "var(--red)",
@@ -139,10 +142,15 @@ export function TerminalPage() {
             {connected ? "connected" : "disconnected"}
           </span>
         </div>
-      </div>
+      </header>
 
       {/* Terminal area */}
-      <div ref={termRef} style={{ flex: 1, padding: "0.5rem" }} />
+      <div
+        ref={termRef}
+        role="application"
+        aria-label={`Terminal session for agent ${agentName}`}
+        style={{ flex: 1, padding: "0.5rem" }}
+      />
     </div>
   );
 }

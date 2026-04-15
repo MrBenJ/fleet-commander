@@ -13,6 +13,21 @@
   --purple: #d2a8ff;
 }
 
+[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --border: #d0d7de;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #8c959f;
+  --blue: #0969da;
+  --green: #1a7f37;
+  --orange: #bc4c00;
+  --red: #cf222e;
+  --purple: #8250df;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -31,4 +46,40 @@ code {
   padding: 0.1rem 0.4rem;
   border-radius: 3px;
   font-size: 0.85em;
+}
+
+/* Accessible focus indicators */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* Skip navigation link */
+.skip-nav {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--blue);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  z-index: 1000;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.skip-nav:focus {
+  top: 0;
+}
+
+/* Visually hidden but accessible to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

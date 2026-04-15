@@ -65,6 +65,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/fleet", s.api.HandleGetFleet)
 	s.mux.HandleFunc("/api/fleet/personas", s.api.HandleGetPersonas)
 	s.mux.HandleFunc("/api/fleet/drivers", s.api.HandleGetDrivers)
+	s.mux.HandleFunc("/api/fleet/branches", s.api.HandleGetBranches)
 	s.mux.HandleFunc("/api/squadron/launch", s.api.HandleLaunchSquadron)
 	s.mux.HandleFunc("/api/squadron/generate", s.api.HandleGenerate)
 	s.mux.HandleFunc("/api/squadron/", func(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +86,13 @@ func (s *Server) routes() {
 	if s.devMode {
 		target, _ := url.Parse("http://localhost:5173")
 		proxy := httputil.NewSingleHostReverseProxy(target)
+		proxy.Transport = &http.Transport{
+			DisableKeepAlives: true,
+		}
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			s.logger.Printf("dev proxy error (%s %s): %v", r.Method, r.URL.Path, err)
+			http.Error(w, "Vite dev server unavailable", http.StatusBadGateway)
+		}
 		s.mux.Handle("/", proxy)
 	} else if s.webFS != nil {
 		spa := &spaHandler{fs: http.FileServerFS(s.webFS)}

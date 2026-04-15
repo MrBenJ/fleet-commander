@@ -26,8 +26,18 @@ export function ContextLog({ messages, agentColors, onAgentClick }: ContextLogPr
   const getColor = (agent: string) =>
     agentColors[agent] || defaultColors[Math.abs(hashCode(agent)) % defaultColors.length];
 
+  const handleAgentKeyDown = (e: React.KeyboardEvent, name: string) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onAgentClick(name);
+    }
+  };
+
   return (
     <div
+      role="log"
+      aria-label="Squadron context messages"
+      aria-live="polite"
       style={{
         flex: 1,
         overflowY: "auto",
@@ -44,9 +54,12 @@ export function ContextLog({ messages, agentColors, onAgentClick }: ContextLogPr
 
         return (
           <div key={idx} style={{ display: "flex", gap: "0.75rem", padding: "0.25rem 0" }}>
-            <span style={{ color: "var(--text-muted)", minWidth: 55 }}>{timeStr}</span>
+            <span style={{ color: "var(--text-muted)", minWidth: 55 }}><time>{timeStr}</time></span>
             <span
+              role="button"
+              tabIndex={0}
               onClick={() => onAgentClick(msg.agent)}
+              onKeyDown={(e) => handleAgentKeyDown(e, msg.agent)}
               style={{
                 color,
                 fontWeight: 600,
@@ -64,6 +77,7 @@ export function ContextLog({ messages, agentColors, onAgentClick }: ContextLogPr
       {messages.length > 0 && (
         <div style={{ display: "flex", justifyContent: "center", padding: "1rem 0 0.5rem" }}>
           <span
+            aria-hidden="true"
             style={{
               fontSize: "0.75rem",
               color: "var(--text-muted)",
