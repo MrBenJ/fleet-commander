@@ -3,6 +3,7 @@ import { useFleet } from "./hooks/useFleet";
 import { WizardLayout } from "./components/wizard/WizardLayout";
 import { MissionControl } from "./components/mission/MissionControl";
 import { TerminalPage } from "./components/terminal/TerminalPage";
+import { ThemeToggle } from "./components/ThemeToggle";
 import type { SquadronAgent } from "./types";
 
 type View = "wizard" | "mission";
@@ -10,7 +11,12 @@ type View = "wizard" | "mission";
 export function App() {
   // If we're on a /terminal/ path, render the terminal directly
   if (window.location.pathname.startsWith("/terminal/")) {
-    return <TerminalPage />;
+    return (
+      <>
+        <ThemeToggle />
+        <TerminalPage />
+      </>
+    );
   }
 
   const { fleet, personas, drivers, loading, error } = useFleet();
@@ -51,6 +57,7 @@ export function App() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
+      <ThemeToggle />
       {view === "wizard" && fleet && (
         <WizardLayout
           personas={personas}
