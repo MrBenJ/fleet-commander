@@ -182,7 +182,7 @@ describe("ReviewStep", () => {
     });
 
     it("sends autoPR=true when auto-PR checkbox is checked", async () => {
-      mockLaunchSquadron.mockResolvedValueOnce(undefined);
+      mockLaunchSquadron.mockResolvedValueOnce({});
       render(<ReviewStep {...defaultProps} />);
       await userEvent.click(screen.getByLabelText(/Create pull request after merge/));
       await userEvent.click(screen.getByText("Launch Squadron"));
