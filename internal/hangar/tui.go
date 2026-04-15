@@ -1,8 +1,6 @@
 package hangar
 
 import (
-	"time"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -15,8 +13,7 @@ const (
 )
 
 type logEntry struct {
-	timestamp string
-	message   string
+	message string
 }
 
 type TUIModel struct {
@@ -66,8 +63,7 @@ func (m TUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 	case LogMsg:
 		m.logs = append(m.logs, logEntry{
-			timestamp: time.Now().Format("15:04:05"),
-			message:   msg.Message,
+			message: msg.Message,
 		})
 		if len(m.logs) > 100 {
 			m.logs = m.logs[len(m.logs)-100:]
@@ -119,7 +115,7 @@ func (m TUIModel) viewLogs() string {
 		start = len(m.logs) - maxLines
 	}
 	for _, entry := range m.logs[start:] {
-		s += mutedStyle.Render(entry.timestamp) + "  " + entry.message + "\n"
+		s += entry.message + "\n"
 	}
 
 	return s

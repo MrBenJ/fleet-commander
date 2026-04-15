@@ -29,7 +29,6 @@ const defaultProps = {
   agent,
   state: "working",
   persona,
-  onClose: vi.fn(),
 };
 
 beforeEach(() => {
@@ -54,12 +53,15 @@ describe("AgentTooltip", () => {
     expect(screen.getByText("waiting")).toBeInTheDocument();
   });
 
-  it("renders task prompt (truncated at 200 chars)", () => {
+  it("renders task prompt in a read-only Monaco editor", () => {
     render(<AgentTooltip {...defaultProps} />);
-    expect(screen.getByText(/Do some testing work/)).toBeInTheDocument();
+    const editor = screen.getByTestId("monaco-editor");
+    expect(editor).toBeInTheDocument();
+    expect(editor).toHaveTextContent("Do some testing work");
+    expect(editor).toHaveAttribute("data-readonly", "true");
   });
 
-  it("truncates long prompts with ellipsis", () => {
+  it("shows full prompt without truncation", () => {
     const longPrompt = "x".repeat(250);
     render(
       <AgentTooltip
@@ -67,38 +69,13 @@ describe("AgentTooltip", () => {
         agent={{ ...agent, prompt: longPrompt }}
       />
     );
-    expect(screen.getByText(/\.\.\.$/)).toBeInTheDocument();
+    const editor = screen.getByTestId("monaco-editor");
+    expect(editor).toHaveTextContent(longPrompt);
   });
 
   it("shows 'No Persona' when persona is undefined", () => {
     render(<AgentTooltip {...defaultProps} persona={undefined} />);
     expect(screen.getByText("No Persona")).toBeInTheDocument();
-  });
-
-  it("has a dialog role with aria-modal", () => {
-    render(<AgentTooltip {...defaultProps} />);
-    const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveAttribute("aria-label", "Agent details: test-agent");
-  });
-
-  it("calls onClose when backdrop is clicked", async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    render(<AgentTooltip {...defaultProps} onClose={onClose} />);
-
-    const backdrop = screen.getByRole("presentation");
-    await user.click(backdrop);
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it("calls onClose on Escape key", async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    render(<AgentTooltip {...defaultProps} onClose={onClose} />);
-
-    await user.keyboard("{Escape}");
-    expect(onClose).toHaveBeenCalled();
   });
 
   it("renders Assume Control and Stop buttons", () => {

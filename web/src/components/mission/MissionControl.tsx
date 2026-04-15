@@ -3,7 +3,6 @@ import type { ContextMessage, SquadronAgent, Persona, WSEvent } from "../../type
 import { useWebSocket } from "../../hooks/useWebSocket";
 import { getFleet } from "../../api";
 import { AgentPill } from "./AgentPill";
-import { AgentTooltip } from "./AgentTooltip";
 import { ContextLog } from "./ContextLog";
 import { MultiViewToggle } from "./MultiViewToggle";
 import { MultiView } from "./MultiView";
@@ -36,7 +35,6 @@ export function MissionControl({
 }: MissionControlProps) {
   const [messages, setMessages] = useState<ContextMessage[]>([]);
   const [agentStates, setAgentStates] = useState<Record<string, string>>({});
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [multiView, setMultiView] = useState(false);
 
   const agentColors = useMemo(() => {
@@ -76,11 +74,6 @@ export function MissionControl({
       setAgentStates((prev) => ({ ...states, ...prev }));
     }).catch(() => {});
   }, []);
-
-  const selectedAgentData = agents.find((a) => a.name === selectedAgent);
-  const selectedPersona = selectedAgentData
-    ? personas.find((p) => p.name === selectedAgentData.persona)
-    : undefined;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -150,11 +143,10 @@ export function MissionControl({
           {agents.map((a) => (
             <AgentPill
               key={a.name}
-              name={a.name}
+              agent={a}
               state={agentStates[a.name] || "starting"}
-              driver={a.driver}
+              persona={personas.find((p) => p.name === a.persona)}
               isMerger={!!mergeMaster && a.name === mergeMaster}
-              onClick={() => setSelectedAgent(a.name)}
             />
           ))}
         </div>
@@ -162,22 +154,12 @@ export function MissionControl({
 
       {/* Main content: context log or multi-view */}
       {multiView ? (
-        <MultiView agents={agents} />
+        <MultiView agents={agents} mergeMaster={mergeMaster} />
       ) : (
         <ContextLog
           messages={messages}
           agentColors={agentColors}
-          onAgentClick={(name) => setSelectedAgent(name)}
-        />
-      )}
-
-      {/* Agent tooltip modal */}
-      {selectedAgent && selectedAgentData && (
-        <AgentTooltip
-          agent={selectedAgentData}
-          state={agentStates[selectedAgent] || "starting"}
-          persona={selectedPersona}
-          onClose={() => setSelectedAgent(null)}
+          onAgentClick={() => {}}
         />
       )}
 

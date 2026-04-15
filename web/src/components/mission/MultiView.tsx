@@ -1,7 +1,9 @@
 import type { SquadronAgent } from "../../types";
+import { DriverIcon } from "./AgentPill";
 
 interface MultiViewProps {
   agents: SquadronAgent[];
+  mergeMaster?: string;
 }
 
 function getGridColumns(count: number): string {
@@ -11,7 +13,7 @@ function getGridColumns(count: number): string {
   return "1fr 1fr 1fr 1fr";
 }
 
-export function MultiView({ agents }: MultiViewProps) {
+export function MultiView({ agents, mergeMaster }: MultiViewProps) {
   const cols = getGridColumns(agents.length);
 
   return (
@@ -46,9 +48,30 @@ export function MultiView({ agents }: MultiViewProps) {
               borderBottom: "1px solid var(--border)",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
             }}
           >
-            {agent.name}
+            <DriverIcon driver={agent.driver} size={12} />
+            <span>{agent.name}</span>
+            {mergeMaster && agent.name === mergeMaster && (
+              <span
+                style={{
+                  fontSize: "0.5rem",
+                  fontWeight: 700,
+                  background: "#a855f7",
+                  color: "#fff",
+                  padding: "0.05rem 0.3rem",
+                  borderRadius: 6,
+                  letterSpacing: "0.03em",
+                  lineHeight: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                MERGE
+              </span>
+            )}
           </div>
           <iframe
             src={`/terminal/${agent.name}`}

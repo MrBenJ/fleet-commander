@@ -12,6 +12,7 @@ build-web:
 build-all: build-web
 	rm -rf cmd/fleet/webdist
 	cp -r web/dist cmd/fleet/webdist
+	go clean -cache
 	go install -ldflags "$(LDFLAGS)" ./cmd/fleet/
 	rm -rf cmd/fleet/webdist
 	mkdir -p cmd/fleet/webdist && touch cmd/fleet/webdist/.gitkeep

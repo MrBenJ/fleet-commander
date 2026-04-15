@@ -2,13 +2,24 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AgentPill } from "./AgentPill";
+import type { SquadronAgent } from "../../types";
+
+vi.mock("../../api", () => ({
+  stopAgent: vi.fn(),
+}));
+
+const defaultAgent: SquadronAgent = {
+  name: "test-agent",
+  branch: "feat/test",
+  prompt: "Do some testing",
+  driver: "claude-code",
+  persona: "zen-master",
+};
 
 describe("AgentPill", () => {
   const defaultProps = {
-    name: "test-agent",
+    agent: defaultAgent,
     state: "working",
-    driver: "claude-code",
-    onClick: vi.fn(),
   };
 
   it("renders agent name", () => {
@@ -17,31 +28,30 @@ describe("AgentPill", () => {
   });
 
   it("renders SVG icon with tooltip for claude-code driver", () => {
-    render(<AgentPill {...defaultProps} driver="claude-code" />);
+    render(<AgentPill {...defaultProps} />);
     const svg = screen.getByTitle("Claude Code");
     expect(svg).toBeInTheDocument();
   });
 
   it("renders SVG icon with tooltip for codex driver", () => {
-    render(<AgentPill {...defaultProps} driver="codex" />);
-    const svg = screen.getByTitle("OpenAI Codex");
+    render(<AgentPill {...defaultProps} agent={{ ...defaultAgent, driver: "codex" }} />);
+    const svg = screen.getByTitle("Codex");
     expect(svg).toBeInTheDocument();
   });
 
   it("renders text badge with tooltip for generic driver", () => {
-    render(<AgentPill {...defaultProps} driver="generic" />);
+    render(<AgentPill {...defaultProps} agent={{ ...defaultAgent, driver: "generic" }} />);
     expect(screen.getByText("G")).toBeInTheDocument();
     expect(screen.getByTitle("Generic")).toBeInTheDocument();
   });
 
   it("renders text abbreviation with tooltip for aider driver", () => {
-    render(<AgentPill {...defaultProps} driver="aider" />);
-    expect(screen.getByText("ai")).toBeInTheDocument();
+    render(<AgentPill {...defaultProps} agent={{ ...defaultAgent, driver: "aider" }} />);
     expect(screen.getByTitle("Aider")).toBeInTheDocument();
   });
 
   it("truncates unknown driver to first 2 chars", () => {
-    render(<AgentPill {...defaultProps} driver="custom-driver" />);
+    render(<AgentPill {...defaultProps} agent={{ ...defaultAgent, driver: "custom-driver" }} />);
     expect(screen.getByText("cu")).toBeInTheDocument();
   });
 
@@ -52,13 +62,12 @@ describe("AgentPill", () => {
     );
   });
 
-  it("calls onClick when clicked", async () => {
-    const onClick = vi.fn();
+  it("shows tooltip on hover", async () => {
     const user = userEvent.setup();
-    render(<AgentPill {...defaultProps} onClick={onClick} />);
+    render(<AgentPill {...defaultProps} />);
 
-    await user.click(screen.getByRole("button"));
-    expect(onClick).toHaveBeenCalledTimes(1);
+    await user.hover(screen.getByRole("button"));
+    expect(screen.getByText("Assume Control")).toBeInTheDocument();
   });
 
   it("applies orange border when state is waiting", () => {
