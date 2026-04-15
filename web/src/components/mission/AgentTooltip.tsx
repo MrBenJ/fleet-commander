@@ -1,6 +1,28 @@
 import type { Persona, SquadronAgent } from "../../types";
 import { stopAgent } from "../../api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Editor from "@monaco-editor/react";
+
+function useMonacoTheme(): "vs-dark" | "light" {
+  const [theme, setTheme] = useState<"vs-dark" | "light">(() => {
+    const attr = document.documentElement.getAttribute("data-theme");
+    return attr === "light" ? "light" : "vs-dark";
+  });
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const attr = document.documentElement.getAttribute("data-theme");
+      setTheme(attr === "light" ? "light" : "vs-dark");
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  return theme;
+}
 
 interface AgentTooltipProps {
   agent: SquadronAgent;
@@ -30,6 +52,7 @@ export function AgentTooltip({
 }: AgentTooltipProps) {
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
+  const monacoTheme = useMonacoTheme();
 
   const handleStop = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,7 +84,11 @@ export function AgentTooltip({
         border: "1px solid var(--border)",
         borderRadius: 12,
         padding: "1.25rem",
-        width: 340,
+        width: 480,
+        maxHeight: "80vh",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
         boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
         zIndex: 200,
       }}
@@ -130,23 +157,56 @@ export function AgentTooltip({
         </div>
       </dl>
 
-      {/* Task preview */}
+      {/* Task — Monaco Editor (read-only) */}
       <div
         style={{
-          fontSize: "0.75rem",
-          color: "var(--text-secondary)",
+          flex: 1,
+          minHeight: 0,
           marginBottom: "1rem",
-          padding: "0.65rem",
-          background: "var(--bg-secondary)",
-          borderRadius: 8,
-          lineHeight: 1.5,
-          border: "1px solid var(--border)",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <div style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: "0.3rem" }}>
+        <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.8rem", marginBottom: "0.4rem" }}>
           Task
         </div>
-        {agent.prompt.slice(0, 200)}{agent.prompt.length > 200 ? "..." : ""}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 200,
+            maxHeight: "40vh",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}
+        >
+          <Editor
+            height="100%"
+            defaultLanguage="markdown"
+            value={agent.prompt}
+            theme={monacoTheme}
+            options={{
+              readOnly: true,
+              domReadOnly: true,
+              minimap: { enabled: false },
+              wordWrap: "on",
+              lineNumbers: "off",
+              scrollBeyondLastLine: false,
+              renderLineHighlight: "none",
+              overviewRulerLanes: 0,
+              hideCursorInOverviewRuler: true,
+              folding: false,
+              glyphMargin: false,
+              padding: { top: 8, bottom: 8 },
+              fontSize: 13,
+              scrollbar: {
+                vertical: "auto",
+                horizontal: "hidden",
+                verticalScrollbarSize: 8,
+              },
+            }}
+          />
+        </div>
       </div>
 
       {/* Error */}

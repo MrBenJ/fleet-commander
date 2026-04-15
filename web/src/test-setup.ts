@@ -6,7 +6,15 @@ import { createElement } from "react";
 Element.prototype.scrollIntoView = () => {};
 
 // Mock @monaco-editor/react — Monaco doesn't work in jsdom.
-vi.mock("@monaco-editor/react", () => ({ default: () => null }));
+// Render a div with the value so tests can assert on content.
+vi.mock("@monaco-editor/react", () => ({
+  default: (props: { value?: string; options?: { readOnly?: boolean } }) => {
+    return createElement("div", {
+      "data-testid": "monaco-editor",
+      "data-readonly": props.options?.readOnly ? "true" : "false",
+    }, props.value ?? "");
+  },
+}));
 
 // Mock CodeEditor with a plain textarea for testing-library compatibility.
 // The real component wraps Monaco Editor which doesn't render in jsdom.
