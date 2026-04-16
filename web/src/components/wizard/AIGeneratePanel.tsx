@@ -65,11 +65,19 @@ function WavyText({ text }: { text: string }) {
 }
 
 function RotatingLoadingText() {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(
+    () => Math.floor(Math.random() * loadingMessages.length)
+  );
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % loadingMessages.length);
+      setIndex((prev) => {
+        let next: number;
+        do {
+          next = Math.floor(Math.random() * loadingMessages.length);
+        } while (next === prev && loadingMessages.length > 1);
+        return next;
+      });
     }, 2500);
     return () => clearInterval(interval);
   }, []);
