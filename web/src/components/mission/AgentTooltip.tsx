@@ -1,6 +1,7 @@
 import type { Persona, SquadronAgent } from "../../types";
 import { stopAgent } from "../../api";
 import { useState } from "react";
+import Markdown from "react-markdown";
 
 interface AgentTooltipProps {
   agent: SquadronAgent;
@@ -144,7 +145,8 @@ export function AgentTooltip({
         <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.8rem", marginBottom: "0.4rem" }}>
           Task
         </div>
-        <pre
+        <div
+          className="tooltip-markdown"
           style={{
             margin: 0,
             padding: "0.5rem 0.75rem",
@@ -153,16 +155,14 @@ export function AgentTooltip({
             borderRadius: 8,
             fontSize: "0.8rem",
             lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
             wordBreak: "break-word",
             maxHeight: "40vh",
             overflowY: "auto",
             color: "var(--text-primary)",
-            fontFamily: "inherit",
           }}
         >
-          {agent.prompt}
-        </pre>
+          <Markdown>{agent.prompt.replace(/<!--/g, "\\<!--")}</Markdown>
+        </div>
       </div>
 
       {/* Error */}

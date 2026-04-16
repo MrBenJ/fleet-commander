@@ -64,3 +64,17 @@ export async function stopAgent(
 ): Promise<{ status: string; agent: string }> {
   return fetchJSON(`/api/agent/${name}/stop`, { method: "POST" });
 }
+
+export interface SquadronInfoResponse {
+  name: string;
+  agents: SquadronAgent[];
+  consensus: string;
+  autoMerge: boolean;
+  members: string[];
+}
+
+export async function getSquadronInfo(
+  name: string
+): Promise<SquadronInfoResponse> {
+  return fetchJSON(`/api/squadron/${name}/info`);
+}
