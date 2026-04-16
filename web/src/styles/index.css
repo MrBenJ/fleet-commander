@@ -71,6 +71,95 @@ code {
   top: 0;
 }
 
+/* Markdown inside agent tooltip */
+.tooltip-markdown h1,
+.tooltip-markdown h2,
+.tooltip-markdown h3,
+.tooltip-markdown h4,
+.tooltip-markdown h5,
+.tooltip-markdown h6 {
+  margin-top: 0.8em;
+  margin-bottom: 0.4em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tooltip-markdown h1 { font-size: 1.15em; }
+.tooltip-markdown h2 { font-size: 1.05em; }
+.tooltip-markdown h3 { font-size: 1em; }
+
+.tooltip-markdown p {
+  margin: 0.4em 0;
+}
+
+.tooltip-markdown ul,
+.tooltip-markdown ol {
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+
+.tooltip-markdown li {
+  margin: 0.15em 0;
+}
+
+.tooltip-markdown pre {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5em 0.75em;
+  overflow-x: auto;
+  margin: 0.4em 0;
+}
+
+.tooltip-markdown pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.9em;
+}
+
+.tooltip-markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.75em;
+  color: var(--text-secondary);
+  margin: 0.4em 0;
+}
+
+.tooltip-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.6em 0;
+}
+
+.tooltip-markdown a {
+  color: var(--blue);
+}
+
+.tooltip-markdown table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  width: 100%;
+}
+
+.tooltip-markdown th,
+.tooltip-markdown td {
+  border: 1px solid var(--border);
+  padding: 0.3em 0.5em;
+  text-align: left;
+}
+
+.tooltip-markdown th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.tooltip-markdown > :first-child {
+  margin-top: 0;
+}
+
+.tooltip-markdown > :last-child {
+  margin-bottom: 0;
+}
+
 /* Visually hidden but accessible to screen readers */
 .sr-only {
   position: absolute;
