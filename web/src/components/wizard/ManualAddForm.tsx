@@ -24,7 +24,6 @@ const labelStyle: React.CSSProperties = {
   color: "var(--text-secondary)",
   fontSize: "0.7rem",
   textTransform: "uppercase" as const,
-  marginBottom: "0.25rem",
   display: "block",
 };
 
@@ -61,14 +60,14 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
             <label htmlFor="manual-agent-name" style={labelStyle}>Agent Name</label>
             <HelpTooltip text="A short identifier for this agent. Used in branch names and tmux session names." />
           </div>
           <input id="manual-agent-name" style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="auth-agent" />
         </div>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
             <label htmlFor="manual-branch" style={labelStyle}>Branch</label>
             <HelpTooltip text="The git branch name for this agent's worktree. Defaults to squadron/<name>/<agent> if left empty." />
           </div>
@@ -81,7 +80,7 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
           />
         </div>
         <div>
-          <label id="manual-prompt-label" style={labelStyle}>Prompt</label>
+          <label id="manual-prompt-label" style={{ ...labelStyle, marginBottom: "0.25rem" }}>Prompt</label>
           <CodeEditor
             labelId="manual-prompt-label"
             value={prompt}
@@ -91,7 +90,7 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
           />
         </div>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
             <label htmlFor="manual-harness" style={labelStyle}>Harness</label>
             <HelpTooltip text="The harness configures how the agent runs. Valid values: claude-code (default), codex, aider, generic." />
           </div>
@@ -107,7 +106,7 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
           </select>
         </div>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
             <label htmlFor="manual-persona" style={labelStyle}>Persona</label>
             <HelpTooltip text="A persona defines the agent's coding style and approach. Valid values: overconfident-engineer, zen-master, paranoid-perfectionist, raging-jerk, peter-molyneux, or leave empty for no persona." />
           </div>

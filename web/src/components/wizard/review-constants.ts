@@ -59,6 +59,5 @@ export const labelStyle: React.CSSProperties = {
   color: "var(--text-secondary)",
   fontSize: "0.7rem",
   textTransform: "uppercase" as const,
-  marginBottom: "0.25rem",
   display: "block",
 };

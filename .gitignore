@@ -55,3 +55,4 @@ web/dist/
 # Embedded web dist (build artifact, .gitkeep is tracked)
 cmd/fleet/webdist/*
 !cmd/fleet/webdist/.gitkeep
+.aider*

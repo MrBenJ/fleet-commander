@@ -28,7 +28,6 @@ const labelStyle: React.CSSProperties = {
   fontSize: "0.75rem",
   textTransform: "uppercase" as const,
   letterSpacing: "0.1em",
-  marginBottom: "0.5rem",
   display: "block",
 };
 
@@ -46,7 +45,7 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 500, width: "100%" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.5rem" }}>
             <label htmlFor="squadron-name" style={labelStyle}>Squadron Name</label>
             <HelpTooltip text="A unique name for this group of agents. Used to identify the squadron in logs and context channels." />
           </div>
@@ -61,7 +60,7 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
         </div>
 
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.5rem" }}>
             <label htmlFor="base-branch" style={labelStyle}>Base Branch</label>
             <HelpTooltip text="The git branch that all agent worktrees will be created from. Each agent gets its own branch forked from this one." />
           </div>

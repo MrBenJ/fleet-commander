@@ -48,7 +48,7 @@ export function AgentCard({
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
                 <label htmlFor={`edit-name-${agent.name}`} style={labelStyle}>Agent Name</label>
                 <HelpTooltip text="A short identifier for this agent. Used in branch names and tmux session names." />
               </div>
@@ -60,7 +60,7 @@ export function AgentCard({
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
                 <label htmlFor={`edit-branch-${agent.name}`} style={labelStyle}>Branch</label>
                 <HelpTooltip text="The git branch name for this agent's worktree. Each agent works in its own isolated branch." />
               </div>
@@ -72,7 +72,7 @@ export function AgentCard({
               />
             </div>
             <div style={{ width: 150 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
                 <label htmlFor={`edit-harness-${agent.name}`} style={labelStyle}>Harness</label>
                 <HelpTooltip text="The harness configures how the agent runs. Valid values: claude-code (default), codex, aider, generic." />
               </div>
@@ -88,7 +88,7 @@ export function AgentCard({
               </select>
             </div>
             <div style={{ width: 180 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
                 <label htmlFor={`edit-persona-${agent.name}`} style={labelStyle}>Persona</label>
                 <HelpTooltip text="A persona defines the agent's coding style and approach. Valid values: overconfident-engineer, zen-master, paranoid-perfectionist, raging-jerk, peter-molyneux, or leave empty for no persona." />
               </div>
@@ -106,7 +106,7 @@ export function AgentCard({
             </div>
           </div>
           <div>
-            <label id={`edit-prompt-label-${agent.name}`} style={labelStyle}>Prompt</label>
+            <label id={`edit-prompt-label-${agent.name}`} style={{ ...labelStyle, marginBottom: "0.25rem" }}>Prompt</label>
             <CodeEditor
               labelId={`edit-prompt-label-${agent.name}`}
               value={editDraft.prompt}

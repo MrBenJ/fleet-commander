@@ -128,7 +128,8 @@ export function AgentTooltip({
           flexDirection: "column",
           gap: "0.5rem",
           fontSize: "0.8rem",
-          marginBottom: "1rem",
+          margin: 0,
+          paddingBottom: "1rem",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between" }}>
