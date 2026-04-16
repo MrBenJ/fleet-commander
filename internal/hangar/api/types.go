@@ -58,6 +58,22 @@ type GenerateResponse struct {
 	Agents []LaunchAgentInput `json:"agents"`
 }
 
+type SquadronInfoResponse struct {
+	Name      string               `json:"name"`
+	Agents    []SquadronAgentInfo  `json:"agents"`
+	Consensus string               `json:"consensus"`
+	AutoMerge bool                 `json:"autoMerge"`
+	Members   []string             `json:"members"`
+}
+
+type SquadronAgentInfo struct {
+	Name    string `json:"name"`
+	Branch  string `json:"branch"`
+	Prompt  string `json:"prompt"`
+	Driver  string `json:"driver"`
+	Persona string `json:"persona,omitempty"`
+}
+
 type ErrorResponse struct {
 	Error   string   `json:"error"`
 	Details []string `json:"details,omitempty"`
