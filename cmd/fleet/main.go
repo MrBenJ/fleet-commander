@@ -84,13 +84,15 @@ var hangarCmd = &cobra.Command{
 		port, _ := cmd.Flags().GetInt("port")
 		noOpen, _ := cmd.Flags().GetBool("no-open")
 		devMode, _ := cmd.Flags().GetBool("dev")
+		controlSquadron, _ := cmd.Flags().GetString("control")
 
 		cfg := hangar.Config{
-			Port:       port,
-			DevMode:    devMode,
-			RepoPath:   f.RepoPath,
-			FleetDir:   f.FleetDir,
-			TmuxPrefix: f.TmuxPrefix(),
+			Port:            port,
+			DevMode:         devMode,
+			RepoPath:        f.RepoPath,
+			FleetDir:        f.FleetDir,
+			TmuxPrefix:      f.TmuxPrefix(),
+			ControlSquadron: controlSquadron,
 		}
 
 		if !devMode {
@@ -103,6 +105,9 @@ var hangarCmd = &cobra.Command{
 
 		srv := hangar.NewServer(cfg)
 		url := fmt.Sprintf("http://localhost:%d", port)
+		if controlSquadron != "" {
+			url += "?squadron=" + controlSquadron
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -215,6 +220,7 @@ func init() {
 	hangarCmd.Flags().Int("port", 4242, "Port to listen on")
 	hangarCmd.Flags().Bool("no-open", false, "Don't auto-open the browser")
 	hangarCmd.Flags().Bool("dev", false, "Proxy to Vite dev server for hot reload")
+	hangarCmd.Flags().String("control", "", "Open directly to mission control for the named squadron")
 	rootCmd.AddCommand(hangarCmd)
 }
 

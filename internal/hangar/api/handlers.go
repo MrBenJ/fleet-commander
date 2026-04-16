@@ -361,6 +361,67 @@ func (h *Handlers) HandleSquadronStatus(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// HandleSquadronInfo handles GET /api/squadron/{name}/info — returns squadron
+// agent details reconstructed from the channel members and fleet config.
+func (h *Handlers) HandleSquadronInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/squadron/")
+	path = strings.TrimSuffix(path, "/info")
+	name := strings.TrimSpace(path)
+
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "squadron name is required")
+		return
+	}
+
+	channelName := "squadron-" + name
+
+	ctx, err := fleetctx.Load(h.fleetDir)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to load context: %v", err))
+		return
+	}
+
+	ch, ok := ctx.Channels[channelName]
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("squadron %q not found", name))
+		return
+	}
+
+	f, err := fleet.Load(h.repoPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to load fleet: %v", err))
+		return
+	}
+
+	promptsDir := h.fleetDir + "/prompts"
+	agents := make([]SquadronAgentInfo, 0, len(ch.Members))
+	for _, memberName := range ch.Members {
+		info := SquadronAgentInfo{Name: memberName}
+		if agent, err := f.GetAgent(memberName); err == nil {
+			info.Branch = agent.Branch
+			info.Driver = agent.Driver
+		}
+		promptFile := promptsDir + "/" + memberName + ".txt"
+		if data, err := os.ReadFile(promptFile); err == nil {
+			info.Prompt = string(data)
+		}
+		agents = append(agents, info)
+	}
+
+	writeJSON(w, http.StatusOK, SquadronInfoResponse{
+		Name:      name,
+		Agents:    agents,
+		Consensus: "universal",
+		AutoMerge: true,
+		Members:   ch.Members,
+	})
+}
+
 // HandleGenerate handles POST /api/squadron/generate — uses claude-code to generate an agent breakdown.
 func (h *Handlers) HandleGenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
