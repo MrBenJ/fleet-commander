@@ -22,6 +22,9 @@
     "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0"
   },
+  "overrides": {
+    "dompurify": "^3.4.0"
+  },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

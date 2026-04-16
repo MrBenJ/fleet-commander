@@ -88,7 +88,7 @@ export function AgentTooltip({
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <div style={{ fontSize: "1.75rem" }} aria-hidden="true">
+        <div style={{ fontSize: "1.75rem", lineHeight: 1 }} aria-hidden="true">
           {personaIcons[agent.persona] || "\u{1F916}"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -106,6 +106,7 @@ export function AgentTooltip({
               borderRadius: "50%",
               background: stateColors[state] || stateColors.starting,
               display: "inline-block",
+              flexShrink: 0,
             }}
           />
           <span

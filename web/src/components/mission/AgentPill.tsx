@@ -107,6 +107,7 @@ export function AgentPill({ agent, state, persona, isMerger }: AgentPillProps) {
             borderRadius: "50%",
             background: dotColor,
             display: "inline-block",
+            flexShrink: 0,
             animation: isWaiting ? "pulse 2s infinite" : undefined,
           }}
         />
