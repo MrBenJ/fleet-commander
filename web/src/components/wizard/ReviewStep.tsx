@@ -1,6 +1,6 @@
 import { useReducer } from "react";
 import type { SquadronAgent, Persona } from "../../types";
-import { launchSquadron } from "../../api";
+import { launchSquadron, ApiError } from "../../api";
 import type { ConsensusType } from "./review-constants";
 import { AgentCard } from "./AgentCard";
 import { ConsensusSelector } from "./ConsensusSelector";
@@ -28,6 +28,7 @@ interface ReviewStepProps {
 type ReviewState = {
   launching: boolean;
   error: string | null;
+  errorDetails: string[];
   editingIdx: number | null;
   editDraft: SquadronAgent | null;
   consensus: ConsensusType;
@@ -39,7 +40,7 @@ type ReviewState = {
 type ReviewAction =
   | { type: "LAUNCH_START" }
   | { type: "LAUNCH_SUCCESS" }
-  | { type: "LAUNCH_ERROR"; error: string }
+  | { type: "LAUNCH_ERROR"; error: string; details?: string[] }
   | { type: "START_EDITING"; idx: number; agent: SquadronAgent }
   | { type: "UPDATE_DRAFT"; draft: SquadronAgent }
   | { type: "SAVE_EDIT" }
@@ -52,6 +53,7 @@ type ReviewAction =
 const initialState: ReviewState = {
   launching: false,
   error: null,
+  errorDetails: [],
   editingIdx: null,
   editDraft: null,
   consensus: "universal",
@@ -63,11 +65,11 @@ const initialState: ReviewState = {
 function reviewReducer(state: ReviewState, action: ReviewAction): ReviewState {
   switch (action.type) {
     case "LAUNCH_START":
-      return { ...state, launching: true, error: null };
+      return { ...state, launching: true, error: null, errorDetails: [] };
     case "LAUNCH_SUCCESS":
       return { ...state, launching: false };
     case "LAUNCH_ERROR":
-      return { ...state, launching: false, error: action.error };
+      return { ...state, launching: false, error: action.error, errorDetails: action.details ?? [] };
     case "START_EDITING":
       return { ...state, editingIdx: action.idx, editDraft: { ...action.agent } };
     case "UPDATE_DRAFT":
@@ -124,7 +126,9 @@ export function ReviewStep({
         mergeMaster: result.mergeMaster || undefined,
       });
     } catch (err) {
-      dispatch({ type: "LAUNCH_ERROR", error: err instanceof Error ? err.message : "Launch failed" });
+      const message = err instanceof Error ? err.message : "Launch failed";
+      const details = err instanceof ApiError ? err.details : [];
+      dispatch({ type: "LAUNCH_ERROR", error: message, details });
     }
   };
 
@@ -216,7 +220,14 @@ export function ReviewStep({
       <div role="alert" aria-live="assertive">
         {state.error && (
           <div style={{ color: "var(--red)", marginBottom: "1rem", fontSize: "0.9rem" }}>
-            {state.error}
+            <div style={{ fontWeight: 600 }}>{state.error}</div>
+            {state.errorDetails.length > 0 && (
+              <ul style={{ margin: "0.4rem 0 0", paddingLeft: "1.25rem", fontSize: "0.85rem" }}>
+                {state.errorDetails.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>

@@ -13,6 +13,18 @@ interface SetupStepProps {
   onDone: (config: SetupConfig) => void;
 }
 
+const SQUADRON_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+function validateSquadronName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > 30) return "Max 30 characters";
+  if (!SQUADRON_NAME_RE.test(trimmed)) {
+    return "Only letters, digits, hyphens, and underscores; must start with a letter or digit";
+  }
+  return null;
+}
+
 const inputStyle: React.CSSProperties = {
   background: "var(--bg-secondary)",
   border: "1px solid var(--border)",
@@ -34,7 +46,9 @@ const labelStyle: React.CSSProperties = {
 export function SetupStep({ initial, currentBranch, branches, onDone }: SetupStepProps) {
   const [config, setConfig] = useState<SetupConfig>(initial);
 
-  const canContinue = config.name.trim().length > 0;
+  const trimmedName = config.name.trim();
+  const nameError = validateSquadronName(config.name);
+  const canContinue = trimmedName.length > 0 && nameError === null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -51,12 +65,26 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
           </div>
           <input
             id="squadron-name"
-            style={inputStyle}
+            style={{
+              ...inputStyle,
+              border: nameError ? "1px solid var(--red)" : inputStyle.border,
+            }}
             value={config.name}
             onChange={(e) => setConfig({ ...config, name: e.target.value })}
-            placeholder="page/homepage-fixes"
+            placeholder="homepage-fixes"
             aria-required="true"
+            aria-invalid={nameError !== null}
+            aria-describedby={nameError ? "squadron-name-error" : undefined}
           />
+          {nameError && (
+            <div
+              id="squadron-name-error"
+              role="alert"
+              style={{ color: "var(--red)", fontSize: "0.75rem", marginTop: "0.25rem" }}
+            >
+              {nameError}
+            </div>
+          )}
         </div>
 
         <div>
@@ -80,7 +108,7 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
         </div>
 
         <button
-          onClick={() => onDone(config)}
+          onClick={() => onDone({ ...config, name: trimmedName })}
           disabled={!canContinue}
           aria-disabled={!canContinue}
           style={{

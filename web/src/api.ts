@@ -7,6 +7,15 @@ import type {
 
 const BASE = "";
 
+export class ApiError extends Error {
+  details: string[];
+  constructor(message: string, details: string[] = []) {
+    super(message);
+    this.name = "ApiError";
+    this.details = details;
+  }
+}
+
 async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -14,7 +23,7 @@ async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({ error: resp.statusText }));
-    throw new Error(body.error || resp.statusText);
+    throw new ApiError(body.error || resp.statusText, body.details || []);
   }
   return resp.json();
 }
@@ -45,7 +54,7 @@ export async function launchSquadron(
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({ error: resp.statusText }));
-    throw new Error(body.error || resp.statusText);
+    throw new ApiError(body.error || resp.statusText, body.details || []);
   }
   return resp.json();
 }
