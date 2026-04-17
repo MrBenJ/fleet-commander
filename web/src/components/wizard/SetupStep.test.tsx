@@ -107,4 +107,29 @@ describe("SetupStep", () => {
     renderSetup();
     expect(screen.getByLabelText(/squadron name/i)).toHaveAttribute("aria-required", "true");
   });
+
+  it("disables Continue and shows error when name contains invalid characters", async () => {
+    const user = userEvent.setup();
+    const { props } = renderSetup();
+
+    await user.type(screen.getByLabelText(/squadron name/i), "bad/name");
+
+    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /letters, digits, hyphens, and underscores/i,
+    );
+    expect(props.onDone).not.toHaveBeenCalled();
+  });
+
+  it("trims whitespace from the name passed to onDone", async () => {
+    const user = userEvent.setup();
+    const { props } = renderSetup();
+
+    await user.type(screen.getByLabelText(/squadron name/i), "  my-squad  ");
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(props.onDone).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "my-squad" }),
+    );
+  });
 });

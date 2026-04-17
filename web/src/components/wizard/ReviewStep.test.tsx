@@ -4,11 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { ReviewStep } from "./ReviewStep";
 import type { SquadronAgent, Persona } from "../../types";
 
-vi.mock("../../api", () => ({
-  launchSquadron: vi.fn(),
-}));
+vi.mock("../../api", async () => {
+  const actual = await vi.importActual<typeof import("../../api")>("../../api");
+  return {
+    ...actual,
+    launchSquadron: vi.fn(),
+  };
+});
 
-import { launchSquadron } from "../../api";
+import { launchSquadron, ApiError } from "../../api";
 
 const mockLaunchSquadron = vi.mocked(launchSquadron);
 
@@ -213,6 +217,20 @@ describe("ReviewStep", () => {
       render(<ReviewStep {...defaultProps} />);
       await userEvent.click(screen.getByText("Launch Squadron"));
       expect(screen.getByText("Network error")).toBeInTheDocument();
+    });
+
+    it("renders validation detail list when ApiError carries details", async () => {
+      mockLaunchSquadron.mockRejectedValueOnce(
+        new ApiError("validation failed", [
+          `name "bad/name" is invalid`,
+          "agents[0].branch is required",
+        ]),
+      );
+      render(<ReviewStep {...defaultProps} />);
+      await userEvent.click(screen.getByText("Launch Squadron"));
+      expect(screen.getByText("validation failed")).toBeInTheDocument();
+      expect(screen.getByText(`name "bad/name" is invalid`)).toBeInTheDocument();
+      expect(screen.getByText("agents[0].branch is required")).toBeInTheDocument();
     });
   });
 });
