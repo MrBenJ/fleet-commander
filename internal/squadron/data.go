@@ -28,11 +28,12 @@ type SquadronData struct {
 }
 
 type SquadronAgent struct {
-	Name    string `json:"name"`
-	Branch  string `json:"branch"`
-	Prompt  string `json:"prompt"`
-	Driver  string `json:"driver,omitempty"`
-	Persona string `json:"persona,omitempty"`
+	Name      string `json:"name"`
+	Branch    string `json:"branch"`
+	Prompt    string `json:"prompt"`
+	Driver    string `json:"driver,omitempty"`
+	Persona   string `json:"persona,omitempty"`
+	FightMode bool   `json:"fightMode,omitempty"`
 }
 
 type rawSquadronData struct {

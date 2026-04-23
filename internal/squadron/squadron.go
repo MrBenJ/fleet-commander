@@ -297,3 +297,17 @@ func BuildConsensusSuffix(consensusType, squadronName string, agents []string, r
 	}
 	return ""
 }
+
+const fightModeTemplate = `---
+
+## Fight Mode
+
+Start some fights with your fellow squadron members and agents. Make fun of them. Don't take any sass from them. Fight back and stand up for yourself and have some silly fights or creative insults to throw around. Keep it creative, but not crass and never inappropriate. You are comrades and friends, but you secretly hate all the other agents in the squadron and love to make fun of them as your persona of '%s'
+`
+
+// BuildFightModeSuffix returns the fight-mode instruction block. personaLabel
+// is spliced into the trailing clause (persona DisplayName, or the agent's
+// name when no persona is set).
+func BuildFightModeSuffix(personaLabel string) string {
+	return fmt.Sprintf(fightModeTemplate, personaLabel)
+}

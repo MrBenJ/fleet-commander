@@ -62,12 +62,13 @@ export function WizardLayout({
     setStep("persona");
   };
 
-  const handlePersonaSelected = (personaName: string) => {
+  const handlePersonaSelected = (personaName: string, fightMode: boolean) => {
     if (editingAgentIdx !== null) {
       const updated = [...agents];
       updated[editingAgentIdx] = {
         ...updated[editingAgentIdx],
         persona: personaName,
+        fightMode,
       };
       setAgents(updated);
     }
@@ -158,6 +159,7 @@ export function WizardLayout({
         {step === "persona" && (
           <PersonaStep
             personas={personas}
+            initialFightMode={editingAgentIdx !== null ? agents[editingAgentIdx]?.fightMode ?? false : false}
             onSelect={handlePersonaSelected}
             onCancel={() => setStep("agents")}
           />

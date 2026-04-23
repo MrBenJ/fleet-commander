@@ -4,6 +4,7 @@ export interface SquadronAgent {
   prompt: string;
   driver: string;
   persona: string;
+  fightMode?: boolean;
 }
 
 export interface SquadronData {

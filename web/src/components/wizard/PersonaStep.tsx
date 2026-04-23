@@ -1,8 +1,11 @@
+import { useState } from "react";
 import type { Persona } from "../../types";
+import { HelpTooltip } from "../common/HelpTooltip";
 
 interface PersonaStepProps {
   personas: Persona[];
-  onSelect: (name: string) => void;
+  initialFightMode?: boolean;
+  onSelect: (name: string, fightMode: boolean) => void;
   onCancel: () => void;
 }
 
@@ -22,7 +25,9 @@ const personaFlavors: Record<string, string> = {
   "peter-molyneux": "Grand promises, revolutionary vision. The feature will change everything.",
 };
 
-export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) {
+export function PersonaStep({ personas, initialFightMode = false, onSelect, onCancel }: PersonaStepProps) {
+  const [fightMode, setFightMode] = useState<boolean>(initialFightMode);
+
   return (
     <div>
       <h2 style={{ marginBottom: "0.5rem" }}>Select Persona</h2>
@@ -37,14 +42,14 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
           gap: "1rem",
-          marginBottom: "2rem",
+          marginBottom: "1.5rem",
         }}
       >
         {personas.map((p) => (
           <button
             key={p.name}
             role="listitem"
-            onClick={() => onSelect(p.name)}
+            onClick={() => onSelect(p.name, fightMode)}
             aria-label={`${p.displayName}: ${personaFlavors[p.name] || p.preamble || ""}`}
             style={{
               background: "var(--bg-secondary)",
@@ -78,7 +83,7 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
         {/* No Persona option */}
         <button
           role="listitem"
-          onClick={() => onSelect("")}
+          onClick={() => onSelect("", fightMode)}
           aria-label="No Persona: Default behavior, no personality overlay"
           style={{
             background: "var(--bg-secondary)",
@@ -97,6 +102,20 @@ export function PersonaStep({ personas, onSelect, onCancel }: PersonaStepProps) 
             Default behavior. No personality overlay.
           </div>
         </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "2rem" }}>
+        <input
+          type="checkbox"
+          id="fight-mode"
+          checked={fightMode}
+          onChange={(e) => setFightMode(e.target.checked)}
+          style={{ width: 18, height: 18 }}
+        />
+        <label htmlFor="fight-mode">
+          Have this agent fight and argue with other agents in the fleet
+          <HelpTooltip text="If checked, agents will humorously roast and fight each other while working and speak like their personas." />
+        </label>
       </div>
 
       <button

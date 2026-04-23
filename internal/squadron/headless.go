@@ -94,6 +94,16 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 			}
 		}
 
+		if a.FightMode {
+			label := a.Name
+			if a.Persona != "" {
+				if p, ok := LookupPersona(a.Persona); ok {
+					label = p.DisplayName
+				}
+			}
+			fullPrompt += "\n" + BuildFightModeSuffix(label)
+		}
+
 		// When consensus is "none" but auto-merge is enabled, non-merger agents
 		// still need to poll for MERGE_COMPLETE/MERGE_FAILED.
 		if data.Consensus == "none" && data.AutoMerge && mergeMaster != "" && a.Name != mergeMaster {

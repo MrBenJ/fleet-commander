@@ -105,6 +105,19 @@ export function AgentCard({
               </select>
             </div>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <input
+              type="checkbox"
+              id={`edit-fight-mode-${agent.name}`}
+              checked={editDraft.fightMode ?? false}
+              onChange={(e) => onDraftChange({ ...editDraft, fightMode: e.target.checked })}
+              style={{ width: 16, height: 16 }}
+            />
+            <label htmlFor={`edit-fight-mode-${agent.name}`} style={{ fontSize: "0.85rem", color: "var(--text-primary)" }}>
+              Have this agent fight and argue with other agents in the fleet
+              <HelpTooltip text="If checked, agents will humorously roast and fight each other while working and speak like their personas." />
+            </label>
+          </div>
           <div>
             <label id={`edit-prompt-label-${agent.name}`} style={{ ...labelStyle, marginBottom: "0.25rem" }}>Prompt</label>
             <CodeEditor
@@ -179,6 +192,20 @@ export function AgentCard({
             {agent.persona && (
               <span style={{ fontSize: "0.7rem", color: "var(--purple, #a855f7)" }}>
                 <span aria-hidden="true">{getPersonaIcon(agent.persona)}</span> {getPersonaName(agent.persona)}
+              </span>
+            )}
+            {agent.fightMode && (
+              <span
+                title="Fight mode enabled: this agent will roast its squadmates in-character"
+                style={{
+                  fontSize: "0.7rem",
+                  background: "var(--red, #dc2626)",
+                  color: "#fff",
+                  padding: "0.15rem 0.5rem",
+                  borderRadius: 10,
+                }}
+              >
+                <span aria-hidden="true">🥊</span> Fight mode
               </span>
             )}
           </div>
