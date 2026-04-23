@@ -102,6 +102,8 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 
 		if data.AutoMerge && a.Name == mergeMaster {
 			fullPrompt += "\n" + BuildMergerSuffix(data.Name, baseBranch, agentBranches, data.AutoPR)
+		} else if data.AutoPR && data.AutoMerge {
+			fullPrompt += "\n" + BuildNoPRForNonMergerSuffix(data.Name)
 		}
 
 		if a.Persona != "" {

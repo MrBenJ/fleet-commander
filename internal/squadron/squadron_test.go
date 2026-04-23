@@ -329,3 +329,19 @@ func TestBuildMergerSuffix_WithoutAutoPR(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildNoPRForNonMergerSuffix(t *testing.T) {
+	got := squadron.BuildNoPRForNonMergerSuffix("alpha")
+
+	mustContain := []string{
+		"DO NOT create a pull request",
+		"gh pr create",
+		"squadron/alpha",
+		"merge master",
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("non-merger no-PR suffix missing %q\n---\n%s", s, got)
+		}
+	}
+}

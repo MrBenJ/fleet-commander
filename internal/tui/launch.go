@@ -543,6 +543,8 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 			agentBranches = append(agentBranches, squadron.AgentBranch{Name: p.AgentName, Branch: p.Branch})
 		}
 		result += "\n" + squadron.BuildMergerSuffix(m.squadronName, m.baseBranch, agentBranches, m.autoPR)
+	} else if m.autoMerge && m.autoPR && m.mergeMaster != "" && agentName != m.mergeMaster {
+		result += "\n" + squadron.BuildNoPRForNonMergerSuffix(m.squadronName)
 	}
 
 	if key, ok := m.personas[agentName]; ok && key != "" {

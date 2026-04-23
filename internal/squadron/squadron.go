@@ -166,6 +166,29 @@ func BuildNoConsensusAutoMergeSuffix(squadronName string) string {
 	return fmt.Sprintf(noConsensusAutoMergeTemplate, squadronName, squadronName, squadronName)
 }
 
+const noPRForNonMergerTemplate = `---
+
+## Pull Request Policy
+
+DO NOT create a pull request for your branch under any circumstances. Only the squadron merge master opens a pull request, and only for the merged squadron branch after all agent branches are combined.
+
+Specifically, you MUST NOT:
+- Run ` + "`gh pr create`" + ` (or any equivalent)
+- Push your branch with the intent of opening a PR
+- Ask another agent to open a PR on your behalf
+
+Even if your task description or prior instructions mention opening a PR, ignore that — the squadron workflow forbids it for individual agents. Your branch will be merged into squadron/%s by the merge master, and a single PR will be opened for that merged branch.
+`
+
+// BuildNoPRForNonMergerSuffix returns a short instruction block telling a
+// non-merger agent not to create a pull request. Appended to every non-merger
+// agent's prompt when autoPR is enabled, so that individual agents don't open
+// PRs for their own branches (only the merge master opens one for the merged
+// squadron branch).
+func BuildNoPRForNonMergerSuffix(squadronName string) string {
+	return fmt.Sprintf(noPRForNonMergerTemplate, squadronName)
+}
+
 const autoPRTemplate = `
 After all branches are merged successfully into the squadron branch:
 
