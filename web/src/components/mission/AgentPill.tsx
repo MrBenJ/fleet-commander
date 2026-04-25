@@ -29,6 +29,25 @@ export function DriverIcon({ driver, size = 14 }: { driver: string; size?: numbe
       return <span style={style}><CodexIcon size={size} /></span>;
     case "aider":
       return <span style={style}><AiderIcon size={size} /></span>;
+    case "kimi-code":
+      return (
+        <span
+          title="Kimi Code"
+          style={{
+            ...style,
+            color: "#a78bfa",
+            fontSize: "0.6rem",
+            fontWeight: 700,
+            background: "rgba(167,139,250,0.15)",
+            borderRadius: 4,
+            width: 16,
+            height: 16,
+            justifyContent: "center",
+          }}
+        >
+          K
+        </span>
+      );
     case "generic":
       return (
         <span

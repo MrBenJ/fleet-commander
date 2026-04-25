@@ -359,7 +359,7 @@ export interface ValidationResult {
 
 const NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 const VALID_CONSENSUS = ['universal', 'review_master', 'none'] as const;
-const VALID_DRIVERS = ['claude-code', 'codex', 'aider', 'generic'] as const;
+const VALID_DRIVERS = ['claude-code', 'codex', 'aider', 'kimi-code', 'generic'] as const;
 
 export function validateSquadronData(data: unknown): ValidationResult {
   const errors: string[] = [];

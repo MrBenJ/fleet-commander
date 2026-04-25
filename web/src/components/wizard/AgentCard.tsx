@@ -74,7 +74,7 @@ export function AgentCard({
             <div style={{ width: 150 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
                 <label htmlFor={`edit-harness-${agent.name}`} style={labelStyle}>Harness</label>
-                <HelpTooltip text="The harness configures how the agent runs. Valid values: claude-code (default), codex, aider, generic." />
+                <HelpTooltip text="The harness configures how the agent runs. Valid values: claude-code (default), codex, aider, kimi-code, generic." />
               </div>
               <select
                 id={`edit-harness-${agent.name}`}

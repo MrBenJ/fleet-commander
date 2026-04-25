@@ -35,6 +35,7 @@ export const driverColors: Record<string, string> = {
   "claude-code": "rgba(31,111,235,0.2)",
   codex: "rgba(46,160,67,0.2)",
   aider: "rgba(240,136,62,0.2)",
+  "kimi-code": "rgba(167,139,250,0.2)",
   generic: "rgba(139,148,158,0.2)",
 };
 
@@ -42,6 +43,7 @@ export const driverTextColors: Record<string, string> = {
   "claude-code": "var(--blue)",
   codex: "var(--green)",
   aider: "var(--orange)",
+  "kimi-code": "#a78bfa",
   generic: "var(--text-secondary)",
 };
 

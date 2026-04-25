@@ -1,6 +1,6 @@
 import type { SquadronAgent } from "../types";
 
-const VALID_DRIVERS = ["claude-code", "codex", "aider", "generic"];
+const VALID_DRIVERS = ["claude-code", "codex", "aider", "kimi-code", "generic"];
 const VALID_PERSONAS = [
   "",
   "overconfident-engineer",

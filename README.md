@@ -4,7 +4,7 @@ A tool for managing parallel coding-agent sessions across multiple repositories,
 
 **The recommended way to use Fleet Commander is `fleet hangar`** -- a web-based squadron mission control with a visual wizard for setup, live agent status, and an in-browser terminal for jumping into any agent. The CLI and TUI commands below remain available for scripting and headless workflows, but Hangar is the preferred interface.
 
-Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Aider, and arbitrary terminal-based agents are supported via the driver system.
+Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Aider, Kimi Code, and arbitrary terminal-based agents are supported via the driver system.
 
 ## Prerequisites
 
@@ -116,7 +116,7 @@ fleet queue
 | `fleet init <repo>` | Initialize a fleet for a repository (also creates `.fleet/FLEET_SYSTEM_PROMPT.md`) |
 | `fleet init <repo> --name <short>` | Initialize with a custom short name (defaults to directory basename) |
 | `fleet add <name> <branch>` | Add a new agent with its own worktree and branch |
-| `fleet add <name> <branch> --driver <name>` | Add an agent backed by a specific driver (`claude-code`, `codex`, `aider`, `generic`) |
+| `fleet add <name> <branch> --driver <name>` | Add an agent backed by a specific driver (`claude-code`, `codex`, `aider`, `kimi-code`, `generic`) |
 | `fleet remove <name>` | Remove an agent, kill its session, clean up worktree |
 | `fleet clear [--force]` | Remove every agent: kill sessions, tear down worktrees, drop from config (branches kept) |
 | `fleet rename <old> <new>` | Rename an agent and move its worktree (agent must be stopped) |
@@ -282,6 +282,7 @@ Fleet Commander talks to coding agents through a `Driver` interface, so you're n
 | `claude-code` (default) | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Full support: hook-based state signaling, system prompts, YOLO mode |
 | `codex` | [Codex CLI](https://github.com/openai/codex) | Pane-scrape state detection |
 | `aider` | [Aider](https://aider.chat) | Pane-scrape state detection |
+| `kimi-code` | [Kimi Code](https://www.kimi.com/code/docs/en/) | Pane-scrape state detection; YOLO via `--yolo` |
 | `generic` | Any terminal-based agent | Supply `--command`, optional `--prompt-flag` and `--yolo-args` |
 
 Example -- add a Codex agent and a custom agent alongside Claude Code:

@@ -11,6 +11,7 @@ var drivers = map[string]Driver{
 	"claude-code": &ClaudeCodeDriver{},
 	"codex":       &CodexDriver{},
 	"aider":       &AiderDriver{},
+	"kimi-code":   &KimiCodeDriver{},
 	// "generic" is not a singleton — it's constructed per-agent via GetForAgent.
 }
 
