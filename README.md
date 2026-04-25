@@ -13,6 +13,7 @@ Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Ai
 - **[git](https://git-scm.com/)** -- worktree creation and branch management
 - **[tmux](https://github.com/tmux/tmux/wiki)** -- each agent runs in its own tmux session
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** -- the AI coding agent (`claude` must be on your `PATH`)
+- **[GitHub CLI (`gh`)](https://cli.github.com)** -- *optional*, required only if you want the squadron merge master to open a pull request automatically (Auto PR). Run `gh auth login` after installing.
 
 ## Quick Start (Hangar Mode -- Recommended)
 
@@ -30,12 +31,12 @@ fleet hangar
 
 That's it. The Hangar walks you through:
 
-1. **Setup** -- name the squadron, pick a consensus model, choose a base branch.
-2. **Agents** -- describe what you want done; Claude generates agent names, branches, and prompts. Or add agents manually.
-3. **Persona & Fight Mode** -- give each agent a personality, optionally let them argue with each other.
+1. **Setup** -- name the squadron, pick a consensus mode (`universal`, `review master`, or `none`), choose a base branch, and toggle Auto Merge / Auto PR.
+2. **Agents** -- describe what you want done and let Claude generate agent names, branches, and prompts; add agents manually; or import a batch from a CSV (drag-and-drop, with a downloadable sample template).
+3. **Persona & Fight Mode** -- pick a built-in personality per agent (Overconfident Engineer, Zen Master, Paranoid Perfectionist, Raging Jerk, Peter Molyneux) and optionally flip the per-agent Fight Mode toggle so they roast each other in the squadron channel.
 4. **Review & Launch** -- inline-edit anything, then fire all agents in parallel.
 
-Once launched, mission control shows live status pills for every agent, a streaming context log, and an "Assume Control" button that opens an in-browser xterm.js terminal connected directly to the agent's tmux session.
+Once launched, mission control shows live status pills for every agent, a streaming context log driven by a WebSocket event stream, and an "Assume Control" button that opens an in-browser xterm.js terminal connected directly to the agent's tmux session.
 
 ```bash
 fleet hangar --port 4242         # custom port (default 4242)
@@ -117,7 +118,7 @@ fleet queue
 | `fleet init <repo> --name <short>` | Initialize with a custom short name (defaults to directory basename) |
 | `fleet add <name> <branch>` | Add a new agent with its own worktree and branch |
 | `fleet add <name> <branch> --driver <name>` | Add an agent backed by a specific driver (`claude-code`, `codex`, `aider`, `kimi-code`, `generic`) |
-| `fleet remove <name>` | Remove an agent, kill its session, clean up worktree |
+| `fleet remove <name> [--branch]` | Remove an agent, kill its session, clean up worktree (pass `--branch` to also delete the git branch) |
 | `fleet clear [--force]` | Remove every agent: kill sessions, tear down worktrees, drop from config (branches kept) |
 | `fleet rename <old> <new>` | Rename an agent and move its worktree (agent must be stopped) |
 | `fleet list` | Show all agents with status, branch, hooks, and PID |
@@ -168,6 +169,38 @@ The launch TUI walks you through a multi-step workflow:
 4. **Launch** -- All agents fire off in parallel
 
 Each agent receives a system prompt from `.fleet/FLEET_SYSTEM_PROMPT.md` (created on `fleet init`, editable by you) and an automatically generated roster table showing all active fleet agents, their branches, and tasks. This gives every agent awareness of what the others are working on.
+
+### Squadron Mode
+
+A "squadron" is a group of agents that coordinate through a fleet context channel, review each other's work, and converge onto a single `squadron/<name>` branch. Squadron mode always runs in yolo and disables per-agent auto-merge -- the squadron does its own merge at the end.
+
+| Command | Description |
+|---------|-------------|
+| `fleet launch squadron` | Interactive squadron launcher (consensus selector → squadron name → standard launch flow) |
+| `fleet launch squadron --data '<json>'` | Headless launch from a JSON payload (the same payload the Hangar wizard sends). Skips the TUI |
+| `fleet launch squadron --use-jump-sh` | Include jump.sh local dev server instructions in the system prompt |
+
+**Consensus modes** -- pick one in the wizard or via the `consensus` field in the headless payload:
+
+- `universal` -- every agent reviews every other agent. Nothing merges until all approvals are in.
+- `review_master` -- one designated agent reviews everyone else's work. Set `reviewMaster` to that agent's name.
+- `none` -- no review step. Agents announce `COMPLETED` and the merge master proceeds.
+
+**Auto Merge** -- on by default. Fleet picks a merge master (or you can pin one with `mergeMaster`), who creates the `squadron/<name>` branch from the base, merges every agent's branch sequentially, and posts `MERGE_COMPLETE` (or `MERGE_FAILED`) to the squadron channel. A `squadron-<name>` channel is auto-created at launch with all agents as members so they can coordinate.
+
+**Auto PR** -- optional. When enabled, the merge master pushes the squadron branch and opens a GitHub pull request via `gh pr create` after merging, then watches CI with `gh pr checks --watch`. Requires the `gh` CLI to be installed and authenticated; the Hangar disables the toggle automatically when `gh` is missing.
+
+**Personas** -- each agent can wear one of the built-in personas, which prepend a character preamble to its prompt and shape its voice in commits and channel messages:
+
+| Key | Persona |
+|-----|---------|
+| `overconfident-engineer` | Snarky, moody, takes feedback but complains the whole time |
+| `zen-master` | Calm, philosophical, quietly arrogant; back-handed compliments |
+| `paranoid-perfectionist` | Nervously over-qualifies everything, devastating reviewer |
+| `raging-jerk` | Loud, brash, hilarious, picks fights for sport |
+| `peter-molyneux` | Visionary; every CRUD endpoint is "revolutionary" |
+
+**Fight Mode** -- a per-agent toggle that appends a Fight Mode block to the prompt, telling the agent to roast its squadron mates (creatively, never crassly) while still shipping the work. Pairs well with personas.
 
 ### Shared Context
 
@@ -235,6 +268,8 @@ Global log entries are automatically attributed with the repo short name and age
 | Command | Description |
 |---------|-------------|
 | `fleet hint` | Show keyboard shortcuts and workflow tips |
+| `fleet unlock` | Force-release a stale `.fleet/config.lock` left by a crashed command |
+| `fleet --version` | Print the binary's version and short commit hash (set at build time via `-ldflags`) |
 
 ## The Queue TUI
 
@@ -396,3 +431,14 @@ go install ./cmd/fleet/
 ```
 
 The binary should be placed alongside `fleet.tmux.conf` for the tmux config to be auto-sourced (it looks for the conf file relative to the executable path).
+
+### Makefile targets
+
+| Target | Description |
+|--------|-------------|
+| `make build` | `go install` the CLI with `-ldflags` baking the version + commit into `fleet --version` |
+| `make build-web` | `npm install` + `npm run build` inside `web/` to produce the SPA bundle |
+| `make build-all` | Build the SPA, copy `web/dist` into `cmd/fleet/webdist/` for `go:embed`, then `go install` -- this is what produces a single binary with the Hangar UI inside |
+| `make test` | `go test ./...` |
+| `make vet` | `go vet ./...` |
+| `make release [BUMP=major\|minor\|patch]` | Bump the latest semver git tag (defaults to a patch bump) and create the tag locally |
