@@ -127,9 +127,11 @@ You are also the MERGE MASTER for squadron "%s". After the squadron reaches cons
 
 CRITICAL: Before starting the merge, verify ALL agents have reached consensus by reading the squadron channel. Do not begin merging until the review process is fully complete.
 
-1. Create the squadron branch from the base:
-   git checkout %s
-   git checkout -b squadron/%s
+1. Create a dedicated integration worktree off the base branch. Do NOT merge into your current agent worktree — create a fresh sibling worktree with branch "squadron/%s-merged" so the integration is cleanly isolated:
+   git worktree add -b squadron/%s-merged ../%s-merged %s
+   cd ../%s-merged
+
+   This new worktree (branch "squadron/%s-merged") is your integration point. All subsequent merge steps run from inside it.
 
 2. Merge each agent's working branch in sequentially (in the order listed below):
    git merge --no-ff <agent-branch>
@@ -137,7 +139,7 @@ CRITICAL: Before starting the merge, verify ALL agents have reached consensus by
 3. If a merge produces conflicts, resolve them yourself. Use each agent's original prompt (available in the squadron channel) as context for what they were trying to accomplish. Prefer preserving all agents' intent.
 
 4. After all merges succeed, announce:
-   fleet context channel-send squadron-%s "MERGE_COMPLETE: squadron/%s"
+   fleet context channel-send squadron-%s "MERGE_COMPLETE: squadron/%s-merged"
 
 5. If a merge fails and you cannot resolve it safely, announce:
    fleet context channel-send squadron-%s "MERGE_FAILED: <agent-name> - <reason>"
@@ -177,7 +179,7 @@ Specifically, you MUST NOT:
 - Push your branch with the intent of opening a PR
 - Ask another agent to open a PR on your behalf
 
-Even if your task description or prior instructions mention opening a PR, ignore that — the squadron workflow forbids it for individual agents. Your branch will be merged into squadron/%s by the merge master, and a single PR will be opened for that merged branch.
+Even if your task description or prior instructions mention opening a PR, ignore that — the squadron workflow forbids it for individual agents. Your branch will be merged into squadron/%s-merged by the merge master, and a single PR will be opened for that merged branch.
 `
 
 // BuildNoPRForNonMergerSuffix returns a short instruction block telling a
@@ -198,7 +200,7 @@ If this command fails, STOP IMMEDIATELY and announce:
    fleet context channel-send squadron-%s "GH_AUTH_FAILED: gh CLI is not authenticated — run gh auth login"
 Do NOT proceed with any of the steps below if auth fails.
 
-1. Push the squadron branch to the remote: git push -u origin squadron/%s
+1. From inside the integration worktree (squadron/%s-merged), push the squadron branch to the remote: git push -u origin squadron/%s-merged
    If the push fails, announce the error and stop:
    fleet context channel-send squadron-%s "PR_BLOCKED: git push failed: <error>"
 
@@ -237,24 +239,28 @@ func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch, au
 
 	result := fmt.Sprintf(
 		mergerTemplate,
-		squadronName,
-		baseBranch, squadronName,
-		squadronName, squadronName,
-		squadronName,
+		squadronName,                             // header: MERGE MASTER for squadron "%s"
+		squadronName,                             // step 1 prose: branch "squadron/%s-merged"
+		squadronName, squadronName,               // step 1 cmd: -b squadron/%s-merged ../%s-merged
+		baseBranch,                               // step 1 cmd: start point
+		squadronName,                             // step 1 cd: ../%s-merged
+		squadronName,                             // step 1 closing prose: branch "squadron/%s-merged"
+		squadronName, squadronName,               // step 4: channel + MERGE_COMPLETE branch
+		squadronName,                             // step 5: channel for MERGE_FAILED
 		list,
 	)
 
 	if autoPR {
 		result += fmt.Sprintf(
 			autoPRTemplate,
-			squadronName, // Step 0: auth fail channel-send
-			squadronName, // Step 1: push
-			squadronName, // Step 1: push fail channel-send
-			squadronName, // Step 2: PR title
-			baseBranch, baseBranch, // Step 2: base branch (text + flag)
-			squadronName, // Step 2: PR fail channel-send
-			squadronName, // Step 4: PR_READY channel-send
-			squadronName, // Step 5: PR_BLOCKED channel-send
+			squadronName,               // Step 0: auth fail channel-send
+			squadronName, squadronName, // Step 1: integration worktree prose + push branch
+			squadronName,               // Step 1: push fail channel-send
+			squadronName,               // Step 2: PR title
+			baseBranch, baseBranch,     // Step 2: base branch (text + flag)
+			squadronName,               // Step 2: PR fail channel-send
+			squadronName,               // Step 4: PR_READY channel-send
+			squadronName,               // Step 5: PR_BLOCKED channel-send
 		)
 	}
 

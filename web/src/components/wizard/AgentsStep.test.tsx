@@ -109,4 +109,86 @@ describe("AgentsStep", () => {
     render(<AgentsStep {...defaultProps} />);
     expect(screen.queryByText(/^Agents \(/)).not.toBeInTheDocument();
   });
+
+  it("renders the squadron fight mode toggle above continue button", () => {
+    render(<AgentsStep {...defaultProps} />);
+    expect(screen.getByLabelText(/fight mode for the whole squadron/i)).toBeInTheDocument();
+  });
+
+  it("squadron fight mode is unchecked by default", () => {
+    render(<AgentsStep {...defaultProps} />);
+    const toggle = screen.getByLabelText(/fight mode for the whole squadron/i) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+  });
+
+  it("squadron fight mode shows checked when all initial agents have fightMode true", () => {
+    const agents: SquadronAgent[] = [
+      { name: "a1", branch: "b", prompt: "p", driver: "claude-code", persona: "", fightMode: true },
+      { name: "a2", branch: "b", prompt: "p", driver: "claude-code", persona: "", fightMode: true },
+    ];
+    render(<AgentsStep {...defaultProps} agents={agents} />);
+    const toggle = screen.getByLabelText(/fight mode for the whole squadron/i) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+  });
+
+  it("squadron fight mode shows unchecked when only some agents have fightMode", () => {
+    const agents: SquadronAgent[] = [
+      { name: "a1", branch: "b", prompt: "p", driver: "claude-code", persona: "", fightMode: true },
+      { name: "a2", branch: "b", prompt: "p", driver: "claude-code", persona: "" },
+    ];
+    render(<AgentsStep {...defaultProps} agents={agents} />);
+    const toggle = screen.getByLabelText(/fight mode for the whole squadron/i) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+  });
+
+  it("toggling squadron fight mode applies fightMode to all agents on continue", async () => {
+    const user = userEvent.setup();
+    const onDone = vi.fn();
+    const agents: SquadronAgent[] = [
+      { name: "a1", branch: "b", prompt: "p", driver: "claude-code", persona: "" },
+      { name: "a2", branch: "b", prompt: "p", driver: "claude-code", persona: "" },
+    ];
+    render(<AgentsStep {...defaultProps} agents={agents} onDone={onDone} />);
+
+    await user.click(screen.getByLabelText(/fight mode for the whole squadron/i));
+    await user.click(screen.getByRole("button", { name: /continue to review/i }));
+
+    expect(onDone).toHaveBeenCalledTimes(1);
+    const passed = onDone.mock.calls[0][0] as SquadronAgent[];
+    expect(passed).toHaveLength(2);
+    expect(passed.every((a) => a.fightMode === true)).toBe(true);
+  });
+
+  it("toggling squadron fight mode off clears fightMode on all agents", async () => {
+    const user = userEvent.setup();
+    const onDone = vi.fn();
+    const agents: SquadronAgent[] = [
+      { name: "a1", branch: "b", prompt: "p", driver: "claude-code", persona: "", fightMode: true },
+      { name: "a2", branch: "b", prompt: "p", driver: "claude-code", persona: "", fightMode: true },
+    ];
+    render(<AgentsStep {...defaultProps} agents={agents} onDone={onDone} />);
+
+    await user.click(screen.getByLabelText(/fight mode for the whole squadron/i));
+    await user.click(screen.getByRole("button", { name: /continue to review/i }));
+
+    const passed = onDone.mock.calls[0][0] as SquadronAgent[];
+    expect(passed.every((a) => a.fightMode === false)).toBe(true);
+  });
+
+  it("agents added after enabling squadron fight mode inherit it", async () => {
+    const user = userEvent.setup();
+    const onDone = vi.fn();
+    render(<AgentsStep {...defaultProps} onDone={onDone} />);
+
+    await user.click(screen.getByLabelText(/fight mode for the whole squadron/i));
+
+    await user.type(screen.getByLabelText("Agent Name"), "fresh-agent");
+    await user.type(screen.getByLabelText("Prompt"), "Do work");
+    await user.click(screen.getByRole("button", { name: /add agent/i }));
+
+    await user.click(screen.getByRole("button", { name: /continue to review/i }));
+    const passed = onDone.mock.calls[0][0] as SquadronAgent[];
+    expect(passed).toHaveLength(1);
+    expect(passed[0].fightMode).toBe(true);
+  });
 });

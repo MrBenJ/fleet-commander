@@ -4,6 +4,7 @@ import { AIGeneratePanel } from "./AIGeneratePanel";
 import { ManualAddForm } from "./ManualAddForm";
 import { AgentListItem } from "./AgentListItem";
 import { CSVUpload } from "./CSVUpload";
+import { HelpTooltip } from "../common/HelpTooltip";
 
 interface AgentsStepProps {
   squadronName: string;
@@ -23,21 +24,32 @@ export function AgentsStep({
   onPickPersona,
 }: AgentsStepProps) {
   const [agents, setAgents] = useState<SquadronAgent[]>(initialAgents);
+  const [squadronFightMode, setSquadronFightMode] = useState<boolean>(
+    initialAgents.length > 0 && initialAgents.every((a) => a.fightMode),
+  );
+
+  const applyFightMode = (a: SquadronAgent): SquadronAgent =>
+    squadronFightMode ? { ...a, fightMode: true } : a;
 
   const handleAgentsGenerated = (newAgents: SquadronAgent[]) => {
-    setAgents((prev) => [...prev, ...newAgents]);
+    setAgents((prev) => [...prev, ...newAgents.map(applyFightMode)]);
   };
 
   const handleAgentAdded = (agent: SquadronAgent) => {
-    setAgents((prev) => [...prev, agent]);
+    setAgents((prev) => [...prev, applyFightMode(agent)]);
   };
 
   const handleCSVAgents = (newAgents: SquadronAgent[]) => {
-    setAgents((prev) => [...prev, ...newAgents]);
+    setAgents((prev) => [...prev, ...newAgents.map(applyFightMode)]);
   };
 
   const handleRemove = (idx: number) => {
     setAgents((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleFightModeToggle = (checked: boolean) => {
+    setSquadronFightMode(checked);
+    setAgents((prev) => prev.map((a) => ({ ...a, fightMode: checked })));
   };
 
   return (
@@ -81,6 +93,20 @@ export function AgentsStep({
           </ul>
         </div>
       )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
+        <input
+          type="checkbox"
+          id="squadron-fight-mode"
+          checked={squadronFightMode}
+          onChange={(e) => handleFightModeToggle(e.target.checked)}
+          style={{ width: 18, height: 18 }}
+        />
+        <label htmlFor="squadron-fight-mode">
+          <span aria-hidden="true">🥊</span> Fight mode for the whole squadron
+          <HelpTooltip text="If checked, every agent in this squadron will humorously roast and fight each other while working and speak in their persona's voice." />
+        </label>
+      </div>
 
       <button
         onClick={() => onDone(agents)}
