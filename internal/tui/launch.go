@@ -413,6 +413,19 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 	}
 	stateFilePath := filepath.Join(statesDir, agent.Name+".json")
 
+	// Set the driver on the agent BEFORE GetForAgent / BuildCommand below.
+	// Otherwise a non-default driver (codex, aider, kimi-code, generic)
+	// silently falls back to claude-code and the wrong launcher script is
+	// generated. UpdateAgentDriver uses withLock which replaces f.Agents
+	// pointers, so we must re-fetch the agent to get the fresh struct.
+	if item.Driver != "" && item.Driver != "claude-code" {
+		if err := m.fleet.UpdateAgentDriver(agent.Name, item.Driver); err != nil {
+			m.log.Log("WARNING: Failed to set driver %q on %q: %v", item.Driver, agent.Name, err)
+		} else if fresh, err := m.fleet.GetAgent(agent.Name); err == nil {
+			agent = fresh
+		}
+	}
+
 	// Inject hooks for state signaling
 	drv, err := driver.GetForAgent(agent)
 	if err != nil {
@@ -483,9 +496,6 @@ This merge step is mandatory. Do not skip it.`, m.targetBranch, item.Branch, ite
 		m.log.Log("Agent %q PID: %d", agent.Name, pid)
 	}
 	m.fleet.UpdateAgent(agent.Name, "running", pid)
-	if item.Driver != "" && item.Driver != "claude-code" {
-		m.fleet.UpdateAgentDriver(agent.Name, item.Driver)
-	}
 	m.launched = append(m.launched, agent.Name)
 
 	return m.advance()

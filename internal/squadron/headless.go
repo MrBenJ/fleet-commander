@@ -81,6 +81,22 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 			}
 		}
 
+		// Set the driver on the agent BEFORE BuildCommand below. GetForAgent
+		// reads agent.Driver; without this, a non-default driver (codex,
+		// aider, kimi-code, generic) silently falls back to claude-code and
+		// the wrong launcher script is written to disk. UpdateAgentDriver
+		// uses withLock which replaces f.Agents pointers, so we must re-fetch
+		// the agent to get the fresh struct that reflects the new driver.
+		if a.Driver != "" && a.Driver != "claude-code" {
+			if err := f.UpdateAgentDriver(a.Name, a.Driver); err != nil {
+				return "", fmt.Errorf("set driver for %q: %w", a.Name, err)
+			}
+			agent, err = f.GetAgent(a.Name)
+			if err != nil {
+				return "", fmt.Errorf("get agent %q after driver update: %w", a.Name, err)
+			}
+		}
+
 		fullPrompt := buildHeadlessPrompt(sysPrompt, data.Agents, a)
 
 		switch data.Consensus {
@@ -161,9 +177,6 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 		f.UpdateAgentStateFile(agent.Name, stateFilePath)
 		pid, _ := tm.GetPID(agent.Name)
 		f.UpdateAgent(agent.Name, "running", pid)
-		if a.Driver != "" && a.Driver != "claude-code" {
-			f.UpdateAgentDriver(agent.Name, a.Driver)
-		}
 		launched = append(launched, agent.Name)
 	}
 

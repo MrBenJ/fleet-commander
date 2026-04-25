@@ -223,7 +223,7 @@ func TestGetDriver(t *testing.T) {
 
 func TestAvailable(t *testing.T) {
 	names := Available()
-	expected := []string{"aider", "claude-code", "codex", "generic"}
+	expected := []string{"aider", "claude-code", "codex", "generic", "kimi-code"}
 	if len(names) != len(expected) {
 		t.Fatalf("Available() returned %v, want %v", names, expected)
 	}

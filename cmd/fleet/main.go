@@ -157,7 +157,7 @@ func init() {
 	initCmd.Flags().String("name", "", "Short name for this repo (defaults to directory name)")
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(addCmd)
-	addCmd.Flags().String("driver", "claude-code", "Coding agent driver (claude-code, codex, aider, generic)")
+	addCmd.Flags().String("driver", "claude-code", "Coding agent driver (claude-code, codex, aider, kimi-code, generic)")
 	addCmd.Flags().String("command", "", "Command to run (required for --driver generic)")
 	addCmd.Flags().String("prompt-flag", "", "Flag for passing prompt to command (generic driver)")
 	addCmd.Flags().StringSlice("yolo-args", nil, "Extra args for yolo mode (generic driver)")
