@@ -32,8 +32,8 @@ fleet hangar
 That's it. The Hangar walks you through:
 
 1. **Setup** -- name the squadron, pick a consensus mode (`universal`, `review master`, or `none`), choose a base branch, and toggle Auto Merge / Auto PR.
-2. **Agents** -- describe what you want done and let Claude generate agent names, branches, and prompts; add agents manually; or import a batch from a CSV (drag-and-drop, with a downloadable sample template).
-3. **Persona & Fight Mode** -- pick a built-in personality per agent (Overconfident Engineer, Zen Master, Paranoid Perfectionist, Raging Jerk, Peter Molyneux) and optionally flip the per-agent Fight Mode toggle so they roast each other in the squadron channel.
+2. **Agents** -- describe what you want done and let Claude generate agent names, branches, and prompts; add agents manually; or import a batch from a CSV (drag-and-drop, with a downloadable sample template). Toggle squadron-wide **Fight Mode** here so every agent roasts each other in the squadron channel.
+3. **Persona** -- pick a built-in personality per agent (Overconfident Engineer, Zen Master, Paranoid Perfectionist, Raging Jerk, Peter Molyneux). Fight Mode can also be fine-tuned per-agent.
 4. **Review & Launch** -- inline-edit anything, then fire all agents in parallel.
 
 Once launched, mission control shows live status pills for every agent, a streaming context log driven by a WebSocket event stream, and an "Assume Control" button that opens an in-browser xterm.js terminal connected directly to the agent's tmux session.
@@ -186,7 +186,7 @@ A "squadron" is a group of agents that coordinate through a fleet context channe
 - `review_master` -- one designated agent reviews everyone else's work. Set `reviewMaster` to that agent's name.
 - `none` -- no review step. Agents announce `COMPLETED` and the merge master proceeds.
 
-**Auto Merge** -- on by default. Fleet picks a merge master (or you can pin one with `mergeMaster`), who creates the `squadron/<name>` branch from the base, merges every agent's branch sequentially, and posts `MERGE_COMPLETE` (or `MERGE_FAILED`) to the squadron channel. A `squadron-<name>` channel is auto-created at launch with all agents as members so they can coordinate.
+**Auto Merge** -- on by default. Fleet picks a merge master (or you can pin one with `mergeMaster`), who creates a dedicated git worktree and branch `squadron/<name>-merged` from the base branch, then merges every agent's branch sequentially inside that worktree. After merging, the merge master posts `MERGE_COMPLETE` (or `MERGE_FAILED`) to the squadron channel. A `squadron-<name>` channel is auto-created at launch with all agents as members so they can coordinate.
 
 **Auto PR** -- optional. When enabled, the merge master pushes the squadron branch and opens a GitHub pull request via `gh pr create` after merging, then watches CI with `gh pr checks --watch`. Requires the `gh` CLI to be installed and authenticated; the Hangar disables the toggle automatically when `gh` is missing.
 
@@ -232,6 +232,7 @@ Named channels with fixed membership for private agent-to-agent communication:
 | Command | Description |
 |---------|-------------|
 | `fleet context channel-create <name> <agent1> <agent2> [...]` | Create a private channel (2-member channels auto-name to `dm-<a>-<b>`) |
+| `fleet context channel-create <name> <agents...> --description <text>` | Create a channel with a description |
 | `fleet context channel-send <channel> <msg>` | Send a message to a channel |
 | `fleet context channel-read <channel>` | Read channel messages |
 | `fleet context channel-list` | List all channels |
