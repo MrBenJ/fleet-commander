@@ -188,8 +188,8 @@ func TestBuildMergerSuffix_SingleAgent(t *testing.T) {
 		{Name: "solo", Branch: "squadron/alpha/solo"},
 	}
 	got := squadron.BuildMergerSuffix("alpha", "develop", agents, false)
-	if !strings.Contains(got, "git checkout develop") {
-		t.Error("base branch should be 'develop'")
+	if !strings.Contains(got, "git worktree add -b squadron/alpha-merged ../alpha-merged develop") {
+		t.Error("base branch 'develop' should appear as the start point of the integration worktree")
 	}
 	if !strings.Contains(got, "solo -> squadron/alpha/solo") {
 		t.Error("single agent branch should appear")
@@ -208,13 +208,13 @@ func TestBuildMergerSuffix(t *testing.T) {
 		"Squadron Merge Duties",
 		"MERGE MASTER",
 		`squadron "alpha"`,
-		"git checkout main",
-		"git checkout -b squadron/alpha",
+		"git worktree add -b squadron/alpha-merged ../alpha-merged main",
+		"cd ../alpha-merged",
 		"git merge --no-ff",
 		"a -> squadron/alpha/a",
 		"b -> squadron/alpha/b",
 		"c -> squadron/alpha/c",
-		`"MERGE_COMPLETE: squadron/alpha"`,
+		`"MERGE_COMPLETE: squadron/alpha-merged"`,
 		`"MERGE_FAILED:`,
 		"CRITICAL: Before starting the merge, verify ALL agents have reached consensus",
 	}
@@ -326,6 +326,73 @@ func TestBuildMergerSuffix_WithoutAutoPR(t *testing.T) {
 	for _, s := range forbidden {
 		if strings.Contains(got, s) {
 			t.Errorf("non-autoPR merger suffix should not contain %q", s)
+		}
+	}
+}
+
+func TestBuildMergerSuffix_CreatesIntegrationWorktree(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "a", Branch: "squadron/alpha/a"},
+		{Name: "b", Branch: "squadron/alpha/b"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "main", agents, false)
+
+	mustContain := []string{
+		// New behavior: merger creates a dedicated worktree for integration
+		"git worktree add",
+		"squadron/alpha-merged",
+		"../alpha-merged",
+		// The base branch is the start point of the new worktree
+		"git worktree add -b squadron/alpha-merged ../alpha-merged main",
+		// Status messages reference the new branch name
+		`"MERGE_COMPLETE: squadron/alpha-merged"`,
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("merger suffix missing %q\n---\n%s", s, got)
+		}
+	}
+
+	// Old single-branch checkout pattern must be gone.
+	forbidden := []string{
+		"git checkout -b squadron/alpha\n",
+	}
+	for _, s := range forbidden {
+		if strings.Contains(got, s) {
+			t.Errorf("merger suffix still contains old pattern %q", s)
+		}
+	}
+}
+
+func TestBuildMergerSuffix_WorktreeNameInterpolation(t *testing.T) {
+	// Squadron name with hyphens and underscores must be substituted verbatim.
+	got := squadron.BuildMergerSuffix("my-trio_v2", "develop", nil, false)
+
+	mustContain := []string{
+		"squadron/my-trio_v2-merged",
+		"../my-trio_v2-merged",
+		"git worktree add -b squadron/my-trio_v2-merged ../my-trio_v2-merged develop",
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("merger suffix missing %q for squadron 'my-trio_v2'\n---\n%s", s, got)
+		}
+	}
+}
+
+func TestBuildMergerSuffix_AutoPRPushesMergedBranch(t *testing.T) {
+	agents := []squadron.AgentBranch{
+		{Name: "a", Branch: "squadron/alpha/a"},
+	}
+	got := squadron.BuildMergerSuffix("alpha", "main", agents, true)
+
+	mustContain := []string{
+		// AutoPR pushes the new merged branch, not the old squadron/<name> branch
+		"git push -u origin squadron/alpha-merged",
+	}
+	for _, s := range mustContain {
+		if !strings.Contains(got, s) {
+			t.Errorf("autoPR merger suffix missing %q\n---\n%s", s, got)
 		}
 	}
 }
