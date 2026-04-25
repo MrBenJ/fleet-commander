@@ -1,6 +1,8 @@
 # Fleet Commander
 
-A CLI + TUI tool for managing parallel coding-agent sessions across multiple repositories, each agent in its own git worktree. You stay in control -- there is no AI coordinator.
+A tool for managing parallel coding-agent sessions across multiple repositories, each agent in its own git worktree. You stay in control -- there is no AI coordinator.
+
+**The recommended way to use Fleet Commander is `fleet hangar`** -- a web-based squadron mission control with a visual wizard for setup, live agent status, and an in-browser terminal for jumping into any agent. The CLI and TUI commands below remain available for scripting and headless workflows, but Hangar is the preferred interface.
 
 Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Aider, and arbitrary terminal-based agents are supported via the driver system.
 
@@ -12,18 +14,46 @@ Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Ai
 - **[tmux](https://github.com/tmux/tmux/wiki)** -- each agent runs in its own tmux session
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** -- the AI coding agent (`claude` must be on your `PATH`)
 
+## Quick Start (Hangar Mode -- Recommended)
+
+```bash
+# Build and install (includes the embedded web UI)
+make build-all
+
+# Initialize a fleet for your repo (one-time, per repo)
+fleet init ~/projects/my-app
+
+# Launch the Hangar -- opens your browser to the mission control UI
+cd ~/projects/my-app
+fleet hangar
+```
+
+That's it. The Hangar walks you through:
+
+1. **Setup** -- name the squadron, pick a consensus model, choose a base branch.
+2. **Agents** -- describe what you want done; Claude generates agent names, branches, and prompts. Or add agents manually.
+3. **Persona & Fight Mode** -- give each agent a personality, optionally let them argue with each other.
+4. **Review & Launch** -- inline-edit anything, then fire all agents in parallel.
+
+Once launched, mission control shows live status pills for every agent, a streaming context log, and an "Assume Control" button that opens an in-browser xterm.js terminal connected directly to the agent's tmux session.
+
+```bash
+fleet hangar --port 4242         # custom port (default 4242)
+fleet hangar --no-open           # don't auto-open the browser
+fleet hangar --control my-squad  # jump straight to mission control for a squadron
+```
+
 ## How It Works
 
-Fleet Commander gives each agent its own git worktree and tmux session. You switch between agents using a TUI queue that shows which agents are working and which need your input. With multi-repo support, you can manage fleets across different repositories from a single interface.
+Fleet Commander gives each agent its own git worktree and tmux session. With multi-repo support, you can manage fleets across different repositories from a single interface.
 
 ```
 ┌─────────────────────────────────────────────┐
-│         Fleet Commander (TUI)               │
+│         Fleet Hangar (browser)              │
 │  ┌─────────────────────────────────────────┐│
-│  │ my-app (3 agents)                       ││
+│  │ my-app / squadron "auth-rework"         ││
 │  │   [A1 feat-auth] [A2 bug-login] [A3]   ││
-│  │ api-service (2 agents)                  ││
-│  │   [A4 endpoints] [A5 caching]           ││
+│  │ Live context log + Assume Control       ││
 │  └─────────────────────────────────────────┘│
 └─────────────┬───────────────────────────────┘
               │
@@ -37,12 +67,11 @@ Fleet Commander gives each agent its own git worktree and tmux session. You swit
 └────────┘ └────────┘ └────────┘
 ```
 
-## Quick Start
+## CLI / TUI Workflow (Advanced)
+
+Prefer the terminal? The original CLI and Bubble Tea TUI are still fully supported.
 
 ```bash
-# Build and install
-go install ./cmd/fleet/
-
 # Initialize fleet for a repo (registers it globally)
 fleet init ~/projects/my-app
 fleet init ~/projects/api-service --name api
@@ -114,6 +143,16 @@ Fleet Commander maintains a global index at `~/.fleet/repos.json` that tracks al
 | `fleet attach <name>` | Attach to an agent's tmux session |
 | `fleet queue` | Open the TUI queue -- see all agents, jump to ones needing input |
 | `fleet queue --all` | Open the multi-repo TUI -- agents grouped by repository |
+
+### Hangar (Web UI -- Recommended)
+
+| Command | Description |
+|---------|-------------|
+| `fleet hangar` | Launch the web-based squadron mission control in your browser (recommended interface) |
+| `fleet hangar --port <n>` | Listen on a custom port (default 4242) |
+| `fleet hangar --no-open` | Start the server without auto-opening the browser |
+| `fleet hangar --control <squadron>` | Jump straight to mission control for an existing squadron |
+| `fleet hangar --dev` | Proxy to a Vite dev server for hot-reload (development only) |
 
 ### Batch Launch
 
