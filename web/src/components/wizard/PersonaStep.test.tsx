@@ -74,7 +74,7 @@ describe("PersonaStep", () => {
     const { props } = renderPersona();
 
     await user.click(screen.getByText("Zen Master"));
-    expect(props.onSelect).toHaveBeenCalledWith("zen-master");
+    expect(props.onSelect).toHaveBeenCalledWith("zen-master", false);
   });
 
   it("calls onSelect with empty string when No Persona is clicked", async () => {
@@ -82,7 +82,7 @@ describe("PersonaStep", () => {
     const { props } = renderPersona();
 
     await user.click(screen.getByText("No Persona"));
-    expect(props.onSelect).toHaveBeenCalledWith("");
+    expect(props.onSelect).toHaveBeenCalledWith("", false);
   });
 
   it("calls onCancel when Back button is clicked", async () => {
