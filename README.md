@@ -340,7 +340,7 @@ For those who like to live dangerously -- and we mean *dangerously* dangerously 
 fleet launch --ultra-dangerous-yolo-mode
 ```
 
-This skips all review steps, passes `--dangerously-skip-permissions` to Claude, and auto-merges on completion. Every agent fires off simultaneously with zero human oversight. You are giving a bunch of overconfident YC graduates AWS administrator access and they all have clearly been railing fat lines in the Planet Fitness bathroom for the past 4 days. Use with caution.
+This skips all review steps, passes `--dangerously-skip-permissions` to Claude, and auto-merges on completion. Every agent fires off simultaneously with zero human oversight. You are giving a bunch of overconfident YC graduates AWS administrator access and they have clearly been slamming white Monster Energy drinks in the Planet Fitness bathroom for the past 4 days. Use with caution.
 
 When you hit `Ctrl+D` to submit your prompts, you'll be met with a sobering moment of reflection:
 
