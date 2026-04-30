@@ -456,7 +456,7 @@ The user wants to accomplish the following:
 Break this down into individual agent tasks. Each agent handles exactly one task.
 
 Respond with ONLY a JSON array (no markdown, no explanation, no code fences) where each element has:
-- "name": a short kebab-case agent name (e.g. "auth-agent", "test-writer")
+- "name": a short kebab-case agent name. MUST be 20 characters or fewer, contain only letters, digits, and hyphens, and start with a letter or digit. Examples: "auth-agent", "test-writer", "db-migrator". Do NOT exceed 20 characters — names like "database-migration-agent" (24 chars) or "frontend-component-builder" (26 chars) will be rejected.
 - "prompt": the full detailed task prompt for that agent
 - "branch": leave as empty string (will be auto-generated)
 - "driver": "claude-code"

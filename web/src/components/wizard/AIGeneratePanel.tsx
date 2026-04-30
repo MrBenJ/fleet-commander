@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { SquadronAgent } from "../../types";
 import { generateAgents } from "../../api";
 import { CodeEditor } from "../common/CodeEditor";
+import { sanitizeAgentName } from "../../utils/agentName";
 
 const loadingMessages = [
   "Compilerizing",
@@ -100,12 +101,16 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
     setGenError(null);
     try {
       const result = await generateAgents(description);
-      const newAgents = result.agents.map((a) => ({
-        ...a,
-        branch: a.branch || `squadron/${squadronName}/${a.name}`,
-        driver: a.driver || "claude-code",
-        persona: a.persona || "",
-      }));
+      const newAgents = result.agents.map((a) => {
+        const name = sanitizeAgentName(a.name);
+        return {
+          ...a,
+          name,
+          branch: a.branch || `squadron/${squadronName}/${name}`,
+          driver: a.driver || "claude-code",
+          persona: a.persona || "",
+        };
+      });
       onAgentsGenerated(newAgents);
     } catch (err) {
       setGenError(err instanceof Error ? err.message : "Generation failed");

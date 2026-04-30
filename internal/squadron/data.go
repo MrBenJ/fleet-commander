@@ -76,8 +76,10 @@ func ParseAndValidate(jsonBytes []byte) (*SquadronData, []error) {
 
 	if data.Name == "" {
 		errs = append(errs, fmt.Errorf("name is required"))
-	} else if len(data.Name) > 30 || !nameRe.MatchString(data.Name) {
-		errs = append(errs, fmt.Errorf("name %q is invalid (must match %s, max 30 chars)", data.Name, nameRe.String()))
+	} else if len(data.Name) > 30 {
+		errs = append(errs, fmt.Errorf("name %q is too long (%d chars, max 30)", data.Name, len(data.Name)))
+	} else if !nameRe.MatchString(data.Name) {
+		errs = append(errs, fmt.Errorf("name %q contains invalid characters (must match %s)", data.Name, nameRe.String()))
 	}
 
 	switch data.Consensus {
@@ -95,8 +97,10 @@ func ParseAndValidate(jsonBytes []byte) (*SquadronData, []error) {
 	for i, a := range data.Agents {
 		if a.Name == "" {
 			errs = append(errs, fmt.Errorf("agents[%d].name is required", i))
-		} else if len(a.Name) > 30 || !nameRe.MatchString(a.Name) {
-			errs = append(errs, fmt.Errorf("agents[%d].name %q is invalid", i, a.Name))
+		} else if len(a.Name) > 30 {
+			errs = append(errs, fmt.Errorf("agents[%d].name %q is too long (%d chars, max 30)", i, a.Name, len(a.Name)))
+		} else if !nameRe.MatchString(a.Name) {
+			errs = append(errs, fmt.Errorf("agents[%d].name %q contains invalid characters (must match %s)", i, a.Name, nameRe.String()))
 		}
 		if a.Name != "" && seen[a.Name] {
 			errs = append(errs, fmt.Errorf("duplicate agent name %q", a.Name))
