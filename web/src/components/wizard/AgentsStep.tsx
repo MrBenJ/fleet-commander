@@ -13,6 +13,7 @@ interface AgentsStepProps {
   personas: Persona[];
   onDone: (agents: SquadronAgent[]) => void;
   onPickPersona: (idx: number, currentAgents: SquadronAgent[]) => void;
+  onChange?: (agents: SquadronAgent[]) => void;
 }
 
 export function AgentsStep({
@@ -22,6 +23,7 @@ export function AgentsStep({
   personas,
   onDone,
   onPickPersona,
+  onChange,
 }: AgentsStepProps) {
   const [agents, setAgents] = useState<SquadronAgent[]>(initialAgents);
   const [squadronFightMode, setSquadronFightMode] = useState<boolean>(
@@ -31,25 +33,33 @@ export function AgentsStep({
   const applyFightMode = (a: SquadronAgent): SquadronAgent =>
     squadronFightMode ? { ...a, fightMode: true } : a;
 
+  const updateAgents = (updater: (prev: SquadronAgent[]) => SquadronAgent[]) => {
+    setAgents((prev) => {
+      const next = updater(prev);
+      onChange?.(next);
+      return next;
+    });
+  };
+
   const handleAgentsGenerated = (newAgents: SquadronAgent[]) => {
-    setAgents((prev) => [...prev, ...newAgents.map(applyFightMode)]);
+    updateAgents((prev) => [...prev, ...newAgents.map(applyFightMode)]);
   };
 
   const handleAgentAdded = (agent: SquadronAgent) => {
-    setAgents((prev) => [...prev, applyFightMode(agent)]);
+    updateAgents((prev) => [...prev, applyFightMode(agent)]);
   };
 
   const handleCSVAgents = (newAgents: SquadronAgent[]) => {
-    setAgents((prev) => [...prev, ...newAgents.map(applyFightMode)]);
+    updateAgents((prev) => [...prev, ...newAgents.map(applyFightMode)]);
   };
 
   const handleRemove = (idx: number) => {
-    setAgents((prev) => prev.filter((_, i) => i !== idx));
+    updateAgents((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleFightModeToggle = (checked: boolean) => {
     setSquadronFightMode(checked);
-    setAgents((prev) => prev.map((a) => ({ ...a, fightMode: checked })));
+    updateAgents((prev) => prev.map((a) => ({ ...a, fightMode: checked })));
   };
 
   return (
