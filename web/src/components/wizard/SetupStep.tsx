@@ -11,11 +11,12 @@ interface SetupStepProps {
   currentBranch: string;
   branches: string[];
   onDone: (config: SetupConfig) => void;
+  onChange?: (config: SetupConfig) => void;
 }
 
 const SQUADRON_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
-function validateSquadronName(name: string): string | null {
+export function validateSquadronName(name: string): string | null {
   const trimmed = name.trim();
   if (!trimmed) return null;
   if (trimmed.length > 30) return "Max 30 characters";
@@ -23,6 +24,10 @@ function validateSquadronName(name: string): string | null {
     return "Only letters, digits, hyphens, and underscores; must start with a letter or digit";
   }
   return null;
+}
+
+export function isSetupComplete(config: SetupConfig): boolean {
+  return config.name.trim().length > 0 && validateSquadronName(config.name) === null;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -43,8 +48,13 @@ const labelStyle: React.CSSProperties = {
   display: "block",
 };
 
-export function SetupStep({ initial, currentBranch, branches, onDone }: SetupStepProps) {
+export function SetupStep({ initial, currentBranch, branches, onDone, onChange }: SetupStepProps) {
   const [config, setConfig] = useState<SetupConfig>(initial);
+
+  const updateConfig = (next: SetupConfig) => {
+    setConfig(next);
+    onChange?.(next);
+  };
 
   const trimmedName = config.name.trim();
   const nameError = validateSquadronName(config.name);
@@ -70,7 +80,7 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
               border: nameError ? "1px solid var(--red)" : inputStyle.border,
             }}
             value={config.name}
-            onChange={(e) => setConfig({ ...config, name: e.target.value })}
+            onChange={(e) => updateConfig({ ...config, name: e.target.value })}
             placeholder="homepage-fixes"
             aria-required="true"
             aria-invalid={nameError !== null}
@@ -96,7 +106,7 @@ export function SetupStep({ initial, currentBranch, branches, onDone }: SetupSte
             id="base-branch"
             style={{ ...inputStyle, appearance: "auto" }}
             value={config.baseBranch}
-            onChange={(e) => setConfig({ ...config, baseBranch: e.target.value })}
+            onChange={(e) => updateConfig({ ...config, baseBranch: e.target.value })}
           >
             {branches.length === 0 && (
               <option value={currentBranch}>{currentBranch}</option>

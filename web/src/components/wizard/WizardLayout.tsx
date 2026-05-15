@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { SquadronAgent, Persona } from "../../types";
 import { getBranches } from "../../api";
-import { SetupStep } from "./SetupStep";
+import { SetupStep, isSetupComplete } from "./SetupStep";
 import { AgentsStep } from "./AgentsStep";
 import { PersonaStep } from "./PersonaStep";
 import { ReviewStep } from "./ReviewStep";
@@ -47,7 +47,7 @@ export function WizardLayout({
   }, [step]);
 
   const handleSetupDone = (c: SquadronConfig) => {
-    setConfig(c);
+    setConfig({ ...c, name: c.name.trim() });
     setStep("agents");
   };
 
@@ -75,9 +75,25 @@ export function WizardLayout({
     setStep("agents");
   };
 
-  const steps: Step[] = ["setup", "agents", "review"];
-  const stepLabels = { setup: "Setup", agents: "Agents", persona: "Persona", review: "Review" };
-  const currentStepIndex = steps.indexOf(step);
+  type BreadcrumbStep = Exclude<Step, "persona">;
+  const steps: BreadcrumbStep[] = ["setup", "agents", "review"];
+  const stepLabels: Record<Step, string> = { setup: "Setup", agents: "Agents", persona: "Persona", review: "Review" };
+  const setupComplete = isSetupComplete(config);
+  const agentsComplete = agents.length > 0;
+  const stepEnabled: Record<BreadcrumbStep, boolean> = {
+    setup: true,
+    agents: setupComplete,
+    review: setupComplete && agentsComplete,
+  };
+  // While editing a persona, treat the underlying step as Agents for breadcrumb highlighting.
+  const breadcrumbStep: BreadcrumbStep = step === "persona" ? "agents" : step;
+  const currentStepIndex = steps.indexOf(breadcrumbStep);
+
+  const handleStepClick = (target: BreadcrumbStep) => {
+    if (!stepEnabled[target]) return;
+    if (target === step) return;
+    setStep(target);
+  };
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem" }}>
@@ -93,47 +109,36 @@ export function WizardLayout({
             padding: 0,
           }}
         >
-          {steps.map((s, i) => (
-            <li
-              key={s}
-              aria-current={step === s ? "step" : undefined}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                color: step === s ? "var(--blue)" : "var(--text-muted)",
-                fontWeight: step === s ? 600 : 400,
-              }}
-            >
-              <span
-                aria-hidden="true"
+          {steps.map((s, i) => {
+            const isCurrent = breadcrumbStep === s;
+            const enabled = stepEnabled[s];
+            const isCompleted = i < currentStepIndex;
+            return (
+              <li
+                key={s}
+                aria-current={isCurrent ? "step" : undefined}
                 style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  background:
-                    step === s ? "var(--blue)" : "var(--bg-secondary)",
-                  color: step === s ? "#fff" : "var(--text-muted)",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "0.75rem",
+                  gap: "0.5rem",
                 }}
               >
-                {i + 1}
-              </span>
-              <span>
-                {stepLabels[s]}
-                {i < currentStepIndex && <span className="sr-only"> (completed)</span>}
-                {step === s && <span className="sr-only"> (current)</span>}
-              </span>
-              {i < steps.length - 1 && (
-                <span style={{ color: "var(--text-muted)", marginLeft: "0.5rem" }} aria-hidden="true">
-                  →
-                </span>
-              )}
-            </li>
-          ))}
+                <StepButton
+                  enabled={enabled}
+                  isCurrent={isCurrent}
+                  onClick={() => handleStepClick(s)}
+                  label={stepLabels[s]}
+                  index={i}
+                  isCompleted={isCompleted}
+                />
+                {i < steps.length - 1 && (
+                  <span style={{ color: "var(--text-muted)", marginLeft: "0.5rem" }} aria-hidden="true">
+                    →
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ol>
       </nav>
 
@@ -144,6 +149,7 @@ export function WizardLayout({
             currentBranch={currentBranch}
             branches={branches}
             onDone={handleSetupDone}
+            onChange={setConfig}
           />
         )}
         {step === "agents" && (
@@ -154,6 +160,7 @@ export function WizardLayout({
             personas={personas}
             onDone={handleAgentsDone}
             onPickPersona={handlePickPersona}
+            onChange={setAgents}
           />
         )}
         {step === "persona" && (
@@ -179,5 +186,99 @@ export function WizardLayout({
         )}
       </div>
     </div>
+  );
+}
+
+interface StepButtonProps {
+  enabled: boolean;
+  isCurrent: boolean;
+  onClick: () => void;
+  label: string;
+  index: number;
+  isCompleted: boolean;
+}
+
+function StepButton({ enabled, isCurrent, onClick, label, index, isCompleted }: StepButtonProps) {
+  const [hovered, setHovered] = useState(false);
+  const interactive = enabled && !isCurrent;
+  const cursor = !enabled ? "not-allowed" : isCurrent ? "default" : "pointer";
+
+  let circleBg = "var(--bg-secondary)";
+  let circleColor = "var(--text-muted)";
+  if (isCurrent) {
+    circleBg = "var(--blue)";
+    circleColor = "#fff";
+  } else if (interactive && hovered) {
+    circleBg = "var(--blue)";
+    circleColor = "#fff";
+  }
+
+  let labelColor: string = "var(--text-muted)";
+  if (isCurrent) {
+    labelColor = "var(--blue)";
+  } else if (interactive && hovered) {
+    labelColor = "var(--blue)";
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+      disabled={!interactive}
+      aria-disabled={!enabled}
+      aria-label={
+        isCurrent
+          ? `${label} (current step)`
+          : isCompleted
+          ? `Go to ${label} (completed)`
+          : enabled
+          ? `Go to ${label}`
+          : `${label} (locked — complete previous step first)`
+      }
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.5rem",
+        background: "transparent",
+        border: "none",
+        padding: "0.25rem 0.5rem",
+        borderRadius: 6,
+        cursor,
+        fontFamily: "inherit",
+        fontSize: "inherit",
+        fontWeight: isCurrent ? 600 : 400,
+        color: labelColor,
+        opacity: enabled ? 1 : 0.5,
+        transition: "color 120ms ease, background 120ms ease",
+        outline: "none",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: "50%",
+          background: circleBg,
+          color: circleColor,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "0.75rem",
+          transition: "background 120ms ease, color 120ms ease",
+        }}
+      >
+        {index + 1}
+      </span>
+      <span>
+        {label}
+        {isCompleted && <span className="sr-only"> (completed)</span>}
+        {isCurrent && <span className="sr-only"> (current)</span>}
+      </span>
+    </button>
   );
 }
