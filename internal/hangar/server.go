@@ -225,10 +225,17 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.server = &http.Server{Handler: s.csrfMiddleware(s.mux)}
 
+	// serveCtx is canceled either when the caller cancels ctx OR when Serve
+	// returns of its own accord (listener closed, fatal error). Either path
+	// must unblock the shutdown goroutine so Start always returns instead
+	// of hanging on <-shutdownDone.
+	serveCtx, serveCancel := context.WithCancel(ctx)
+	defer serveCancel()
+
 	shutdownDone := make(chan struct{})
 	go func() {
 		defer close(shutdownDone)
-		<-ctx.Done()
+		<-serveCtx.Done()
 		shutdownCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		if err := s.server.Shutdown(shutdownCtx); err != nil {
@@ -240,7 +247,9 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.log(fmt.Sprintf("Server started on %s", s.addr))
 	err = s.server.Serve(listener)
-	// Wait for the shutdown goroutine to finish so callers see Stop() effects.
+	// Signal the shutdown goroutine so it proceeds even when Serve returned
+	// before ctx was canceled (e.g., a listener-level failure).
+	serveCancel()
 	<-shutdownDone
 	s.closeLogCh()
 	if errors.Is(err, http.ErrServerClosed) {
