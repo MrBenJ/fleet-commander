@@ -1,6 +1,6 @@
 module github.com/MrBenJ/fleet-commander
 
-go 1.25.0
+go 1.25.3
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0
