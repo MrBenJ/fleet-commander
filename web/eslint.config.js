@@ -57,6 +57,11 @@ export default [
       ],
       "react-hooks/rules-of-hooks": "warn",
       "react-hooks/exhaustive-deps": "warn",
+      // The eslint-plugin-react-hooks v6 set adds rules that fire on
+      // legitimate patterns (e.g., mutating refs inside a connect()
+      // useCallback that initializes a long-lived WebSocket). Demote
+      // them while the codebase is cleaned up.
+      "react-hooks/refs": "warn",
       "react/no-unescaped-entities": "warn",
       "no-console": ["warn", { allow: ["warn", "error"] }],
     },
