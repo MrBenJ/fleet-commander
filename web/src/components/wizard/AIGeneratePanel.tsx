@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { SquadronAgent } from "../../types";
-import { generateAgents } from "../../api";
+import { generateAgents, getAvailableDrivers } from "../../api";
 import { CodeEditor } from "../common/CodeEditor";
 import { sanitizeAgentName } from "../../utils/agentName";
 
@@ -93,14 +93,35 @@ interface AIGeneratePanelProps {
 
 export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGeneratePanelProps) {
   const [description, setDescription] = useState("");
+  const [selectedDriver, setSelectedDriver] = useState("claude-code");
+  const [codexAvailable, setCodexAvailable] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAvailableDrivers()
+      .then((drivers) => {
+        if (cancelled) return;
+        setCodexAvailable(
+          drivers.some((driver) => driver.name === "codex" && driver.available)
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCodexAvailable(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleGenerate = async () => {
     setGenerating(true);
     setGenError(null);
     try {
-      const result = await generateAgents(description);
+      const result = await generateAgents(description, selectedDriver);
       const newAgents = result.agents.map((a) => {
         const name = sanitizeAgentName(a.name);
         return {
@@ -133,6 +154,30 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
       <style>{loadingKeyframes}</style>
       <div id="ai-generate-heading" style={{ fontWeight: 600, color: "var(--purple)", marginBottom: "0.75rem" }}>
         AI Generate from Description
+      </div>
+      <div style={{ marginBottom: "0.75rem" }}>
+        <label htmlFor="ai-generate-driver" style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>
+          Driver
+        </label>
+        <select
+          id="ai-generate-driver"
+          value={selectedDriver}
+          onChange={(event) => setSelectedDriver(event.target.value)}
+          title={!codexAvailable ? "codex not installed" : undefined}
+          style={{
+            width: "100%",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            padding: "0.5rem 0.75rem",
+            background: "var(--bg-primary)",
+            color: "var(--text-primary)",
+          }}
+        >
+          <option value="claude-code">Claude Code</option>
+          <option value="codex" disabled={!codexAvailable} title={!codexAvailable ? "codex not installed" : undefined}>
+            Codex{codexAvailable ? "" : " (codex not installed)"}
+          </option>
+        </select>
       </div>
       <label id="ai-description-label" className="sr-only">Task description for AI generation</label>
       <div style={{ marginBottom: "1rem" }}>

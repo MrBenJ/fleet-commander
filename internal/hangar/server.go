@@ -66,13 +66,13 @@ type Server struct {
 }
 
 type Config struct {
-	Port             int
-	DevMode          bool
-	WebFS            fs.FS
-	RepoPath         string // repo root — for fleet.Load()
-	FleetDir         string // .fleet directory — for context/channels
-	TmuxPrefix       string
-	ControlSquadron  string // when set, open directly to mission control for this squadron
+	Port            int
+	DevMode         bool
+	WebFS           fs.FS
+	RepoPath        string // repo root — for fleet.Load()
+	FleetDir        string // .fleet directory — for context/channels
+	TmuxPrefix      string
+	ControlSquadron string // when set, open directly to mission control for this squadron
 }
 
 func NewServer(cfg Config) *Server {
@@ -102,6 +102,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/fleet", s.api.HandleGetFleet)
 	s.mux.HandleFunc("/api/fleet/personas", s.api.HandleGetPersonas)
 	s.mux.HandleFunc("/api/fleet/drivers", s.api.HandleGetDrivers)
+	s.mux.HandleFunc("/api/drivers/available", s.api.HandleAvailableDrivers)
 	s.mux.HandleFunc("/api/fleet/branches", s.api.HandleGetBranches)
 	s.mux.HandleFunc("/api/squadron/launch", s.api.HandleLaunchSquadron)
 	s.mux.HandleFunc("/api/squadron/generate", s.api.HandleGenerate)
