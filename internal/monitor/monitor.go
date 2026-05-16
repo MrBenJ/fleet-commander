@@ -82,7 +82,7 @@ func (m *Monitor) Check(agentName string) *Snapshot {
 		allLines := strings.Split(stripped, "\n")
 		bottomLines := getLastNonEmptyLines(allLines, paneBottomLines)
 		if state := drv.DetectState(bottomLines, stripped); state != nil {
-			snap.State = AgentState(*state)
+			snap.State = *state
 			m.snapshots[agentName] = snap
 			return snap
 		}
@@ -155,7 +155,7 @@ func detectState(lastLine, fullContent string) AgentState {
 	allLines := strings.Split(stripped, "\n")
 	bottomLines := getLastNonEmptyLines(allLines, paneBottomLines)
 	if state := d.DetectState(bottomLines, stripped); state != nil {
-		return AgentState(*state)
+		return *state
 	}
 	return StateWorking
 }
