@@ -16,15 +16,15 @@ func (d *CodexDriver) InteractiveCommand() []string {
 }
 
 func (d *CodexDriver) PlanCommand(prompt string) ([]byte, error) {
-	return exec.Command("codex", prompt).CombinedOutput()
+	return exec.Command("codex", "exec", "--color", "never", prompt).CombinedOutput()
 }
 
 func (d *CodexDriver) BuildCommand(opts LaunchOpts) string {
-	approvalMode := "suggest"
+	args := "--ask-for-approval on-request --sandbox workspace-write"
 	if opts.YoloMode {
-		approvalMode = "full-auto"
+		args = "--dangerously-bypass-approvals-and-sandbox"
 	}
-	return fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec codex --approval-mode %s \"$prompt\"\n", opts.PromptFile, approvalMode)
+	return fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec codex %s \"$prompt\"\n", opts.PromptFile, args)
 }
 
 // DetectState analyzes tmux pane content to determine Codex agent state.

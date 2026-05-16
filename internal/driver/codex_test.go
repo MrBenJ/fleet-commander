@@ -26,11 +26,14 @@ func TestCodexBuildCommand(t *testing.T) {
 		if !strings.Contains(script, "exec codex") {
 			t.Errorf("script does not contain 'exec codex': %q", script)
 		}
-		if !strings.Contains(script, "--approval-mode suggest") {
-			t.Errorf("normal mode should use --approval-mode suggest: %q", script)
+		if !strings.Contains(script, "--ask-for-approval on-request") {
+			t.Errorf("normal mode should use --ask-for-approval on-request: %q", script)
 		}
-		if strings.Contains(script, "full-auto") {
-			t.Errorf("normal mode should not contain full-auto: %q", script)
+		if !strings.Contains(script, "--sandbox workspace-write") {
+			t.Errorf("normal mode should use --sandbox workspace-write: %q", script)
+		}
+		if strings.Contains(script, "--dangerously-bypass-approvals-and-sandbox") {
+			t.Errorf("normal mode should not bypass approvals and sandbox: %q", script)
 		}
 		if !strings.Contains(script, "/tmp/prompt.txt") {
 			t.Errorf("script does not contain prompt file path: %q", script)
@@ -42,11 +45,14 @@ func TestCodexBuildCommand(t *testing.T) {
 			PromptFile: "/tmp/prompt.txt",
 			YoloMode:   true,
 		})
-		if !strings.Contains(script, "--approval-mode full-auto") {
-			t.Errorf("yolo mode should use --approval-mode full-auto: %q", script)
+		if !strings.Contains(script, "--dangerously-bypass-approvals-and-sandbox") {
+			t.Errorf("yolo mode should bypass approvals and sandbox: %q", script)
 		}
-		if strings.Contains(script, "suggest") {
-			t.Errorf("yolo mode should not contain suggest: %q", script)
+		if strings.Contains(script, "--ask-for-approval") {
+			t.Errorf("yolo mode should not configure approval prompts: %q", script)
+		}
+		if strings.Contains(script, "--sandbox workspace-write") {
+			t.Errorf("yolo mode should not configure workspace-write sandbox: %q", script)
 		}
 	})
 }
