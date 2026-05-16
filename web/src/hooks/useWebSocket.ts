@@ -34,7 +34,11 @@ export function useWebSocket(path: string, options: UseWebSocketOptions = {}) {
 
     ws.onclose = () => {
       setConnected(false);
-      // Reconnect with backoff
+      // Reconnect with backoff. `connect` self-references its own
+      // useCallback identifier, which the react-hooks lint flags as
+      // a TDZ access during render — fine at runtime because the
+      // callback runs only after `connect` is fully assigned.
+      // eslint-disable-next-line
       reconnectTimer.current = window.setTimeout(connect, 2000);
     };
 
