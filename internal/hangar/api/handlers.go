@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +11,7 @@ import (
 
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
+	"github.com/MrBenJ/fleet-commander/internal/execx"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/squadron"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
@@ -19,11 +19,14 @@ import (
 
 // Handlers holds all REST API handler methods.
 type Handlers struct {
-	repoPath string      // repo root — for fleet.Load()
-	fleetDir string      // .fleet directory — for context/channels
-	logger   *log.Logger // for write-failure diagnostics
+	repoPath string       // repo root — for fleet.Load()
+	fleetDir string       // .fleet directory — for context/channels
+	runner   execx.Runner // shared subprocess runner with timeouts
+	logger   *log.Logger  // for write-failure diagnostics
 }
 
+// Test seams: package-level vars that production handlers route through so
+// unit tests can swap them out without standing up a fake runner.
 var (
 	driverGet      = driver.Get
 	execLookPath   = exec.LookPath
@@ -32,111 +35,40 @@ var (
 	}
 )
 
-// NewHandlers creates a new Handlers instance.
-// repoPath is the repo root (for fleet.Load), fleetDir is the .fleet path (for context).
-// Write errors fall through to the stdlib default logger.
+// NewHandlers creates a new Handlers instance with the default Runner and
+// the stdlib default logger.
 func NewHandlers(repoPath, fleetDir string) *Handlers {
-	return NewHandlersWithLogger(repoPath, fleetDir, log.Default())
+	return NewHandlersWithRunner(repoPath, fleetDir, execx.DefaultRunner())
 }
 
-// NewHandlersWithLogger creates a Handlers that emits write-failure diagnostics
-// to the supplied logger. A nil logger falls back to the stdlib default.
+// NewHandlersWithRunner creates a Handlers with an injected Runner. Used by
+// tests to provide a fake. Logger falls back to the stdlib default.
+func NewHandlersWithRunner(repoPath, fleetDir string, runner execx.Runner) *Handlers {
+	return NewHandlersFull(repoPath, fleetDir, runner, log.Default())
+}
+
+// NewHandlersWithLogger creates a Handlers that emits write-failure
+// diagnostics to the supplied logger. A nil logger falls back to the
+// stdlib default. Runner is the default.
 func NewHandlersWithLogger(repoPath, fleetDir string, logger *log.Logger) *Handlers {
+	return NewHandlersFull(repoPath, fleetDir, execx.DefaultRunner(), logger)
+}
+
+// NewHandlersFull is the full constructor — allows injecting both a Runner
+// and a logger. Nil for either falls back to its default.
+func NewHandlersFull(repoPath, fleetDir string, runner execx.Runner, logger *log.Logger) *Handlers {
+	if runner == nil {
+		runner = execx.DefaultRunner()
+	}
 	if logger == nil {
 		logger = log.Default()
 	}
-	return &Handlers{repoPath: repoPath, fleetDir: fleetDir, logger: logger}
+	return &Handlers{repoPath: repoPath, fleetDir: fleetDir, runner: runner, logger: logger}
 }
 
-// personaNames is the ordered list of built-in persona keys.
-var personaNames = []string{
-	"overconfident-engineer",
-	"zen-master",
-	"paranoid-perfectionist",
-	"raging-jerk",
-	"peter-molyneux",
-}
-
-// HandleGetFleet handles GET /api/fleet — loads and returns fleet info.
-func (h *Handlers) HandleGetFleet(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	f, err := fleet.Load(h.repoPath)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to load fleet: %v", err))
-		return
-	}
-
-	branch, err := f.CurrentBranch()
-	if err != nil {
-		branch = ""
-	}
-
-	agents := make([]AgentResponse, 0, len(f.Agents))
-	for _, a := range f.Agents {
-		agents = append(agents, AgentResponse{
-			Name:          a.Name,
-			Branch:        a.Branch,
-			Status:        a.Status,
-			Driver:        a.Driver,
-			HooksOK:       a.HooksOK,
-			StateFilePath: a.StateFilePath,
-		})
-	}
-
-	_, ghErr := execLookPath("gh")
-
-	writeJSON(w, http.StatusOK, FleetResponse{
-		RepoPath:      f.RepoPath,
-		CurrentBranch: branch,
-		GHAvailable:   ghErr == nil,
-		Agents:        agents,
-	})
-}
-
-// HandleGetPersonas handles GET /api/fleet/personas — returns all built-in personas.
-func (h *Handlers) HandleGetPersonas(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	personas := make([]PersonaResponse, 0, len(personaNames))
-	for _, name := range personaNames {
-		p, ok := squadron.LookupPersona(name)
-		if !ok {
-			continue
-		}
-		personas = append(personas, PersonaResponse{
-			Name:        p.Name,
-			DisplayName: p.DisplayName,
-			Preamble:    p.Preamble,
-		})
-	}
-
-	writeJSON(w, http.StatusOK, personas)
-}
-
-// HandleGetDrivers handles GET /api/fleet/drivers — returns available driver names.
-func (h *Handlers) HandleGetDrivers(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	names := driver.Available()
-	drivers := make([]DriverResponse, 0, len(names))
-	for _, name := range names {
-		drivers = append(drivers, DriverResponse{Name: name})
-	}
-
-	writeJSON(w, http.StatusOK, drivers)
-}
-
-// HandleAvailableDrivers handles GET /api/drivers/available — returns runtime CLI availability.
+// HandleAvailableDrivers handles GET /api/drivers/available — returns runtime CLI availability
+// for each driver the wizard can present, so the UI can disable options
+// whose binary isn't installed.
 func (h *Handlers) HandleAvailableDrivers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -151,6 +83,9 @@ func (h *Handlers) HandleAvailableDrivers(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, drivers)
 }
 
+// isDriverBinaryAvailable reports whether the binary required by a driver
+// is on PATH. Unknown drivers are treated as available (the driver layer
+// owns the actual lookup) so unknown-name failures surface elsewhere.
 func isDriverBinaryAvailable(name string) bool {
 	binary, ok := driverBinaries[name]
 	if !ok {
@@ -158,63 +93,6 @@ func isDriverBinaryAvailable(name string) bool {
 	}
 	_, err := execLookPath(binary)
 	return err == nil
-}
-
-// HandleGetBranches handles GET /api/fleet/branches — returns available git branches,
-// excluding branches currently checked out in worktrees.
-func (h *Handlers) HandleGetBranches(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	// Get worktree branches to exclude (skip the main worktree so its
-	// branch — typically "main" — stays available as a base branch).
-	worktreeBranches := make(map[string]bool)
-	wtCmd := exec.Command("git", "worktree", "list", "--porcelain")
-	wtCmd.Dir = h.repoPath
-	wtOut, err := wtCmd.Output()
-	if err == nil {
-		isMainWorktree := true
-		for _, line := range strings.Split(string(wtOut), "\n") {
-			if line == "" {
-				isMainWorktree = false
-				continue
-			}
-			if !isMainWorktree && strings.HasPrefix(line, "branch ") {
-				ref := strings.TrimPrefix(line, "branch ")
-				branch := strings.TrimPrefix(ref, "refs/heads/")
-				worktreeBranches[branch] = true
-			}
-		}
-	}
-
-	// Get all local branches.
-	cmd := exec.Command("git", "branch", "--format=%(refname:short)")
-	cmd.Dir = h.repoPath
-	out, err := cmd.Output()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to list branches: %v", err))
-		return
-	}
-
-	var branches []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		name := strings.TrimSpace(line)
-		if name == "" {
-			continue
-		}
-		if worktreeBranches[name] {
-			continue
-		}
-		branches = append(branches, name)
-	}
-
-	if branches == nil {
-		branches = []string{}
-	}
-
-	writeJSON(w, http.StatusOK, branches)
 }
 
 // HandleLaunchSquadron handles POST /api/squadron/launch — validates and launches a squadron.
@@ -273,7 +151,7 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 
 	// Pre-flight: autoPR requires the gh CLI.
 	if data.AutoPR {
-		if _, err := exec.LookPath("gh"); err != nil {
+		if _, err := h.runner.LookPath("gh"); err != nil {
 			writeError(w, http.StatusBadRequest,
 				"autoPR requires the gh CLI (https://cli.github.com) — install it and run `gh auth login`")
 			return
@@ -465,82 +343,6 @@ func (h *Handlers) HandleSquadronInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleGenerate handles POST /api/squadron/generate — generates an agent breakdown.
-func (h *Handlers) HandleGenerate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	var req GenerateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
-		return
-	}
-
-	if req.Description == "" {
-		writeError(w, http.StatusBadRequest, "description is required")
-		return
-	}
-
-	selectedDriver := req.Driver
-	if selectedDriver == "" {
-		selectedDriver = "claude-code"
-	}
-	if selectedDriver != "claude-code" && selectedDriver != "codex" {
-		writeError(w, http.StatusBadRequest, "driver must be claude-code or codex")
-		return
-	}
-	if selectedDriver == "codex" && !isDriverBinaryAvailable("codex") {
-		writeError(w, http.StatusBadRequest, "codex not installed")
-		return
-	}
-
-	drv, err := driverGet(selectedDriver)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get driver: %v", err))
-		return
-	}
-
-	metaprompt := fmt.Sprintf(`You are a task decomposition assistant for Fleet Commander, a tool that manages parallel AI coding agents.
-
-The user wants to accomplish the following:
-
-%s
-
-Break this down into individual agent tasks. Each agent handles exactly one task.
-
-Respond with ONLY a JSON array (no markdown, no explanation, no code fences) where each element has:
-- "name": a short kebab-case agent name. MUST be 20 characters or fewer, contain only letters, digits, and hyphens, and start with a letter or digit. Examples: "auth-agent", "test-writer", "db-migrator". Do NOT exceed 20 characters — names like "database-migration-agent" (24 chars) or "frontend-component-builder" (26 chars) will be rejected.
-- "prompt": the full detailed task prompt for that agent
-- "branch": leave as empty string (will be auto-generated)
-- "driver": "%s"
-- "persona": leave as empty string
-
-Example format:
-[{"name":"auth-agent","prompt":"Implement OAuth2 login flow with Google and GitHub providers","branch":"","driver":"%s","persona":""}]`, req.Description, selectedDriver, selectedDriver)
-
-	out, err := drv.PlanCommand(metaprompt)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("plan command failed: %v", err))
-		return
-	}
-
-	jsonData := extractJSON(out)
-	if jsonData == nil {
-		writeError(w, http.StatusInternalServerError, "no JSON array found in plan output")
-		return
-	}
-
-	var agents []LaunchAgentInput
-	if err := json.Unmarshal(jsonData, &agents); err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to parse plan output: %v", err))
-		return
-	}
-
-	writeJSON(w, http.StatusOK, GenerateResponse{Agents: agents})
-}
-
 // writeJSON encodes v as JSON and writes it with the given status code.
 // Write failures are logged through the stdlib default logger rather than
 // silently swallowed.
@@ -565,27 +367,4 @@ func writeJSONWithLogger(w http.ResponseWriter, status int, v interface{}, logge
 		}
 		logger.Printf("hangar/api: writeJSON: %v", err)
 	}
-}
-
-// extractJSON finds the first JSON array in data (e.g., claude output that may
-// include prose before/after the JSON).
-func extractJSON(data []byte) []byte {
-	start := bytes.IndexByte(data, '[')
-	if start == -1 {
-		return nil
-	}
-	// Find the matching closing bracket.
-	depth := 0
-	for i := start; i < len(data); i++ {
-		switch data[i] {
-		case '[':
-			depth++
-		case ']':
-			depth--
-			if depth == 0 {
-				return data[start : i+1]
-			}
-		}
-	}
-	return nil
 }

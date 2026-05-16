@@ -50,12 +50,11 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract agent name from path: /ws/terminal/{agent}
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 {
+	agentName, ok := terminalAgentName(r.URL.Path)
+	if !ok {
 		http.Error(w, "missing agent name", http.StatusBadRequest)
 		return
 	}
-	agentName := parts[3]
 	sessionName := fmt.Sprintf("%s-%s", p.tmuxPrefix, agentName)
 
 	// Check session exists
@@ -131,6 +130,18 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 			ptmx.Write(msg)
 		}
 	}
+}
+
+func terminalAgentName(path string) (string, bool) {
+	parts := strings.Split(path, "/")
+	if len(parts) != 4 || parts[1] != "ws" || parts[2] != "terminal" {
+		return "", false
+	}
+	name := strings.TrimSpace(parts[3])
+	if name == "" || strings.ContainsAny(name, `/\`) {
+		return "", false
+	}
+	return name, true
 }
 
 func parseResize(msg []byte) *pty.Winsize {

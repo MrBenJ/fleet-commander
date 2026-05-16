@@ -1,21 +1,31 @@
 package worktree
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/MrBenJ/fleet-commander/internal/execx"
 )
 
 // Manager handles git worktree operations
 type Manager struct {
 	RepoPath string
+	runner   execx.Runner
 }
 
 // NewManager creates a new worktree manager for the given repo
 func NewManager(repoPath string) *Manager {
-	return &Manager{RepoPath: repoPath}
+	return NewManagerWithRunner(repoPath, execx.DefaultRunner())
+}
+
+func NewManagerWithRunner(repoPath string, runner execx.Runner) *Manager {
+	if runner == nil {
+		runner = execx.DefaultRunner()
+	}
+	return &Manager{RepoPath: repoPath, runner: runner}
 }
 
 // Create creates a new worktree with the given branch
@@ -25,32 +35,37 @@ func (m *Manager) Create(worktreePath, branch string) error {
 	if err := os.MkdirAll(parent, 0755); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
-	
+
 	// Check if repo has any commits (HEAD exists)
-	headCmd := exec.Command("git", "rev-parse", "--verify", "HEAD")
-	headCmd.Dir = m.RepoPath
-	headCmd.Stderr = nil
-	if err := headCmd.Run(); err != nil {
+	ctx := context.Background()
+	if err := m.runner.Run(ctx, execx.Options{
+		Name: "git",
+		Args: []string{"rev-parse", "--verify", "HEAD"},
+		Dir:  m.RepoPath,
+	}); err != nil {
 		// No commits yet - create an empty commit first
-		emptyCommitCmd := exec.Command("git", "commit", "--allow-empty", "-m", "Initial commit")
-		emptyCommitCmd.Dir = m.RepoPath
-		emptyCommitCmd.Stdout = os.Stdout
-		emptyCommitCmd.Stderr = os.Stderr
-		if err := emptyCommitCmd.Run(); err != nil {
+		if err := m.runner.Run(ctx, execx.Options{
+			Name:   "git",
+			Args:   []string{"commit", "--allow-empty", "-m", "Initial commit"},
+			Dir:    m.RepoPath,
+			Stdout: os.Stdout,
+			Stderr: os.Stderr,
+		}); err != nil {
 			return fmt.Errorf("failed to create initial commit: %w", err)
 		}
 	}
-	
+
 	// Create worktree with new branch
-	cmd := exec.Command("git", "worktree", "add", "-b", branch, worktreePath)
-	cmd.Dir = m.RepoPath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	if err := cmd.Run(); err != nil {
+	if err := m.runner.Run(ctx, execx.Options{
+		Name:   "git",
+		Args:   []string{"worktree", "add", "-b", branch, worktreePath},
+		Dir:    m.RepoPath,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}); err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -61,17 +76,18 @@ func (m *Manager) CreateFromExisting(worktreePath, branch string) error {
 	if err := os.MkdirAll(parent, 0755); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
-	
+
 	// Create worktree from existing branch (no -b flag)
-	cmd := exec.Command("git", "worktree", "add", worktreePath, branch)
-	cmd.Dir = m.RepoPath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	if err := cmd.Run(); err != nil {
+	if err := m.runner.Run(context.Background(), execx.Options{
+		Name:   "git",
+		Args:   []string{"worktree", "add", worktreePath, branch},
+		Dir:    m.RepoPath,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}); err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -79,15 +95,20 @@ func (m *Manager) CreateFromExisting(worktreePath, branch string) error {
 // normal remove → force remove → os.RemoveAll (for leftover directories
 // that git no longer recognizes as worktrees).
 func (m *Manager) Remove(worktreePath string) error {
-	cmd := exec.Command("git", "worktree", "remove", worktreePath)
-	cmd.Dir = m.RepoPath
-	if err := cmd.Run(); err == nil {
+	ctx := context.Background()
+	if err := m.runner.Run(ctx, execx.Options{
+		Name: "git",
+		Args: []string{"worktree", "remove", worktreePath},
+		Dir:  m.RepoPath,
+	}); err == nil {
 		return nil
 	}
 
-	forceCmd := exec.Command("git", "worktree", "remove", "--force", worktreePath)
-	forceCmd.Dir = m.RepoPath
-	if err := forceCmd.Run(); err == nil {
+	if err := m.runner.Run(ctx, execx.Options{
+		Name: "git",
+		Args: []string{"worktree", "remove", "--force", worktreePath},
+		Dir:  m.RepoPath,
+	}); err == nil {
 		return nil
 	}
 
@@ -102,10 +123,11 @@ func (m *Manager) Remove(worktreePath string) error {
 // The first entry is always the main worktree (the repo root itself).
 // Callers who want only fleet-managed worktrees must filter it out.
 func (m *Manager) List() ([]string, error) {
-	cmd := exec.Command("git", "worktree", "list", "--porcelain")
-	cmd.Dir = m.RepoPath
-
-	output, err := cmd.Output()
+	output, err := m.runner.Output(context.Background(), execx.Options{
+		Name: "git",
+		Args: []string{"worktree", "list", "--porcelain"},
+		Dir:  m.RepoPath,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list worktrees: %w", err)
 	}
@@ -121,10 +143,11 @@ func (m *Manager) List() ([]string, error) {
 
 // Move moves a worktree to a new path using git worktree move
 func (m *Manager) Move(oldPath, newPath string) error {
-	cmd := exec.Command("git", "worktree", "move", oldPath, newPath)
-	cmd.Dir = m.RepoPath
-
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := m.runner.CombinedOutput(context.Background(), execx.Options{
+		Name: "git",
+		Args: []string{"worktree", "move", oldPath, newPath},
+		Dir:  m.RepoPath,
+	}); err != nil {
 		return fmt.Errorf("failed to move worktree: %s", strings.TrimSpace(string(out)))
 	}
 

@@ -23,15 +23,15 @@ func TestServer_StartUnblocksWhenServeReturnsWithoutCtxCancel(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- srv.Start(ctx) }()
 
-	// Wait for Start to register its server.
+	// Wait for Start to register its listener.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if srv.Addr() != "" && srv.server != nil {
+		if srv.Addr() != "" {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if srv.server == nil {
+	if srv.Addr() == "" {
 		t.Fatal("server did not become ready")
 	}
 
@@ -41,8 +41,10 @@ func TestServer_StartUnblocksWhenServeReturnsWithoutCtxCancel(t *testing.T) {
 		}
 	}()
 
-	// Force Serve to return without canceling ctx.
-	if err := srv.server.Close(); err != nil {
+	// Force Serve to return without canceling ctx. Server.Close reads
+	// s.server under addrMu so it is race-safe even while Start is still
+	// initializing fields.
+	if err := srv.Close(); err != nil {
 		t.Fatalf("server.Close: %v", err)
 	}
 

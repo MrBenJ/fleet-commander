@@ -46,3 +46,25 @@ func TestNewProxy(t *testing.T) {
 		t.Errorf("expected prefix 'fleet', got %q", p.tmuxPrefix)
 	}
 }
+
+func TestTerminalAgentName(t *testing.T) {
+	tests := []struct {
+		path string
+		name string
+		ok   bool
+	}{
+		{"/ws/terminal/alpha", "alpha", true},
+		{"/ws/terminal/squadron-agent-1", "squadron-agent-1", true},
+		{"/ws/terminal/", "", false},
+		{"/ws/terminal/alpha/extra", "", false},
+		{"/api/terminal/alpha", "", false},
+		{"/ws/terminal/../alpha", "", false},
+	}
+
+	for _, tt := range tests {
+		name, ok := terminalAgentName(tt.path)
+		if ok != tt.ok || name != tt.name {
+			t.Fatalf("terminalAgentName(%q) = %q, %v; want %q, %v", tt.path, name, ok, tt.name, tt.ok)
+		}
+	}
+}

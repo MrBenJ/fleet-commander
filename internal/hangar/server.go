@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -65,6 +66,7 @@ type Server struct {
 	webFS      fs.FS
 	mux        *http.ServeMux
 	logger     *log.Logger
+	slogger    *slog.Logger
 	server     *http.Server
 	fleetDir   string
 	api        *api.Handlers
@@ -90,6 +92,7 @@ func NewServer(cfg Config) *Server {
 	logCh := make(chan string, 100)
 	cw := &chanWriter{ch: logCh}
 	logger := log.New(cw, "[hangar] ", log.Ltime)
+	slogger := newChannelLogger(logCh).With("component", "hangar")
 	listenHost := cfg.Listen
 	if listenHost == "" {
 		listenHost = DefaultListenHost
@@ -103,6 +106,7 @@ func NewServer(cfg Config) *Server {
 		fleetDir:   cfg.FleetDir,
 		mux:        http.NewServeMux(),
 		logger:     logger,
+		slogger:    slogger,
 		api:        api.NewHandlersWithLogger(cfg.RepoPath, cfg.FleetDir, logger),
 		hub:        ws.NewHubWithValidator(cfg.FleetDir, cfg.RepoPath, cfg.TmuxPrefix, logger, validator),
 		terminal:   terminal.NewProxyWithValidator(cfg.TmuxPrefix, logger, validator),
@@ -222,9 +226,8 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.addrMu.Lock()
 	s.addr = listener.Addr().String()
-	s.addrMu.Unlock()
-
 	s.server = &http.Server{Handler: s.csrfMiddleware(s.mux)}
+	s.addrMu.Unlock()
 
 	// serveCtx is canceled either when the caller cancels ctx OR when Serve
 	// returns of its own accord (listener closed, fatal error). Either path
@@ -282,6 +285,19 @@ func (s *Server) ListenHost() string {
 	return s.listenHost
 }
 
+// Close immediately stops the server, breaking active connections. Mainly
+// useful in tests to force Serve to return without canceling ctx.
+// Returns nil if Start has not yet bound a listener.
+func (s *Server) Close() error {
+	s.addrMu.RLock()
+	srv := s.server
+	s.addrMu.RUnlock()
+	if srv == nil {
+		return nil
+	}
+	return srv.Close()
+}
+
 func (s *Server) log(msg string) {
-	s.logger.Print(msg)
+	s.slogger.Info(msg)
 }

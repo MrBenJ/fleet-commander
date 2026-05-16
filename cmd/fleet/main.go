@@ -2,20 +2,17 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"runtime"
 	"syscall"
 
-	"github.com/spf13/cobra"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/hangar"
 	"github.com/MrBenJ/fleet-commander/internal/tui"
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
 )
 
 // Set via -ldflags at build time. Falls back to "dev" if unset.
@@ -109,61 +106,8 @@ var hangarCmd = &cobra.Command{
 			cfg.WebFS = webFS
 		}
 
-		srv := hangar.NewServer(cfg)
-		url := fmt.Sprintf("http://%s:%d", browserHost(listen), port)
-		if controlSquadron != "" {
-			url += "?squadron=" + controlSquadron
-		}
-
-		// Inherit the root signal-aware context so SIGINT/SIGTERM trigger a
-		// clean shutdown of the HTTP server and background goroutines.
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
-		errCh := make(chan error, 1)
-		go func() { errCh <- srv.Start(ctx) }()
-
-		if !noOpen {
-			openBrowser(url)
-		}
-
-		tuiModel := hangar.NewTUIModel(url)
-		p := tea.NewProgram(tuiModel)
-
-		// Feed server logs to TUI. The loop exits when LogCh closes (after
-		// srv.Start returns), so no goroutine leak.
-		go func() {
-			for msg := range srv.LogCh {
-				p.Send(hangar.LogMsg{Message: msg})
-			}
-		}()
-
-		runErr := func() error {
-			_, err := p.Run()
-			return err
-		}()
-
-		// Trigger shutdown and wait for the server to finish so deferred
-		// state writes and tmux cleanup complete before main returns.
-		cancel()
-		if srvErr := <-errCh; srvErr != nil && !errors.Is(srvErr, http.ErrServerClosed) {
-			if runErr == nil {
-				return srvErr
-			}
-			// Surface the original TUI error; log the secondary server error.
-			fmt.Fprintf(os.Stderr, "hangar server shutdown error: %v\n", srvErr)
-		}
-		return runErr
+		return hangar.NewApp(cfg, openBrowser).Run(cmd.Context(), noOpen)
 	},
-}
-
-// browserHost converts the listen host into something a browser can resolve.
-// "0.0.0.0" or empty becomes "localhost"; everything else passes through.
-func browserHost(listen string) string {
-	if listen == "" || listen == "0.0.0.0" || listen == "::" {
-		return "localhost"
-	}
-	return listen
 }
 
 func openBrowser(url string) {
