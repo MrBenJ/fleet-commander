@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,8 +19,9 @@ import (
 
 // Handlers holds all REST API handler methods.
 type Handlers struct {
-	repoPath string // repo root — for fleet.Load()
-	fleetDir string // .fleet directory — for context/channels
+	repoPath string      // repo root — for fleet.Load()
+	fleetDir string      // .fleet directory — for context/channels
+	logger   *log.Logger // for write-failure diagnostics
 }
 
 var (
@@ -32,8 +34,18 @@ var (
 
 // NewHandlers creates a new Handlers instance.
 // repoPath is the repo root (for fleet.Load), fleetDir is the .fleet path (for context).
+// Write errors fall through to the stdlib default logger.
 func NewHandlers(repoPath, fleetDir string) *Handlers {
-	return &Handlers{repoPath: repoPath, fleetDir: fleetDir}
+	return NewHandlersWithLogger(repoPath, fleetDir, log.Default())
+}
+
+// NewHandlersWithLogger creates a Handlers that emits write-failure diagnostics
+// to the supplied logger. A nil logger falls back to the stdlib default.
+func NewHandlersWithLogger(repoPath, fleetDir string, logger *log.Logger) *Handlers {
+	if logger == nil {
+		logger = log.Default()
+	}
+	return &Handlers{repoPath: repoPath, fleetDir: fleetDir, logger: logger}
 }
 
 // personaNames is the ordered list of built-in persona keys.
@@ -252,12 +264,10 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 		for _, e := range errs {
 			details = append(details, e.Error())
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{
+		writeJSONWithLogger(w, http.StatusBadRequest, ErrorResponse{
 			Error:   "validation failed",
 			Details: details,
-		})
+		}, h.logger)
 		return
 	}
 
@@ -532,17 +542,29 @@ Example format:
 }
 
 // writeJSON encodes v as JSON and writes it with the given status code.
+// Write failures are logged through the stdlib default logger rather than
+// silently swallowed.
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	writeJSONWithLogger(w, status, v, log.Default())
 }
 
 // writeError writes an ErrorResponse as JSON with the given status code.
+// Write failures are logged through the stdlib default logger.
 func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSONWithLogger(w, status, ErrorResponse{Error: msg}, log.Default())
+}
+
+// writeJSONWithLogger is the shared implementation that captures any
+// encode/write error and forwards it to the supplied logger.
+func writeJSONWithLogger(w http.ResponseWriter, status int, v interface{}, logger *log.Logger) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ErrorResponse{Error: msg})
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		if logger == nil {
+			logger = log.Default()
+		}
+		logger.Printf("hangar/api: writeJSON: %v", err)
+	}
 }
 
 // extractJSON finds the first JSON array in data (e.g., claude output that may

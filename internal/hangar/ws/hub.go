@@ -12,26 +12,32 @@ import (
 
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
+	"github.com/MrBenJ/fleet-commander/internal/hangar/security"
 	"github.com/MrBenJ/fleet-commander/internal/monitor"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
-
 type Hub struct {
-	clients      map[*websocket.Conn]bool
-	mu           sync.RWMutex
-	fleetDir     string
-	repoPath     string
-	logger       *log.Logger
-	lastLogLen   map[string]int
-	monitor      *monitor.Monitor
-	lastStates   map[string]string
+	clients    map[*websocket.Conn]bool
+	mu         sync.RWMutex
+	fleetDir   string
+	repoPath   string
+	logger     *log.Logger
+	lastLogLen map[string]int
+	monitor    *monitor.Monitor
+	lastStates map[string]string
+	upgrader   websocket.Upgrader
 }
 
+// NewHub constructs a Hub with a permissive origin check, intended for tests.
+// Production callers should use NewHubWithValidator.
 func NewHub(fleetDir, repoPath, tmuxPrefix string, logger *log.Logger) *Hub {
+	return NewHubWithValidator(fleetDir, repoPath, tmuxPrefix, logger, security.New(true))
+}
+
+// NewHubWithValidator constructs a Hub whose WebSocket upgrader rejects
+// cross-origin requests according to the supplied validator.
+func NewHubWithValidator(fleetDir, repoPath, tmuxPrefix string, logger *log.Logger, v *security.Validator) *Hub {
 	tm := tmux.NewManager(tmuxPrefix)
 	return &Hub{
 		clients:    make(map[*websocket.Conn]bool),
@@ -41,6 +47,11 @@ func NewHub(fleetDir, repoPath, tmuxPrefix string, logger *log.Logger) *Hub {
 		lastLogLen: make(map[string]int),
 		monitor:    monitor.NewMonitor(tm),
 		lastStates: make(map[string]string),
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return v.AllowWebSocket(r)
+			},
+		},
 	}
 }
 
@@ -50,7 +61,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Printf("WebSocket upgrade failed: %v", err)
 		return

@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
@@ -85,9 +89,11 @@ var hangarCmd = &cobra.Command{
 		noOpen, _ := cmd.Flags().GetBool("no-open")
 		devMode, _ := cmd.Flags().GetBool("dev")
 		controlSquadron, _ := cmd.Flags().GetString("control")
+		listen, _ := cmd.Flags().GetString("listen")
 
 		cfg := hangar.Config{
 			Port:            port,
+			Listen:          listen,
 			DevMode:         devMode,
 			RepoPath:        f.RepoPath,
 			FleetDir:        f.FleetDir,
@@ -104,12 +110,14 @@ var hangarCmd = &cobra.Command{
 		}
 
 		srv := hangar.NewServer(cfg)
-		url := fmt.Sprintf("http://localhost:%d", port)
+		url := fmt.Sprintf("http://%s:%d", browserHost(listen), port)
 		if controlSquadron != "" {
 			url += "?squadron=" + controlSquadron
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		// Inherit the root signal-aware context so SIGINT/SIGTERM trigger a
+		// clean shutdown of the HTTP server and background goroutines.
+		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
 		errCh := make(chan error, 1)
@@ -122,21 +130,40 @@ var hangarCmd = &cobra.Command{
 		tuiModel := hangar.NewTUIModel(url)
 		p := tea.NewProgram(tuiModel)
 
-		// Feed server logs to TUI
+		// Feed server logs to TUI. The loop exits when LogCh closes (after
+		// srv.Start returns), so no goroutine leak.
 		go func() {
 			for msg := range srv.LogCh {
 				p.Send(hangar.LogMsg{Message: msg})
 			}
 		}()
 
-		if _, err := p.Run(); err != nil {
-			cancel()
+		runErr := func() error {
+			_, err := p.Run()
 			return err
-		}
+		}()
 
+		// Trigger shutdown and wait for the server to finish so deferred
+		// state writes and tmux cleanup complete before main returns.
 		cancel()
-		return nil
+		if srvErr := <-errCh; srvErr != nil && !errors.Is(srvErr, http.ErrServerClosed) {
+			if runErr == nil {
+				return srvErr
+			}
+			// Surface the original TUI error; log the secondary server error.
+			fmt.Fprintf(os.Stderr, "hangar server shutdown error: %v\n", srvErr)
+		}
+		return runErr
 	},
+}
+
+// browserHost converts the listen host into something a browser can resolve.
+// "0.0.0.0" or empty becomes "localhost"; everything else passes through.
+func browserHost(listen string) string {
+	if listen == "" || listen == "0.0.0.0" || listen == "::" {
+		return "localhost"
+	}
+	return listen
 }
 
 func openBrowser(url string) {
@@ -218,15 +245,27 @@ func init() {
 	launchCmd.Flags().Bool("use-jump-sh", false, "Include jump.sh local dev server instructions in the system prompt")
 
 	hangarCmd.Flags().Int("port", 4242, "Port to listen on")
+	hangarCmd.Flags().String("listen", hangar.DefaultListenHost, "Address to bind on (use 0.0.0.0 to expose to the LAN — not recommended)")
 	hangarCmd.Flags().Bool("no-open", false, "Don't auto-open the browser")
 	hangarCmd.Flags().Bool("dev", false, "Proxy to Vite dev server for hot reload")
 	hangarCmd.Flags().String("control", "", "Open directly to mission control for the named squadron")
 	rootCmd.AddCommand(hangarCmd)
 }
 
-func main() {
-	if err := rootCmd.Execute(); err != nil {
+// run executes the root command with a signal-aware context and returns the
+// process exit code. SIGINT/SIGTERM cancel the context so background
+// goroutines (HTTP server, hub poll loop) can shut down gracefully before
+// the process exits.
+func run() int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
+}
+
+func main() {
+	os.Exit(run())
 }
