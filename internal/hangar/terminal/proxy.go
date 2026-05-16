@@ -21,18 +21,85 @@ var upgrader = websocket.Upgrader{
 type Proxy struct {
 	tmuxPrefix string
 	logger     *log.Logger
+
+	mu      sync.Mutex
+	closed  bool
+	// active tracks in-flight terminal sessions so Shutdown can drain them.
+	// The value is the cleanup func registered when the session started.
+	active map[uint64]func()
+	nextID uint64
 }
 
 func NewProxy(tmuxPrefix string, logger *log.Logger) *Proxy {
 	return &Proxy{
 		tmuxPrefix: tmuxPrefix,
 		logger:     logger,
+		active:     map[uint64]func(){},
 	}
+}
+
+// register stores a cleanup callback for an in-flight terminal session and
+// returns an unregister handle. Callers must invoke the handle when the
+// session ends so we don't leak entries — and must not invoke their own
+// cleanup if Shutdown already ran (Shutdown takes ownership of all entries
+// it sees).
+func (p *Proxy) register(cleanup func()) (id uint64, unregister func()) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		// Shutdown already started: run cleanup synchronously so the caller
+		// doesn't leak resources, and return a no-op unregister.
+		go cleanup()
+		return 0, func() {}
+	}
+	p.nextID++
+	id = p.nextID
+	p.active[id] = cleanup
+	return id, func() {
+		p.mu.Lock()
+		delete(p.active, id)
+		p.mu.Unlock()
+	}
+}
+
+// Shutdown drains all in-flight terminal sessions. Idempotent. Returns the
+// number of sessions that were cleaned up so callers can log a summary.
+func (p *Proxy) Shutdown() int {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return 0
+	}
+	p.closed = true
+	cleanups := make([]func(), 0, len(p.active))
+	for _, fn := range p.active {
+		cleanups = append(cleanups, fn)
+	}
+	p.active = map[uint64]func(){}
+	p.mu.Unlock()
+
+	for _, fn := range cleanups {
+		fn()
+	}
+	return len(cleanups)
+}
+
+// isClosed reports whether Shutdown has been called. Used by HandleTerminal
+// to refuse new sessions during shutdown.
+func (p *Proxy) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
 }
 
 func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 	if !websocket.IsWebSocketUpgrade(r) {
 		http.Error(w, "WebSocket upgrade required", http.StatusUpgradeRequired)
+		return
+	}
+
+	if p.isClosed() {
+		http.Error(w, "server shutting down", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -83,6 +150,10 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	defer cleanup()
+
+	// Register the session so Shutdown can tear it down on server exit.
+	_, unregister := p.register(cleanup)
+	defer unregister()
 
 	// pty → WebSocket (stdout to browser)
 	go func() {

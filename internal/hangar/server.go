@@ -168,10 +168,18 @@ func (s *Server) Start(ctx context.Context) error {
 	s.addr = listener.Addr().String()
 	s.addrMu.Unlock()
 
-	s.server = &http.Server{Handler: s.mux}
+	s.server = &http.Server{Handler: accessLogger(s.logger, s.mux)}
 
 	go func() {
 		<-ctx.Done()
+		// Tear down WS clients and PTY sessions BEFORE Shutdown so their
+		// goroutines unwind cleanly instead of being orphaned mid-stream.
+		if n := s.hub.Shutdown(); n > 0 {
+			s.log(fmt.Sprintf("Closed %d browser WebSocket(s) on shutdown", n))
+		}
+		if n := s.terminal.Shutdown(); n > 0 {
+			s.log(fmt.Sprintf("Closed %d terminal session(s) on shutdown", n))
+		}
 		s.server.Shutdown(context.Background())
 	}()
 

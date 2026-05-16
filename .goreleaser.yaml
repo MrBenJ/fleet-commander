@@ -1,0 +1,72 @@
+# Goreleaser v2 config for Fleet Commander.
+#
+# Local sanity check:        goreleaser check
+# Build a snapshot locally:  goreleaser build --snapshot --clean
+# Tag-driven release (CI):   goreleaser release --clean
+#
+# The release pipeline expects `make build-all` to have already populated
+# `cmd/fleet/webdist` with the compiled SPA so that go:embed picks it up.
+version: 2
+
+project_name: fleet
+
+before:
+  hooks:
+    - go mod tidy
+    # Build the web SPA so the embedded webdist is current.
+    - make build-web
+    - sh -c "rm -rf cmd/fleet/webdist && cp -r web/dist cmd/fleet/webdist"
+
+builds:
+  - id: fleet
+    main: ./cmd/fleet
+    binary: fleet
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE*
+      - README.md
+      - fleet.tmux.conf
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  draft: true
+  prerelease: auto
