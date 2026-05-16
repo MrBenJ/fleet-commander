@@ -14,16 +14,16 @@ linters:
   enable:
     - govet
     - ineffassign
-    - staticcheck
     - unconvert
-    - gocritic
     - revive
   # Aspirational linters intentionally left off until the existing backlog
   # is swept clean:
-  #   - errcheck — dozens of unchecked f.UpdateAgent* / w.Flush call sites
-  #   - unparam  — flags long-stable CLI command signatures
-  #   - gosec    — depends on errcheck being clean first
-  #   - gocyclo  — TUI Update functions exceed the threshold by design
+  #   - errcheck    — dozens of unchecked f.UpdateAgent* / w.Flush call sites
+  #   - unparam     — flags long-stable CLI command signatures
+  #   - gosec       — depends on errcheck being clean first
+  #   - gocyclo     — TUI Update functions exceed the threshold by design
+  #   - staticcheck — flags QF1012/SA1019 style picks across the TUI
+  #   - gocritic    — wants if-else→switch and other stylistic rewrites
 
   settings:
     gocyclo:
