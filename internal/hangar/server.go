@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -57,6 +58,7 @@ type Server struct {
 	webFS    fs.FS
 	mux      *http.ServeMux
 	logger   *log.Logger
+	slogger  *slog.Logger
 	server   *http.Server
 	fleetDir string
 	api      *api.Handlers
@@ -66,19 +68,20 @@ type Server struct {
 }
 
 type Config struct {
-	Port             int
-	DevMode          bool
-	WebFS            fs.FS
-	RepoPath         string // repo root — for fleet.Load()
-	FleetDir         string // .fleet directory — for context/channels
-	TmuxPrefix       string
-	ControlSquadron  string // when set, open directly to mission control for this squadron
+	Port            int
+	DevMode         bool
+	WebFS           fs.FS
+	RepoPath        string // repo root — for fleet.Load()
+	FleetDir        string // .fleet directory — for context/channels
+	TmuxPrefix      string
+	ControlSquadron string // when set, open directly to mission control for this squadron
 }
 
 func NewServer(cfg Config) *Server {
 	logCh := make(chan string, 100)
 	cw := &chanWriter{ch: logCh}
 	logger := log.New(cw, "[hangar] ", log.Ltime)
+	slogger := newChannelLogger(logCh).With("component", "hangar")
 	s := &Server{
 		port:     cfg.Port,
 		devMode:  cfg.DevMode,
@@ -86,6 +89,7 @@ func NewServer(cfg Config) *Server {
 		fleetDir: cfg.FleetDir,
 		mux:      http.NewServeMux(),
 		logger:   logger,
+		slogger:  slogger,
 		api:      api.NewHandlers(cfg.RepoPath, cfg.FleetDir),
 		hub:      ws.NewHub(cfg.FleetDir, cfg.RepoPath, cfg.TmuxPrefix, logger),
 		terminal: terminal.NewProxy(cfg.TmuxPrefix, logger),
@@ -192,5 +196,5 @@ func (s *Server) Port() int {
 }
 
 func (s *Server) log(msg string) {
-	s.logger.Print(msg)
+	s.slogger.Info(msg)
 }

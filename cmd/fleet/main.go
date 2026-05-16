@@ -1,17 +1,15 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
 
-	"github.com/spf13/cobra"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/hangar"
 	"github.com/MrBenJ/fleet-commander/internal/tui"
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
 )
 
 // Set via -ldflags at build time. Falls back to "dev" if unset.
@@ -103,39 +101,7 @@ var hangarCmd = &cobra.Command{
 			cfg.WebFS = webFS
 		}
 
-		srv := hangar.NewServer(cfg)
-		url := fmt.Sprintf("http://localhost:%d", port)
-		if controlSquadron != "" {
-			url += "?squadron=" + controlSquadron
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		errCh := make(chan error, 1)
-		go func() { errCh <- srv.Start(ctx) }()
-
-		if !noOpen {
-			openBrowser(url)
-		}
-
-		tuiModel := hangar.NewTUIModel(url)
-		p := tea.NewProgram(tuiModel)
-
-		// Feed server logs to TUI
-		go func() {
-			for msg := range srv.LogCh {
-				p.Send(hangar.LogMsg{Message: msg})
-			}
-		}()
-
-		if _, err := p.Run(); err != nil {
-			cancel()
-			return err
-		}
-
-		cancel()
-		return nil
+		return hangar.NewApp(cfg, openBrowser).Run(cmd.Context(), noOpen)
 	},
 }
 
