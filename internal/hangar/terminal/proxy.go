@@ -12,21 +12,34 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
-)
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
+	"github.com/MrBenJ/fleet-commander/internal/hangar/security"
+)
 
 type Proxy struct {
 	tmuxPrefix string
 	logger     *log.Logger
+	upgrader   websocket.Upgrader
 }
 
+// NewProxy constructs a Proxy with a permissive origin check, intended for
+// tests. Production callers should use NewProxyWithValidator.
 func NewProxy(tmuxPrefix string, logger *log.Logger) *Proxy {
+	return NewProxyWithValidator(tmuxPrefix, logger, security.New(true))
+}
+
+// NewProxyWithValidator constructs a Proxy whose WebSocket upgrader rejects
+// cross-origin requests using the supplied validator. This is critical for
+// the terminal proxy because it bridges a WebSocket directly to a shell PTY.
+func NewProxyWithValidator(tmuxPrefix string, logger *log.Logger, v *security.Validator) *Proxy {
 	return &Proxy{
 		tmuxPrefix: tmuxPrefix,
 		logger:     logger,
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return v.AllowWebSocket(r)
+			},
+		},
 	}
 }
 
@@ -53,7 +66,7 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upgrade to WebSocket
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := p.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		p.logger.Printf("terminal upgrade failed for %s: %v", agentName, err)
 		return

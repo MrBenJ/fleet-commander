@@ -3,6 +3,7 @@ package hangar
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -14,9 +15,15 @@ import (
 	"sync"
 
 	"github.com/MrBenJ/fleet-commander/internal/hangar/api"
+	"github.com/MrBenJ/fleet-commander/internal/hangar/security"
 	"github.com/MrBenJ/fleet-commander/internal/hangar/terminal"
 	"github.com/MrBenJ/fleet-commander/internal/hangar/ws"
 )
+
+// DefaultListenHost is the loopback bind address used when Config.Listen is
+// empty. The hangar exposes a PTY proxy and squadron-control API: binding to
+// localhost by default prevents anyone else on the LAN from driving it.
+const DefaultListenHost = "127.0.0.1"
 
 // chanWriter routes log output to a channel instead of stderr,
 // so log messages display cleanly in the Bubble Tea TUI.
@@ -50,46 +57,57 @@ func (w *chanWriter) Write(p []byte) (int, error) {
 }
 
 type Server struct {
-	port     int
-	addr     string
-	addrMu   sync.RWMutex
-	devMode  bool
-	webFS    fs.FS
-	mux      *http.ServeMux
-	logger   *log.Logger
-	server   *http.Server
-	fleetDir string
-	api      *api.Handlers
-	hub      *ws.Hub
-	terminal *terminal.Proxy
-	LogCh    chan string
+	port       int
+	listenHost string
+	addr       string
+	addrMu     sync.RWMutex
+	devMode    bool
+	webFS      fs.FS
+	mux        *http.ServeMux
+	logger     *log.Logger
+	server     *http.Server
+	fleetDir   string
+	api        *api.Handlers
+	hub        *ws.Hub
+	terminal   *terminal.Proxy
+	validator  *security.Validator
+	logChOnce  sync.Once
+	LogCh      chan string
 }
 
 type Config struct {
-	Port             int
-	DevMode          bool
-	WebFS            fs.FS
-	RepoPath         string // repo root — for fleet.Load()
-	FleetDir         string // .fleet directory — for context/channels
-	TmuxPrefix       string
-	ControlSquadron  string // when set, open directly to mission control for this squadron
+	Port            int
+	Listen          string // host to bind on; defaults to 127.0.0.1
+	DevMode         bool
+	WebFS           fs.FS
+	RepoPath        string // repo root — for fleet.Load()
+	FleetDir        string // .fleet directory — for context/channels
+	TmuxPrefix      string
+	ControlSquadron string // when set, open directly to mission control for this squadron
 }
 
 func NewServer(cfg Config) *Server {
 	logCh := make(chan string, 100)
 	cw := &chanWriter{ch: logCh}
 	logger := log.New(cw, "[hangar] ", log.Ltime)
+	listenHost := cfg.Listen
+	if listenHost == "" {
+		listenHost = DefaultListenHost
+	}
+	validator := security.New(cfg.DevMode)
 	s := &Server{
-		port:     cfg.Port,
-		devMode:  cfg.DevMode,
-		webFS:    cfg.WebFS,
-		fleetDir: cfg.FleetDir,
-		mux:      http.NewServeMux(),
-		logger:   logger,
-		api:      api.NewHandlers(cfg.RepoPath, cfg.FleetDir),
-		hub:      ws.NewHub(cfg.FleetDir, cfg.RepoPath, cfg.TmuxPrefix, logger),
-		terminal: terminal.NewProxy(cfg.TmuxPrefix, logger),
-		LogCh:    logCh,
+		port:       cfg.Port,
+		listenHost: listenHost,
+		devMode:    cfg.DevMode,
+		webFS:      cfg.WebFS,
+		fleetDir:   cfg.FleetDir,
+		mux:        http.NewServeMux(),
+		logger:     logger,
+		api:        api.NewHandlersWithLogger(cfg.RepoPath, cfg.FleetDir, logger),
+		hub:        ws.NewHubWithValidator(cfg.FleetDir, cfg.RepoPath, cfg.TmuxPrefix, logger, validator),
+		terminal:   terminal.NewProxyWithValidator(cfg.TmuxPrefix, logger, validator),
+		validator:  validator,
+		LogCh:      logCh,
 	}
 	s.routes()
 	return s
@@ -143,42 +161,100 @@ func (s *Server) routes() {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"status":"ok"}`))
+	if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
+		s.logger.Printf("handleHealth write: %v", err)
+	}
 }
 
 type spaHandler struct {
 	fs http.Handler
 }
 
+// ServeHTTP routes requests to the SPA. A path is treated as a real asset
+// only if its *last* segment contains a dot ("/assets/main.js" → asset,
+// "/foo.bar/baz" → SPA route). The previous heuristic checked the whole
+// path with strings.Contains and misrouted any path with a dotted directory.
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	if path != "/" && !strings.Contains(path, ".") {
+	if !isAssetPath(r.URL.Path) {
 		r.URL.Path = "/"
 	}
 	h.fs.ServeHTTP(w, r)
 }
 
+// isAssetPath returns true if the path looks like a static asset and should
+// be served directly rather than rewritten to index.html.
+func isAssetPath(p string) bool {
+	if p == "" || p == "/" {
+		return false
+	}
+	idx := strings.LastIndex(p, "/")
+	last := p[idx+1:]
+	return strings.Contains(last, ".")
+}
+
+// csrfMiddleware enforces an Origin allowlist on non-GET/HEAD/OPTIONS
+// requests. Defense-in-depth against drive-by browser POSTs, which would
+// otherwise be able to launch or stop squadrons.
+func (s *Server) csrfMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !s.validator.AllowCrossSiteRequest(r) {
+			http.Error(w, "forbidden: cross-origin request denied", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Start binds the listener, registers shutdown on ctx cancellation, and
+// blocks serving requests. Returns nil on graceful shutdown, or an error
+// from net.Listen / server.Serve otherwise.
 func (s *Server) Start(ctx context.Context) error {
-	addr := fmt.Sprintf(":%d", s.port)
+	addr := net.JoinHostPort(s.listenHost, fmt.Sprintf("%d", s.port))
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("port %d in use: %w (try --port)", s.port, err)
+		return fmt.Errorf("listen on %s: %w (try --port)", addr, err)
 	}
 	s.addrMu.Lock()
 	s.addr = listener.Addr().String()
 	s.addrMu.Unlock()
 
-	s.server = &http.Server{Handler: s.mux}
+	s.server = &http.Server{Handler: s.csrfMiddleware(s.mux)}
 
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
-		s.server.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		if err := s.server.Shutdown(shutdownCtx); err != nil {
+			s.logger.Printf("server shutdown: %v", err)
+		}
 	}()
 
 	go s.hub.PollLoop(ctx)
 
 	s.log(fmt.Sprintf("Server started on %s", s.addr))
-	return s.server.Serve(listener)
+	err = s.server.Serve(listener)
+	// Wait for the shutdown goroutine to finish so callers see Stop() effects.
+	<-shutdownDone
+	s.closeLogCh()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
+
+// closeLogCh closes the log channel exactly once so consumers can range
+// over it cleanly. Safe to call multiple times.
+func (s *Server) closeLogCh() {
+	s.logChOnce.Do(func() {
+		close(s.LogCh)
+	})
 }
 
 func (s *Server) Addr() string {
@@ -189,6 +265,11 @@ func (s *Server) Addr() string {
 
 func (s *Server) Port() int {
 	return s.port
+}
+
+// ListenHost returns the host portion of the bind address (e.g. "127.0.0.1").
+func (s *Server) ListenHost() string {
+	return s.listenHost
 }
 
 func (s *Server) log(msg string) {
