@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/MrBenJ/fleet-commander/security/advisories/new
+    about: Please use private vulnerability reporting — do NOT file a public issue.

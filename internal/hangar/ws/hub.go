@@ -20,6 +20,7 @@ import (
 type Hub struct {
 	clients    map[*websocket.Conn]bool
 	mu         sync.RWMutex
+	closed     bool
 	fleetDir   string
 	repoPath   string
 	logger     *log.Logger
@@ -61,6 +62,16 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Refuse new connections once shutdown has started — otherwise a client
+	// can race in between Shutdown's close and the listener stopping.
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		http.Error(w, "server shutting down", http.StatusServiceUnavailable)
+		return
+	}
+	h.mu.Unlock()
+
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Printf("WebSocket upgrade failed: %v", err)
@@ -68,6 +79,13 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.mu.Lock()
+	if h.closed {
+		// Lost the race: Shutdown started after we passed the first check
+		// but before we registered. Close the freshly-upgraded conn and bail.
+		h.mu.Unlock()
+		conn.Close()
+		return
+	}
 	h.clients[conn] = true
 	h.mu.Unlock()
 
@@ -125,6 +143,36 @@ func (h *Hub) PollLoop(ctx context.Context) {
 			h.pollAgentStates()
 		}
 	}
+}
+
+// Shutdown closes every connected WebSocket client and refuses new
+// connections. Idempotent: a second call is a no-op. Returns the count of
+// connections that were closed so callers can log a meaningful summary.
+func (h *Hub) Shutdown() int {
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return 0
+	}
+	h.closed = true
+	closing := make([]*websocket.Conn, 0, len(h.clients))
+	for c := range h.clients {
+		closing = append(closing, c)
+	}
+	// Empty the map up front so concurrent broadcast iterations see a clean
+	// state once we release the lock.
+	h.clients = map[*websocket.Conn]bool{}
+	h.mu.Unlock()
+
+	for _, c := range closing {
+		// Best-effort: send a close frame so well-behaved clients get a
+		// reason, then forcibly close. We don't care about errors here —
+		// the connection is going away regardless.
+		_ = c.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutting down"))
+		c.Close()
+	}
+	return len(closing)
 }
 
 func (h *Hub) pollAgentStates() {

@@ -246,12 +246,6 @@ func TestServer_GracefulShutdownClosesLogCh(t *testing.T) {
 		t.Fatal("server did not start")
 	}
 
-	// Drain any startup logs.
-	go func() {
-		for range srv.LogCh {
-		}
-	}()
-
 	cancel()
 	select {
 	case err := <-startErr:
@@ -262,16 +256,20 @@ func TestServer_GracefulShutdownClosesLogCh(t *testing.T) {
 		t.Fatal("server did not stop in time")
 	}
 
-	// LogCh should be closed by now.
-	select {
-	case _, ok := <-srv.LogCh:
-		if ok {
-			t.Error("LogCh should be closed after Start returns")
+	// Drain any buffered messages, then verify the channel is closed.
+	// A range over a closed-and-emptied channel exits cleanly; if LogCh
+	// were still open, the range would block past the deadline.
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		for range srv.LogCh {
 		}
-	default:
-		// Channel must be readable (closed channels return immediately) —
-		// if it blocks here, it's not closed. Fail the test.
-		t.Error("LogCh blocked on read; expected closed channel")
+	}()
+	select {
+	case <-drained:
+		// Pass — LogCh is closed and the range exited.
+	case <-time.After(2 * time.Second):
+		t.Error("LogCh did not close after Start returned")
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/MrBenJ/fleet-commander/internal/config"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/hangar"
 	"github.com/MrBenJ/fleet-commander/internal/tui"
@@ -82,7 +83,16 @@ var hangarCmd = &cobra.Command{
 			return fmt.Errorf("no fleet found — run `fleet init` first: %w", err)
 		}
 
+		// Env vars (FLEET_PORT, etc.) supply defaults; flags override when set.
+		envCfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("invalid FLEET_* environment: %w", err)
+		}
+
 		port, _ := cmd.Flags().GetInt("port")
+		if !cmd.Flags().Changed("port") {
+			port = envCfg.Port
+		}
 		noOpen, _ := cmd.Flags().GetBool("no-open")
 		devMode, _ := cmd.Flags().GetBool("dev")
 		controlSquadron, _ := cmd.Flags().GetString("control")

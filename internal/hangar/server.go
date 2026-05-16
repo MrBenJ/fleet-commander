@@ -226,7 +226,9 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.addrMu.Lock()
 	s.addr = listener.Addr().String()
-	s.server = &http.Server{Handler: s.csrfMiddleware(s.mux)}
+	// Wrap with both the access logger (request visibility) and the CSRF
+	// middleware (origin allowlist on state-changing requests).
+	s.server = &http.Server{Handler: accessLogger(s.logger, s.csrfMiddleware(s.mux))}
 	s.addrMu.Unlock()
 
 	// serveCtx is canceled either when the caller cancels ctx OR when Serve
@@ -240,6 +242,14 @@ func (s *Server) Start(ctx context.Context) error {
 	go func() {
 		defer close(shutdownDone)
 		<-serveCtx.Done()
+		// Tear down WS clients and PTY sessions BEFORE Shutdown so their
+		// goroutines unwind cleanly instead of being orphaned mid-stream.
+		if n := s.hub.Shutdown(); n > 0 {
+			s.log(fmt.Sprintf("Closed %d browser WebSocket(s) on shutdown", n))
+		}
+		if n := s.terminal.Shutdown(); n > 0 {
+			s.log(fmt.Sprintf("Closed %d terminal session(s) on shutdown", n))
+		}
 		shutdownCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		if err := s.server.Shutdown(shutdownCtx); err != nil {
