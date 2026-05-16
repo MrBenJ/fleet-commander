@@ -3,6 +3,7 @@ import {
   getFleet,
   getPersonas,
   getDrivers,
+  getAvailableDrivers,
   getBranches,
   launchSquadron,
   generateAgents,
@@ -77,6 +78,19 @@ describe("getDrivers", () => {
   });
 });
 
+describe("getAvailableDrivers", () => {
+  it("fetches runtime driver availability from /api/drivers/available", async () => {
+    const drivers = [{ name: "claude-code", available: true }, { name: "codex", available: false }];
+    mockFetch.mockResolvedValue(jsonResponse(drivers));
+
+    const result = await getAvailableDrivers();
+    expect(result).toEqual(drivers);
+    expect(mockFetch).toHaveBeenCalledWith("/api/drivers/available", expect.objectContaining({
+      headers: { "Content-Type": "application/json" },
+    }));
+  });
+});
+
 describe("getBranches", () => {
   it("fetches branches from /api/fleet/branches", async () => {
     const branches = ["main", "dev"];
@@ -117,11 +131,11 @@ describe("generateAgents", () => {
     const agents = { agents: [{ name: "gen1", branch: "b", prompt: "p", driver: "claude-code", persona: "" }] };
     mockFetch.mockResolvedValue(jsonResponse(agents));
 
-    const result = await generateAgents("build a thing");
+    const result = await generateAgents("build a thing", "codex");
     expect(result).toEqual(agents);
     expect(mockFetch).toHaveBeenCalledWith("/api/squadron/generate", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ description: "build a thing" }),
+      body: JSON.stringify({ description: "build a thing", driver: "codex" }),
     }));
   });
 });

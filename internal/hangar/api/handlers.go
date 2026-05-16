@@ -22,6 +22,14 @@ type Handlers struct {
 	fleetDir string // .fleet directory — for context/channels
 }
 
+var (
+	driverGet      = driver.Get
+	execLookPath   = exec.LookPath
+	driverBinaries = map[string]string{
+		"codex": "codex",
+	}
+)
+
 // NewHandlers creates a new Handlers instance.
 // repoPath is the repo root (for fleet.Load), fleetDir is the .fleet path (for context).
 func NewHandlers(repoPath, fleetDir string) *Handlers {
@@ -67,7 +75,7 @@ func (h *Handlers) HandleGetFleet(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	_, ghErr := exec.LookPath("gh")
+	_, ghErr := execLookPath("gh")
 
 	writeJSON(w, http.StatusOK, FleetResponse{
 		RepoPath:      f.RepoPath,
@@ -114,6 +122,30 @@ func (h *Handlers) HandleGetDrivers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, drivers)
+}
+
+// HandleAvailableDrivers handles GET /api/drivers/available — returns runtime CLI availability.
+func (h *Handlers) HandleAvailableDrivers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	drivers := []AvailableDriverResponse{
+		{Name: "claude-code", Available: true},
+		{Name: "codex", Available: isDriverBinaryAvailable("codex")},
+	}
+
+	writeJSON(w, http.StatusOK, drivers)
+}
+
+func isDriverBinaryAvailable(name string) bool {
+	binary, ok := driverBinaries[name]
+	if !ok {
+		return true
+	}
+	_, err := execLookPath(binary)
+	return err == nil
 }
 
 // HandleGetBranches handles GET /api/fleet/branches — returns available git branches,
@@ -423,7 +455,7 @@ func (h *Handlers) HandleSquadronInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleGenerate handles POST /api/squadron/generate — uses claude-code to generate an agent breakdown.
+// HandleGenerate handles POST /api/squadron/generate — generates an agent breakdown.
 func (h *Handlers) HandleGenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -441,7 +473,20 @@ func (h *Handlers) HandleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	drv, err := driver.Get("claude-code")
+	selectedDriver := req.Driver
+	if selectedDriver == "" {
+		selectedDriver = "claude-code"
+	}
+	if selectedDriver != "claude-code" && selectedDriver != "codex" {
+		writeError(w, http.StatusBadRequest, "driver must be claude-code or codex")
+		return
+	}
+	if selectedDriver == "codex" && !isDriverBinaryAvailable("codex") {
+		writeError(w, http.StatusBadRequest, "codex not installed")
+		return
+	}
+
+	drv, err := driverGet(selectedDriver)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get driver: %v", err))
 		return
@@ -459,11 +504,11 @@ Respond with ONLY a JSON array (no markdown, no explanation, no code fences) whe
 - "name": a short kebab-case agent name. MUST be 20 characters or fewer, contain only letters, digits, and hyphens, and start with a letter or digit. Examples: "auth-agent", "test-writer", "db-migrator". Do NOT exceed 20 characters — names like "database-migration-agent" (24 chars) or "frontend-component-builder" (26 chars) will be rejected.
 - "prompt": the full detailed task prompt for that agent
 - "branch": leave as empty string (will be auto-generated)
-- "driver": "claude-code"
+- "driver": "%s"
 - "persona": leave as empty string
 
 Example format:
-[{"name":"auth-agent","prompt":"Implement OAuth2 login flow with Google and GitHub providers","branch":"","driver":"claude-code","persona":""}]`, req.Description)
+[{"name":"auth-agent","prompt":"Implement OAuth2 login flow with Google and GitHub providers","branch":"","driver":"%s","persona":""}]`, req.Description, selectedDriver, selectedDriver)
 
 	out, err := drv.PlanCommand(metaprompt)
 	if err != nil {
