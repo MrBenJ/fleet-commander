@@ -19,7 +19,7 @@ import (
 // origin.
 func TestProxy_RejectsCrossOriginUpgrade(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	proxy := NewProxyWithValidator("fleet", logger, security.New(false))
+	proxy := NewProxyWithValidator("fleet", logger, security.New(false, "127.0.0.1"))
 
 	// The proxy first checks that a tmux session exists. If we point at a
 	// session name no test environment will ever have, the request 404s
@@ -59,7 +59,7 @@ func TestProxy_RejectsCrossOriginUpgrade(t *testing.T) {
 // would be rejected before that point with 403.
 func TestProxy_AcceptsSameOriginHandshakeReachesTmuxCheck(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	proxy := NewProxyWithValidator("fleet", logger, security.New(false))
+	proxy := NewProxyWithValidator("fleet", logger, security.New(false, "127.0.0.1"))
 
 	server := httptest.NewServer(http.HandlerFunc(proxy.HandleTerminal))
 	defer server.Close()
@@ -87,7 +87,7 @@ func TestProxy_AcceptsSameOriginHandshakeReachesTmuxCheck(t *testing.T) {
 // existing tmux session.
 func TestProxy_BlocksCrossOriginBeforeTmuxLookup(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	proxy := NewProxyWithValidator("fleet", logger, security.New(false))
+	proxy := NewProxyWithValidator("fleet", logger, security.New(false, "127.0.0.1"))
 
 	server := httptest.NewServer(http.HandlerFunc(proxy.HandleTerminal))
 	defer server.Close()

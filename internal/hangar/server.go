@@ -97,7 +97,7 @@ func NewServer(cfg Config) *Server {
 	if listenHost == "" {
 		listenHost = DefaultListenHost
 	}
-	validator := security.New(cfg.DevMode)
+	validator := security.New(cfg.DevMode, listenHost)
 	s := &Server{
 		port:       cfg.Port,
 		listenHost: listenHost,

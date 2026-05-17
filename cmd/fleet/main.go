@@ -97,6 +97,9 @@ var hangarCmd = &cobra.Command{
 		devMode, _ := cmd.Flags().GetBool("dev")
 		controlSquadron, _ := cmd.Flags().GetString("control")
 		listen, _ := cmd.Flags().GetString("listen")
+		if !cmd.Flags().Changed("listen") {
+			listen = envCfg.Listen
+		}
 
 		cfg := hangar.Config{
 			Port:            port,

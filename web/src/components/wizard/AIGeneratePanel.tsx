@@ -128,7 +128,7 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
           ...a,
           name,
           branch: a.branch || `squadron/${squadronName}/${name}`,
-          driver: a.driver || "claude-code",
+          driver: a.driver || selectedDriver,
           persona: a.persona || "",
         };
       });

@@ -19,16 +19,37 @@ import (
 //   - dev (devMode=true): additionally allow Vite dev server origins
 //     (port 5173 on loopback hosts).
 //
+// In addition, the Host header itself is validated against an allowlist
+// derived from the configured bind host. This blocks DNS rebinding: a victim
+// loads http://attacker.example:4242, attacker's DNS later flips to 127.0.0.1,
+// and the browser sends Host: attacker.example:4242 with a matching Origin —
+// hostsEqual alone would accept it. Anchoring on the server's bind host
+// breaks that chain.
+//
 // Empty Origin is treated as "non-browser client" and allowed, because
 // browsers always send Origin on the affected paths. CLI tools and tests
 // connect without an Origin header.
 type Validator struct {
 	devMode bool
+	// allowedHosts is the set of hostnames (lower-case, no port) that may
+	// appear in the request's Host header. nil means "any Host accepted" —
+	// used when the server bound to a wildcard address (0.0.0.0, ::) or
+	// when bindHost was not supplied (test fallback paths).
+	allowedHosts map[string]struct{}
 }
 
-// New constructs a Validator. devMode=true also permits the Vite dev server.
-func New(devMode bool) *Validator {
-	return &Validator{devMode: devMode}
+// New constructs a Validator.
+//
+//   - devMode=true also permits the Vite dev server origin.
+//   - bindHost is the address the server bound to (e.g. "127.0.0.1",
+//     "0.0.0.0", or a specific IP/hostname). It seeds the Host-header
+//     allowlist used for DNS-rebind defense. Pass "" to skip Host
+//     validation entirely.
+func New(devMode bool, bindHost string) *Validator {
+	return &Validator{
+		devMode:      devMode,
+		allowedHosts: deriveAllowedHosts(bindHost),
+	}
 }
 
 // AllowWebSocket returns true if the WebSocket upgrade request's Origin
@@ -51,6 +72,9 @@ func (v *Validator) AllowCrossSiteRequest(r *http.Request) bool {
 }
 
 func (v *Validator) allow(origin, host string) bool {
+	if !v.hostAllowed(host) {
+		return false
+	}
 	if origin == "" {
 		// Browsers always send Origin on the protected paths; an absent
 		// Origin therefore can't be a browser-driven cross-origin attack.
@@ -68,6 +92,46 @@ func (v *Validator) allow(origin, host string) bool {
 		return true
 	}
 	return false
+}
+
+// hostAllowed checks the request's Host header hostname against the
+// validator's allowlist. Returns true when no allowlist is configured.
+func (v *Validator) hostAllowed(host string) bool {
+	if v.allowedHosts == nil {
+		return true
+	}
+	h, _ := splitHostPort(host)
+	if h == "" {
+		h = host
+	}
+	if strings.HasPrefix(h, "[") && strings.HasSuffix(h, "]") {
+		h = h[1 : len(h)-1]
+	}
+	_, ok := v.allowedHosts[strings.ToLower(h)]
+	return ok
+}
+
+// deriveAllowedHosts builds the set of acceptable Host header hostnames from
+// the server's bind address.
+//
+//   - empty or wildcard bind ("", "0.0.0.0", "::") → nil (any Host accepted;
+//     the operator opted in to non-loopback exposure)
+//   - loopback bind → all loopback aliases (defeats DNS rebinding into the
+//     local server)
+//   - any other specific host → only that exact hostname
+func deriveAllowedHosts(bindHost string) map[string]struct{} {
+	h := strings.ToLower(strings.TrimSpace(bindHost))
+	if h == "" || isUnspecified(h) {
+		return nil
+	}
+	if isLoopback(h) {
+		return map[string]struct{}{
+			"127.0.0.1": {},
+			"localhost": {},
+			"::1":       {},
+		}
+	}
+	return map[string]struct{}{h: {}}
 }
 
 // hostsEqual compares two host:port values, normalizing loopback aliases so
@@ -105,6 +169,18 @@ func isLoopback(h string) bool {
 	}
 	ip := net.ParseIP(h)
 	return ip != nil && ip.IsLoopback()
+}
+
+// isUnspecified reports whether h is a wildcard bind address (0.0.0.0, ::).
+func isUnspecified(h string) bool {
+	if h == "" {
+		return false
+	}
+	if strings.HasPrefix(h, "[") && strings.HasSuffix(h, "]") {
+		h = h[1 : len(h)-1]
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsUnspecified()
 }
 
 func isViteDevHost(h string) bool {
