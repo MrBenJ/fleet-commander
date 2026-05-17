@@ -71,6 +71,17 @@ func (v *Validator) AllowCrossSiteRequest(r *http.Request) bool {
 	return v.allow(r.Header.Get("Origin"), r.Host)
 }
 
+// AllowHost returns true if the request's Host header is in the configured
+// allowlist. This is independent of method and Origin — use it as the outer
+// DNS-rebind gate that runs on every request, including read-only GETs that
+// the CSRF/Origin check intentionally skips.
+func (v *Validator) AllowHost(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	return v.hostAllowed(r.Host)
+}
+
 func (v *Validator) allow(origin, host string) bool {
 	if !v.hostAllowed(host) {
 		return false

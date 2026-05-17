@@ -170,6 +170,29 @@ func TestAllow_BindHostBehavior(t *testing.T) {
 	})
 }
 
+func TestAllowHost(t *testing.T) {
+	v := New(false, "127.0.0.1")
+
+	if !v.AllowHost(newRequest("127.0.0.1:4242", "")) {
+		t.Error("loopback Host should be allowed")
+	}
+	if !v.AllowHost(newRequest("localhost:4242", "")) {
+		t.Error("localhost alias should be allowed")
+	}
+	if v.AllowHost(newRequest("attacker.example:4242", "")) {
+		t.Error("non-loopback Host must be rejected for loopback-bound server")
+	}
+	if v.AllowHost(nil) {
+		t.Error("nil request must not be allowed")
+	}
+
+	// Permissive validator (wildcard or unset bind host) accepts anything.
+	permissive := New(false, "")
+	if !permissive.AllowHost(newRequest("anything.example:4242", "")) {
+		t.Error("permissive validator should accept any Host")
+	}
+}
+
 func TestIsLoopback(t *testing.T) {
 	cases := map[string]bool{
 		"":            false,
