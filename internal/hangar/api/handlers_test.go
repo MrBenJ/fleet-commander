@@ -848,9 +848,11 @@ func TestExtractJSON(t *testing.T) {
 			wantJSON: `[{"name":"a"},{"name":"b"}]`,
 		},
 		{
-			name:     "nested arrays",
-			input:    `[[1,2],[3,4]]`,
-			wantJSON: `[[1,2],[3,4]]`,
+			// A nested array inside an agent field must not be mistaken for
+			// the outer answer.
+			name:     "agent with nested array field",
+			input:    `[{"name":"a","tags":["x","y"]}]`,
+			wantJSON: `[{"name":"a","tags":["x","y"]}]`,
 		},
 		{
 			name:    "no array",
@@ -866,6 +868,37 @@ func TestExtractJSON(t *testing.T) {
 			name:    "unclosed bracket",
 			input:   `[{"name":"a"`,
 			wantNil: true,
+		},
+		{
+			// Codex's `exec` banner includes a non-JSON bracket pair before
+			// the actual array — must be skipped, not parsed.
+			name: "codex banner before array",
+			input: "OpenAI Codex v0.130.0\n--------\n" +
+				"sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/foo/.codex/memories]\n" +
+				"--------\ncodex\n" +
+				`[{"name":"a"},{"name":"b"}]` + "\ntokens used\n13,189\n",
+			wantJSON: `[{"name":"a"},{"name":"b"}]`,
+		},
+		{
+			// A ']' inside a JSON string must not prematurely close the array.
+			name:     "bracket inside string",
+			input:    `[{"prompt":"look for [BUG] markers"}]`,
+			wantJSON: `[{"prompt":"look for [BUG] markers"}]`,
+		},
+		{
+			// Codex echoes the user prompt (including the metaprompt's example
+			// JSON) before its actual reply. We must skip the echoed example
+			// and pick the real answer at the end.
+			name: "codex echoes prompt then answers",
+			input: "OpenAI Codex v0.130.0\n" +
+				"sandbox: workspace-write [workdir, /tmp]\n--------\n" +
+				"user\n" +
+				"Example format:\n" +
+				`[{"name":"auth-agent","prompt":"Implement OAuth2"}]` + "\n" +
+				"codex\n" +
+				`[{"name":"cat-poet","prompt":"Write cats.md"},{"name":"dog-poet","prompt":"Write dogs.md"}]` + "\n" +
+				"tokens used\n13,646\n",
+			wantJSON: `[{"name":"cat-poet","prompt":"Write cats.md"},{"name":"dog-poet","prompt":"Write dogs.md"}]`,
 		},
 	}
 

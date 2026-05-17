@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -84,24 +83,75 @@ Example format:
 	writeJSON(w, http.StatusOK, GenerateResponse{Agents: agents})
 }
 
-// extractJSON finds the first JSON array in data (e.g., claude output that may
-// include prose before/after the JSON).
+// extractJSON finds the JSON array carrying the planner's answer. Three driver
+// quirks force us to be careful:
+//
+//  1. Banners can contain decorative bracket pairs that aren't JSON — e.g.
+//     codex's "sandbox: workspace-write [workdir, /tmp, $TMPDIR, ...]" header.
+//  2. Codex echoes the entire user prompt back in stdout *before* the
+//     assistant reply, so the metaprompt's example JSON (`[{"name":"auth-agent",...}]`)
+//     appears as a valid array earlier than the actual answer.
+//  3. An agent object can hold nested arrays in its fields (e.g. tags), and
+//     those nested arrays mustn't be mistaken for the outer answer.
+//
+// Strategy: scan every '[' position with a string-aware balanced match, accept
+// only candidates that parse as an array of *objects* (matching the planner
+// schema), and return the *last* such candidate. Both supported drivers
+// (claude-code, codex) place the real answer at or near the end of stdout,
+// so taking the last schema-shaped array sidesteps the prompt echo.
 func extractJSON(data []byte) []byte {
-	start := bytes.IndexByte(data, '[')
-	if start == -1 {
-		return nil
+	var last []byte
+	for i := 0; i < len(data); i++ {
+		if data[i] != '[' {
+			continue
+		}
+		end, ok := matchJSONArray(data, i)
+		if !ok {
+			continue
+		}
+		candidate := data[i : end+1]
+		var probe []map[string]json.RawMessage
+		if json.Unmarshal(candidate, &probe) == nil && len(probe) > 0 {
+			last = candidate
+		}
+	}
+	return last
+}
+
+// matchJSONArray returns the index of the ']' that balances the '[' at start,
+// treating quoted JSON strings as opaque so brackets inside strings don't
+// throw off depth. Returns false if the bracket is never balanced.
+func matchJSONArray(data []byte, start int) (int, bool) {
+	if start >= len(data) || data[start] != '[' {
+		return 0, false
 	}
 	depth := 0
+	inStr := false
+	escape := false
 	for i := start; i < len(data); i++ {
-		switch data[i] {
+		c := data[i]
+		if inStr {
+			switch {
+			case escape:
+				escape = false
+			case c == '\\':
+				escape = true
+			case c == '"':
+				inStr = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inStr = true
 		case '[':
 			depth++
 		case ']':
 			depth--
 			if depth == 0 {
-				return data[start : i+1]
+				return i, true
 			}
 		}
 	}
-	return nil
+	return 0, false
 }
