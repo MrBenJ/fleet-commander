@@ -18,7 +18,7 @@ import (
 // would have succeeded under the previous CheckOrigin = true behavior.
 func TestHubWebSocket_RejectsCrossOrigin(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(false))
+	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(false, "127.0.0.1"))
 
 	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
 	defer server.Close()
@@ -49,7 +49,7 @@ func TestHubWebSocket_RejectsCrossOrigin(t *testing.T) {
 // when the Origin matches the server Host.
 func TestHubWebSocket_AcceptsSameOrigin(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(false))
+	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(false, "127.0.0.1"))
 
 	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
 	defer server.Close()
@@ -76,7 +76,7 @@ func TestHubWebSocket_AcceptsSameOrigin(t *testing.T) {
 // request must be rejected.
 func TestHubWebSocket_DevModeAllowsVite(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(true))
+	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(true, "127.0.0.1"))
 
 	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
 	defer server.Close()
@@ -93,7 +93,7 @@ func TestHubWebSocket_DevModeAllowsVite(t *testing.T) {
 
 func TestHubWebSocket_DevModeOffRejectsVite(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
-	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(false))
+	hub := NewHubWithValidator("/tmp/fake", "/tmp/fake", "fleet", logger, security.New(false, "127.0.0.1"))
 
 	server := httptest.NewServer(http.HandlerFunc(hub.HandleWebSocket))
 	defer server.Close()

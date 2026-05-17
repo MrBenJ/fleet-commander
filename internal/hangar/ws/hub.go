@@ -33,7 +33,7 @@ type Hub struct {
 // NewHub constructs a Hub with a permissive origin check, intended for tests.
 // Production callers should use NewHubWithValidator.
 func NewHub(fleetDir, repoPath, tmuxPrefix string, logger *log.Logger) *Hub {
-	return NewHubWithValidator(fleetDir, repoPath, tmuxPrefix, logger, security.New(true))
+	return NewHubWithValidator(fleetDir, repoPath, tmuxPrefix, logger, security.New(true, ""))
 }
 
 // NewHubWithValidator constructs a Hub whose WebSocket upgrader rejects

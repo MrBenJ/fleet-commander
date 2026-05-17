@@ -113,6 +113,34 @@ describe("AIGeneratePanel", () => {
     });
   });
 
+  it("falls back missing driver to selectedDriver, not claude-code", async () => {
+    const user = userEvent.setup();
+    const onAgentsGenerated = vi.fn();
+    mockGetAvailableDrivers.mockResolvedValue([
+      { name: "claude-code", available: true },
+      { name: "codex", available: true },
+    ]);
+    mockGenerateAgents.mockResolvedValue({
+      agents: [
+        { name: "no-driver", branch: "", prompt: "Build", driver: "", persona: "" },
+      ],
+    });
+
+    render(<AIGeneratePanel {...defaultProps} onAgentsGenerated={onAgentsGenerated} />);
+    await vi.waitFor(() => {
+      expect(screen.getByRole("option", { name: "Codex" })).not.toBeDisabled();
+    });
+    await user.selectOptions(screen.getByLabelText("Driver"), "codex");
+    await user.type(screen.getByLabelText("Task description for AI generation"), "tasks");
+    await user.click(screen.getByRole("button", { name: /generate agent breakdown/i }));
+
+    await vi.waitFor(() => {
+      expect(onAgentsGenerated).toHaveBeenCalledWith([
+        expect.objectContaining({ driver: "codex" }),
+      ]);
+    });
+  });
+
   it("displays an error message on generation failure", async () => {
     const user = userEvent.setup();
     mockGenerateAgents.mockRejectedValue(new Error("API down"));

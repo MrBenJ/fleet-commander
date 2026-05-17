@@ -97,7 +97,7 @@ func NewServer(cfg Config) *Server {
 	if listenHost == "" {
 		listenHost = DefaultListenHost
 	}
-	validator := security.New(cfg.DevMode)
+	validator := security.New(cfg.DevMode, listenHost)
 	s := &Server{
 		port:       cfg.Port,
 		listenHost: listenHost,
@@ -215,6 +215,23 @@ func (s *Server) csrfMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// hostMiddleware enforces the Host-header allowlist on *every* request,
+// including read-only GETs. CSRF is method-scoped (csrfMiddleware), but DNS
+// rebinding lets an attacker page execute same-origin reads against
+// /api/fleet, squadron /info, etc.; those leak repo path, agent state, and
+// stored prompts. The allowlist is derived from the server's bind host —
+// loopback bind only accepts loopback Host headers; wildcard bind accepts
+// any Host (operator opted in to LAN exposure).
+func (s *Server) hostMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.validator.AllowHost(r) {
+			http.Error(w, "forbidden: host header not allowed", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // Start binds the listener, registers shutdown on ctx cancellation, and
 // blocks serving requests. Returns nil on graceful shutdown, or an error
 // from net.Listen / server.Serve otherwise.
@@ -226,9 +243,10 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.addrMu.Lock()
 	s.addr = listener.Addr().String()
-	// Wrap with both the access logger (request visibility) and the CSRF
-	// middleware (origin allowlist on state-changing requests).
-	s.server = &http.Server{Handler: accessLogger(s.logger, s.csrfMiddleware(s.mux))}
+	// Order: access log wraps host allowlist wraps CSRF wraps mux.
+	// - hostMiddleware blocks DNS rebinding on every request (including GETs).
+	// - csrfMiddleware blocks drive-by writes on non-GET methods.
+	s.server = &http.Server{Handler: accessLogger(s.logger, s.hostMiddleware(s.csrfMiddleware(s.mux)))}
 	s.addrMu.Unlock()
 
 	// serveCtx is canceled either when the caller cancels ctx OR when Serve

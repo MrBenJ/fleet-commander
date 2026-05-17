@@ -799,6 +799,54 @@ func TestHandleGenerate_RejectsUnavailableCodex(t *testing.T) {
 	}
 }
 
+// TestHandleGenerate_NormalizesDriverToSelected ensures planner output that
+// omits or mismatches the driver field gets rewritten to the driver the user
+// actually picked. Without this, a Codex selection could yield Claude-backed
+// agents whenever the LLM dropped the field.
+func TestHandleGenerate_NormalizesDriverToSelected(t *testing.T) {
+	origDriverGet := driverGet
+	origLookPath := execLookPath
+	planner := &fakePlannerDriver{
+		name: "codex",
+		// Mix: one agent has wrong driver, one has empty driver.
+		output: []byte(`[{"name":"a","prompt":"x","branch":"","driver":"claude-code","persona":""},{"name":"b","prompt":"y","branch":"","driver":"","persona":""}]`),
+	}
+	driverGet = func(name string) (driver.Driver, error) { return planner, nil }
+	execLookPath = func(file string) (string, error) {
+		if file == "codex" {
+			return "/usr/local/bin/codex", nil
+		}
+		return "", exec.ErrNotFound
+	}
+	t.Cleanup(func() {
+		driverGet = origDriverGet
+		execLookPath = origLookPath
+	})
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"do it","driver":"codex"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp GenerateResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+	if len(resp.Agents) != 2 {
+		t.Fatalf("expected 2 agents, got %d", len(resp.Agents))
+	}
+	for i, a := range resp.Agents {
+		if a.Driver != "codex" {
+			t.Errorf("agent[%d] driver = %q, want %q", i, a.Driver, "codex")
+		}
+	}
+}
+
 func TestHandleGenerate_DefaultsToClaudeCodeDriver(t *testing.T) {
 	origDriverGet := driverGet
 	planner := &fakePlannerDriver{

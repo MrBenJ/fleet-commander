@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/MrBenJ/fleet-commander/internal/hangar/security"
 )
 
 func newCaptureLogger() (*log.Logger, *bytes.Buffer) {
@@ -101,6 +103,78 @@ func TestStatusRecorder_ExposesHijacker(t *testing.T) {
 	}
 	if rec.status != http.StatusSwitchingProtocols {
 		t.Errorf("after successful Hijack, status should be 101; got %d", rec.status)
+	}
+}
+
+// TestHostMiddleware_RejectsRebindOnGET asserts the DNS-rebind defense
+// covers read-only methods, not just CSRF-scoped state changes. A loopback-
+// bound server must refuse GET /api/fleet (and friends) when the Host header
+// names a non-loopback host, since DNS rebinding can give a foreign page
+// same-origin read access to repo path and stored prompts.
+func TestHostMiddleware_RejectsRebindOnGET(t *testing.T) {
+	s := &Server{
+		validator: security.New(false, "127.0.0.1"),
+	}
+	called := false
+	handler := s.hostMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+
+	cases := []struct {
+		name       string
+		method     string
+		host       string
+		wantStatus int
+		wantCalled bool
+	}{
+		{"GET rebound attacker", http.MethodGet, "attacker.example:4242", http.StatusForbidden, false},
+		{"HEAD rebound attacker", http.MethodHead, "attacker.example:4242", http.StatusForbidden, false},
+		{"OPTIONS rebound attacker", http.MethodOptions, "attacker.example:4242", http.StatusForbidden, false},
+		{"POST rebound attacker", http.MethodPost, "attacker.example:4242", http.StatusForbidden, false},
+		{"GET localhost passes", http.MethodGet, "127.0.0.1:4242", http.StatusOK, true},
+		{"GET localhost alias passes", http.MethodGet, "localhost:4242", http.StatusOK, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			called = false
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, "/api/fleet", nil)
+			req.Host = tc.host
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d", rr.Code, tc.wantStatus)
+			}
+			if called != tc.wantCalled {
+				t.Errorf("downstream called = %v, want %v", called, tc.wantCalled)
+			}
+		})
+	}
+}
+
+// TestHostMiddleware_WildcardBindAllowsAny asserts an operator who explicitly
+// binds 0.0.0.0 (LAN exposure) opts out of Host filtering — the middleware
+// must not block their own custom hostnames.
+func TestHostMiddleware_WildcardBindAllowsAny(t *testing.T) {
+	s := &Server{
+		validator: security.New(false, "0.0.0.0"),
+	}
+	called := false
+	handler := s.hostMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/fleet", nil)
+	req.Host = "my-server.lan:4242"
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("wildcard bind must accept LAN Host, got status %d", rr.Code)
+	}
+	if !called {
+		t.Error("downstream handler should have been invoked")
 	}
 }
 

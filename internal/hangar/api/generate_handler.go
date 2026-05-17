@@ -80,6 +80,13 @@ Example format:
 		return
 	}
 
+	// The planner is instructed to populate driver, but LLM output isn't
+	// guaranteed. Anchor each agent to the driver the user actually picked so
+	// selecting Codex never silently produces Claude-backed agents.
+	for i := range agents {
+		agents[i].Driver = selectedDriver
+	}
+
 	writeJSON(w, http.StatusOK, GenerateResponse{Agents: agents})
 }
 

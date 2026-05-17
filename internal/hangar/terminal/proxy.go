@@ -32,7 +32,7 @@ type Proxy struct {
 // NewProxy constructs a Proxy with a permissive origin check, intended for
 // tests. Production callers should use NewProxyWithValidator.
 func NewProxy(tmuxPrefix string, logger *log.Logger) *Proxy {
-	return NewProxyWithValidator(tmuxPrefix, logger, security.New(true))
+	return NewProxyWithValidator(tmuxPrefix, logger, security.New(true, ""))
 }
 
 // NewProxyWithValidator constructs a Proxy whose WebSocket upgrader rejects
