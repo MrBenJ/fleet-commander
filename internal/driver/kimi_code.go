@@ -127,8 +127,10 @@ func (d *KimiCodeDriver) DetectState(bottomLines []string, fullContent string) *
 	return nil
 }
 
-// TODO: hook injection once Kimi's hook config schema is publicly documented.
-func (d *KimiCodeDriver) InjectHooks(worktreePath string) error  { return nil }
+// Hook injection is intentionally a no-op until Kimi publishes a stable hook
+// config schema. When that lands, mirror the Claude Code implementation in
+// internal/hooks. Tracked: see TODO.md (M8 of TECH_DEBT_PLAN.md).
+func (d *KimiCodeDriver) InjectHooks(worktreePath string) error { return nil }
 func (d *KimiCodeDriver) RemoveHooks(worktreePath string) error { return nil }
 
 func (d *KimiCodeDriver) CheckAvailable() error {

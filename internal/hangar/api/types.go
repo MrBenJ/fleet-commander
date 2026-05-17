@@ -26,6 +26,11 @@ type DriverResponse struct {
 	Name string `json:"name"`
 }
 
+type AvailableDriverResponse struct {
+	Name      string `json:"name"`
+	Available bool   `json:"available"`
+}
+
 type LaunchRequest struct {
 	Name         string             `json:"name"`
 	Consensus    string             `json:"consensus"`
@@ -53,6 +58,7 @@ type LaunchResponse struct {
 
 type GenerateRequest struct {
 	Description string `json:"description"`
+	Driver      string `json:"driver,omitempty"`
 }
 
 type GenerateResponse struct {
@@ -60,11 +66,11 @@ type GenerateResponse struct {
 }
 
 type SquadronInfoResponse struct {
-	Name      string               `json:"name"`
-	Agents    []SquadronAgentInfo  `json:"agents"`
-	Consensus string               `json:"consensus"`
-	AutoMerge bool                 `json:"autoMerge"`
-	Members   []string             `json:"members"`
+	Name      string              `json:"name"`
+	Agents    []SquadronAgentInfo `json:"agents"`
+	Consensus string              `json:"consensus"`
+	AutoMerge bool                `json:"autoMerge"`
+	Members   []string            `json:"members"`
 }
 
 type SquadronAgentInfo struct {

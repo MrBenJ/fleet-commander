@@ -11,12 +11,14 @@ build:
 build-web:
 	cd web && npm install && npm run build
 
-# Copy dist into cmd/fleet/ for go:embed, then install to PATH
+# Copy dist into cmd/fleet/ for go:embed, then install to PATH.
+# We pass -a to force-rebuild only this binary so the embedded webdist is
+# picked up — go clean -cache is intentionally NOT used (it would wipe the
+# user's entire Go build cache, including unrelated projects).
 build-all: build-web
 	rm -rf cmd/fleet/webdist
 	cp -r web/dist cmd/fleet/webdist
-	go clean -cache
-	go install -ldflags "$(LDFLAGS)" ./cmd/fleet/
+	go install -a -ldflags "$(LDFLAGS)" ./cmd/fleet/
 	rm -rf cmd/fleet/webdist
 	mkdir -p cmd/fleet/webdist && touch cmd/fleet/webdist/.gitkeep
 

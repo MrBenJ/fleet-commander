@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
+	"syscall"
 
-	"github.com/spf13/cobra"
+	"github.com/MrBenJ/fleet-commander/internal/config"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/hangar"
 	"github.com/MrBenJ/fleet-commander/internal/tui"
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
 )
 
 // Set via -ldflags at build time. Falls back to "dev" if unset.
@@ -81,13 +83,24 @@ var hangarCmd = &cobra.Command{
 			return fmt.Errorf("no fleet found — run `fleet init` first: %w", err)
 		}
 
+		// Env vars (FLEET_PORT, etc.) supply defaults; flags override when set.
+		envCfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("invalid FLEET_* environment: %w", err)
+		}
+
 		port, _ := cmd.Flags().GetInt("port")
+		if !cmd.Flags().Changed("port") {
+			port = envCfg.Port
+		}
 		noOpen, _ := cmd.Flags().GetBool("no-open")
 		devMode, _ := cmd.Flags().GetBool("dev")
 		controlSquadron, _ := cmd.Flags().GetString("control")
+		listen, _ := cmd.Flags().GetString("listen")
 
 		cfg := hangar.Config{
 			Port:            port,
+			Listen:          listen,
 			DevMode:         devMode,
 			RepoPath:        f.RepoPath,
 			FleetDir:        f.FleetDir,
@@ -103,39 +116,7 @@ var hangarCmd = &cobra.Command{
 			cfg.WebFS = webFS
 		}
 
-		srv := hangar.NewServer(cfg)
-		url := fmt.Sprintf("http://localhost:%d", port)
-		if controlSquadron != "" {
-			url += "?squadron=" + controlSquadron
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		errCh := make(chan error, 1)
-		go func() { errCh <- srv.Start(ctx) }()
-
-		if !noOpen {
-			openBrowser(url)
-		}
-
-		tuiModel := hangar.NewTUIModel(url)
-		p := tea.NewProgram(tuiModel)
-
-		// Feed server logs to TUI
-		go func() {
-			for msg := range srv.LogCh {
-				p.Send(hangar.LogMsg{Message: msg})
-			}
-		}()
-
-		if _, err := p.Run(); err != nil {
-			cancel()
-			return err
-		}
-
-		cancel()
-		return nil
+		return hangar.NewApp(cfg, openBrowser).Run(cmd.Context(), noOpen)
 	},
 }
 
@@ -218,15 +199,27 @@ func init() {
 	launchCmd.Flags().Bool("use-jump-sh", false, "Include jump.sh local dev server instructions in the system prompt")
 
 	hangarCmd.Flags().Int("port", 4242, "Port to listen on")
+	hangarCmd.Flags().String("listen", hangar.DefaultListenHost, "Address to bind on (use 0.0.0.0 to expose to the LAN — not recommended)")
 	hangarCmd.Flags().Bool("no-open", false, "Don't auto-open the browser")
 	hangarCmd.Flags().Bool("dev", false, "Proxy to Vite dev server for hot reload")
 	hangarCmd.Flags().String("control", "", "Open directly to mission control for the named squadron")
 	rootCmd.AddCommand(hangarCmd)
 }
 
-func main() {
-	if err := rootCmd.Execute(); err != nil {
+// run executes the root command with a signal-aware context and returns the
+// process exit code. SIGINT/SIGTERM cancel the context so background
+// goroutines (HTTP server, hub poll loop) can shut down gracefully before
+// the process exits.
+func run() int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
+}
+
+func main() {
+	os.Exit(run())
 }

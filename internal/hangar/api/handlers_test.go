@@ -12,7 +12,29 @@ import (
 	"time"
 
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
+	"github.com/MrBenJ/fleet-commander/internal/driver"
 )
+
+type fakePlannerDriver struct {
+	name       string
+	lastPrompt string
+	output     []byte
+	err        error
+}
+
+func (d *fakePlannerDriver) Name() string { return d.name }
+func (d *fakePlannerDriver) InteractiveCommand() []string {
+	return []string{d.name}
+}
+func (d *fakePlannerDriver) BuildCommand(driver.LaunchOpts) string { return "" }
+func (d *fakePlannerDriver) PlanCommand(prompt string) ([]byte, error) {
+	d.lastPrompt = prompt
+	return d.output, d.err
+}
+func (d *fakePlannerDriver) DetectState([]string, string) *driver.AgentState { return nil }
+func (d *fakePlannerDriver) InjectHooks(string) error                        { return nil }
+func (d *fakePlannerDriver) RemoveHooks(string) error                        { return nil }
+func (d *fakePlannerDriver) CheckAvailable() error                           { return nil }
 
 // createTestFleet sets up a temp dir that looks like a fleet repo:
 // a git repo with .fleet/config.json containing the given agents.
@@ -114,6 +136,43 @@ func TestHandleGetDrivers(t *testing.T) {
 
 	if len(drivers) < 3 {
 		t.Fatalf("expected at least 3 drivers, got %d", len(drivers))
+	}
+}
+
+func TestHandleAvailableDrivers(t *testing.T) {
+	origLookPath := execLookPath
+	execLookPath = func(file string) (string, error) {
+		if file == "codex" {
+			return "", exec.ErrNotFound
+		}
+		return "/bin/" + file, nil
+	}
+	t.Cleanup(func() { execLookPath = origLookPath })
+
+	h := NewHandlers("/tmp/fake-repo", "/tmp/fake-repo/.fleet")
+	req := httptest.NewRequest(http.MethodGet, "/api/drivers/available", nil)
+	w := httptest.NewRecorder()
+
+	h.HandleAvailableDrivers(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var drivers []AvailableDriverResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &drivers); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+
+	availability := map[string]bool{}
+	for _, d := range drivers {
+		availability[d.Name] = d.Available
+	}
+	if !availability["claude-code"] {
+		t.Fatal("expected claude-code to always be available")
+	}
+	if availability["codex"] {
+		t.Fatal("expected codex to be unavailable when binary lookup fails")
 	}
 }
 
@@ -671,6 +730,104 @@ func TestHandleGenerate_EmptyBody(t *testing.T) {
 	}
 }
 
+func TestHandleGenerate_UsesSelectedDriver(t *testing.T) {
+	origDriverGet := driverGet
+	origLookPath := execLookPath
+	planner := &fakePlannerDriver{
+		name:   "codex",
+		output: []byte(`[{"name":"codex-agent","prompt":"Do codex things","branch":"","driver":"codex","persona":""}]`),
+	}
+	driverGet = func(name string) (driver.Driver, error) {
+		if name != "codex" {
+			t.Fatalf("expected codex driver lookup, got %q", name)
+		}
+		return planner, nil
+	}
+	execLookPath = func(file string) (string, error) {
+		if file == "codex" {
+			return "/usr/local/bin/codex", nil
+		}
+		return "", exec.ErrNotFound
+	}
+	t.Cleanup(func() {
+		driverGet = origDriverGet
+		execLookPath = origLookPath
+	})
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"split this up","driver":"codex"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(planner.lastPrompt, `"driver": "codex"`) {
+		t.Fatalf("expected metaprompt to request codex driver, got %q", planner.lastPrompt)
+	}
+
+	var resp GenerateResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+	if len(resp.Agents) != 1 || resp.Agents[0].Driver != "codex" {
+		t.Fatalf("expected codex agent response, got %+v", resp.Agents)
+	}
+}
+
+func TestHandleGenerate_RejectsUnavailableCodex(t *testing.T) {
+	origLookPath := execLookPath
+	execLookPath = func(file string) (string, error) {
+		if file == "codex" {
+			return "", exec.ErrNotFound
+		}
+		return "/bin/" + file, nil
+	}
+	t.Cleanup(func() { execLookPath = origLookPath })
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"split this up","driver":"codex"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleGenerate_DefaultsToClaudeCodeDriver(t *testing.T) {
+	origDriverGet := driverGet
+	planner := &fakePlannerDriver{
+		name:   "claude-code",
+		output: []byte(`[{"name":"claude-agent","prompt":"Do claude things","branch":"","driver":"claude-code","persona":""}]`),
+	}
+	driverGet = func(name string) (driver.Driver, error) {
+		if name != "claude-code" {
+			t.Fatalf("expected claude-code driver lookup, got %q", name)
+		}
+		return planner, nil
+	}
+	t.Cleanup(func() { driverGet = origDriverGet })
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"split this up"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(planner.lastPrompt, `"driver": "claude-code"`) {
+		t.Fatalf("expected metaprompt to request claude-code driver, got %q", planner.lastPrompt)
+	}
+}
+
 // --- extractJSON helper ---
 
 func TestExtractJSON(t *testing.T) {
@@ -691,9 +848,11 @@ func TestExtractJSON(t *testing.T) {
 			wantJSON: `[{"name":"a"},{"name":"b"}]`,
 		},
 		{
-			name:     "nested arrays",
-			input:    `[[1,2],[3,4]]`,
-			wantJSON: `[[1,2],[3,4]]`,
+			// A nested array inside an agent field must not be mistaken for
+			// the outer answer.
+			name:     "agent with nested array field",
+			input:    `[{"name":"a","tags":["x","y"]}]`,
+			wantJSON: `[{"name":"a","tags":["x","y"]}]`,
 		},
 		{
 			name:    "no array",
@@ -709,6 +868,37 @@ func TestExtractJSON(t *testing.T) {
 			name:    "unclosed bracket",
 			input:   `[{"name":"a"`,
 			wantNil: true,
+		},
+		{
+			// Codex's `exec` banner includes a non-JSON bracket pair before
+			// the actual array — must be skipped, not parsed.
+			name: "codex banner before array",
+			input: "OpenAI Codex v0.130.0\n--------\n" +
+				"sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/foo/.codex/memories]\n" +
+				"--------\ncodex\n" +
+				`[{"name":"a"},{"name":"b"}]` + "\ntokens used\n13,189\n",
+			wantJSON: `[{"name":"a"},{"name":"b"}]`,
+		},
+		{
+			// A ']' inside a JSON string must not prematurely close the array.
+			name:     "bracket inside string",
+			input:    `[{"prompt":"look for [BUG] markers"}]`,
+			wantJSON: `[{"prompt":"look for [BUG] markers"}]`,
+		},
+		{
+			// Codex echoes the user prompt (including the metaprompt's example
+			// JSON) before its actual reply. We must skip the echoed example
+			// and pick the real answer at the end.
+			name: "codex echoes prompt then answers",
+			input: "OpenAI Codex v0.130.0\n" +
+				"sandbox: workspace-write [workdir, /tmp]\n--------\n" +
+				"user\n" +
+				"Example format:\n" +
+				`[{"name":"auth-agent","prompt":"Implement OAuth2"}]` + "\n" +
+				"codex\n" +
+				`[{"name":"cat-poet","prompt":"Write cats.md"},{"name":"dog-poet","prompt":"Write dogs.md"}]` + "\n" +
+				"tokens used\n13,646\n",
+			wantJSON: `[{"name":"cat-poet","prompt":"Write cats.md"},{"name":"dog-poet","prompt":"Write dogs.md"}]`,
 		},
 	}
 

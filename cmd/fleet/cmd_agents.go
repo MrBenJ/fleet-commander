@@ -2,14 +2,15 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/MrBenJ/fleet-commander/internal/driver"
+	"github.com/MrBenJ/fleet-commander/internal/execx"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/global"
 	"github.com/MrBenJ/fleet-commander/internal/tmux"
@@ -367,9 +368,12 @@ func removeAgentFromFleet(f *fleet.Fleet, agentName string, deleteBranch bool) e
 
 	if deleteBranch {
 		fmt.Printf("Deleting branch '%s'...\n", agent.Branch)
-		deleteBr := exec.Command("git", "branch", "-D", agent.Branch)
-		deleteBr.Dir = f.RepoPath
-		if out, err := deleteBr.CombinedOutput(); err != nil {
+		out, err := execx.DefaultRunner().CombinedOutput(context.Background(), execx.Options{
+			Name: "git",
+			Args: []string{"branch", "-D", agent.Branch},
+			Dir:  f.RepoPath,
+		})
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: could not delete branch: %s\n", string(out))
 		}
 	}

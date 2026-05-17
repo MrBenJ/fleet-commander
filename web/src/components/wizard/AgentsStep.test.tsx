@@ -6,6 +6,10 @@ import type { Persona, SquadronAgent } from "../../types";
 
 vi.mock("../../api", () => ({
   generateAgents: vi.fn(),
+  getAvailableDrivers: vi.fn(() => Promise.resolve([
+    { name: "claude-code", available: true },
+    { name: "codex", available: false },
+  ])),
 }));
 
 describe("AgentsStep", () => {

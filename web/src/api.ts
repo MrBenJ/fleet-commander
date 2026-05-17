@@ -40,6 +40,10 @@ export async function getDrivers(): Promise<{ name: string }[]> {
   return fetchJSON("/api/fleet/drivers");
 }
 
+export async function getAvailableDrivers(): Promise<{ name: string; available: boolean }[]> {
+  return fetchJSON("/api/drivers/available");
+}
+
 export async function getBranches(): Promise<string[]> {
   return fetchJSON("/api/fleet/branches");
 }
@@ -60,11 +64,12 @@ export async function launchSquadron(
 }
 
 export async function generateAgents(
-  description: string
+  description: string,
+  driver = "claude-code"
 ): Promise<{ agents: SquadronAgent[] }> {
   return fetchJSON("/api/squadron/generate", {
     method: "POST",
-    body: JSON.stringify({ description }),
+    body: JSON.stringify({ description, driver }),
   });
 }
 

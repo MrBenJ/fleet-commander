@@ -5,11 +5,13 @@ import { AIGeneratePanel } from "./AIGeneratePanel";
 
 vi.mock("../../api", () => ({
   generateAgents: vi.fn(),
+  getAvailableDrivers: vi.fn(),
 }));
 
-import { generateAgents } from "../../api";
+import { generateAgents, getAvailableDrivers } from "../../api";
 
 const mockGenerateAgents = vi.mocked(generateAgents);
+const mockGetAvailableDrivers = vi.mocked(getAvailableDrivers);
 
 describe("AIGeneratePanel", () => {
   const defaultProps = {
@@ -19,11 +21,17 @@ describe("AIGeneratePanel", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetAvailableDrivers.mockResolvedValue([
+      { name: "claude-code", available: true },
+      { name: "codex", available: false },
+    ]);
   });
 
-  it("renders the heading and textarea", () => {
+  it("renders the heading, driver dropdown, and textarea", async () => {
     render(<AIGeneratePanel {...defaultProps} />);
     expect(screen.getByText("AI Generate from Description")).toBeInTheDocument();
+    expect(screen.getByLabelText("Driver")).toHaveValue("claude-code");
+    expect(screen.getByRole("option", { name: /codex not installed/i })).toBeDisabled();
     expect(screen.getByLabelText("Task description for AI generation")).toBeInTheDocument();
   });
 
@@ -54,12 +62,35 @@ describe("AIGeneratePanel", () => {
     await user.type(screen.getByLabelText("Task description for AI generation"), "Build auth");
     await user.click(screen.getByRole("button", { name: /generate agent breakdown/i }));
 
-    expect(mockGenerateAgents).toHaveBeenCalledWith("Build auth");
+    expect(mockGenerateAgents).toHaveBeenCalledWith("Build auth", "claude-code");
     await vi.waitFor(() => {
       expect(onAgentsGenerated).toHaveBeenCalledWith([
         { name: "auth-agent", branch: "squadron/test-squad/auth-agent", prompt: "Build auth", driver: "claude-code", persona: "" },
       ]);
     });
+  });
+
+  it("sends codex when codex is available and selected", async () => {
+    const user = userEvent.setup();
+    mockGetAvailableDrivers.mockResolvedValue([
+      { name: "claude-code", available: true },
+      { name: "codex", available: true },
+    ]);
+    mockGenerateAgents.mockResolvedValue({
+      agents: [
+        { name: "codex-agent", branch: "", prompt: "Build with codex", driver: "codex", persona: "" },
+      ],
+    });
+
+    render(<AIGeneratePanel {...defaultProps} />);
+    await vi.waitFor(() => {
+      expect(screen.getByRole("option", { name: "Codex" })).not.toBeDisabled();
+    });
+    await user.selectOptions(screen.getByLabelText("Driver"), "codex");
+    await user.type(screen.getByLabelText("Task description for AI generation"), "Build codex things");
+    await user.click(screen.getByRole("button", { name: /generate agent breakdown/i }));
+
+    expect(mockGenerateAgents).toHaveBeenCalledWith("Build codex things", "codex");
   });
 
   it("fills in default branch and driver when missing from API response", async () => {

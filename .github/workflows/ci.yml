@@ -26,8 +26,66 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      - name: Test
-        run: go test -race ./...
+      - name: Test (with coverage)
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Coverage summary
+        run: |
+          go tool cover -func=coverage.out | tail -20
+          echo "---"
+          echo "Total coverage:"
+          go tool cover -func=coverage.out | tail -1
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: coverage.out
+          if-no-files-found: warn
+
+  go-lint:
+    name: Go Lint (advisory)
+    runs-on: ubuntu-latest
+    # Advisory while the existing backlog is cleaned up. Flip to required
+    # once the codebase is lint-clean.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
+
+  go-vulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    # Vuln reports surface real issues but transient false-positives shouldn't
+    # block PRs while triage is wired up. Flip to required after one clean run.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        # Advisory job: surface vulnerabilities in logs without failing the
+        # workflow. Stdlib vulns are a moving target (each new Go patch
+        # drops a fresh list) and continue-on-error already hides this
+        # from the workflow result — exit 0 keeps the check itself green
+        # so the PR status page isn't dominated by a transient stdlib bump.
+        run: govulncheck ./... || true
 
   frontend-tests:
     name: Frontend Tests
@@ -49,6 +107,55 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  frontend-lint:
+    name: Frontend Lint (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier format check
+        # Advisory: the pre-PR codebase isn't prettier-clean. Surface the
+        # diff in logs without failing the job.
+        run: npm run format:check || true
+
+  frontend-audit:
+    name: Frontend Audit (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (production deps only)
+        run: npm audit --omit=dev --audit-level=high
 
   build:
     name: Build Verification

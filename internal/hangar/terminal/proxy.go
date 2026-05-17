@@ -12,22 +12,97 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
-)
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
+	"github.com/MrBenJ/fleet-commander/internal/hangar/security"
+)
 
 type Proxy struct {
 	tmuxPrefix string
 	logger     *log.Logger
+	upgrader   websocket.Upgrader
+
+	mu     sync.Mutex
+	closed bool
+	// active tracks in-flight terminal sessions so Shutdown can drain them.
+	// The value is the cleanup func registered when the session started.
+	active map[uint64]func()
+	nextID uint64
 }
 
+// NewProxy constructs a Proxy with a permissive origin check, intended for
+// tests. Production callers should use NewProxyWithValidator.
 func NewProxy(tmuxPrefix string, logger *log.Logger) *Proxy {
+	return NewProxyWithValidator(tmuxPrefix, logger, security.New(true))
+}
+
+// NewProxyWithValidator constructs a Proxy whose WebSocket upgrader rejects
+// cross-origin requests using the supplied validator. This is critical for
+// the terminal proxy because it bridges a WebSocket directly to a shell PTY.
+func NewProxyWithValidator(tmuxPrefix string, logger *log.Logger, v *security.Validator) *Proxy {
 	return &Proxy{
 		tmuxPrefix: tmuxPrefix,
 		logger:     logger,
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return v.AllowWebSocket(r)
+			},
+		},
+		active: map[uint64]func(){},
 	}
+}
+
+// register stores a cleanup callback for an in-flight terminal session and
+// returns an unregister handle. Callers must invoke the handle when the
+// session ends so we don't leak entries — and must not invoke their own
+// cleanup if Shutdown already ran (Shutdown takes ownership of all entries
+// it sees).
+func (p *Proxy) register(cleanup func()) (id uint64, unregister func()) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		// Shutdown already started: run cleanup synchronously so the caller
+		// doesn't leak resources, and return a no-op unregister.
+		go cleanup()
+		return 0, func() {}
+	}
+	p.nextID++
+	id = p.nextID
+	p.active[id] = cleanup
+	return id, func() {
+		p.mu.Lock()
+		delete(p.active, id)
+		p.mu.Unlock()
+	}
+}
+
+// Shutdown drains all in-flight terminal sessions. Idempotent. Returns the
+// number of sessions that were cleaned up so callers can log a summary.
+func (p *Proxy) Shutdown() int {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return 0
+	}
+	p.closed = true
+	cleanups := make([]func(), 0, len(p.active))
+	for _, fn := range p.active {
+		cleanups = append(cleanups, fn)
+	}
+	p.active = map[uint64]func(){}
+	p.mu.Unlock()
+
+	for _, fn := range cleanups {
+		fn()
+	}
+	return len(cleanups)
+}
+
+// isClosed reports whether Shutdown has been called. Used by HandleTerminal
+// to refuse new sessions during shutdown.
+func (p *Proxy) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
 }
 
 func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
@@ -36,13 +111,17 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if p.isClosed() {
+		http.Error(w, "server shutting down", http.StatusServiceUnavailable)
+		return
+	}
+
 	// Extract agent name from path: /ws/terminal/{agent}
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 {
+	agentName, ok := terminalAgentName(r.URL.Path)
+	if !ok {
 		http.Error(w, "missing agent name", http.StatusBadRequest)
 		return
 	}
-	agentName := parts[3]
 	sessionName := fmt.Sprintf("%s-%s", p.tmuxPrefix, agentName)
 
 	// Check session exists
@@ -53,7 +132,7 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upgrade to WebSocket
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := p.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		p.logger.Printf("terminal upgrade failed for %s: %v", agentName, err)
 		return
@@ -83,6 +162,10 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	defer cleanup()
+
+	// Register the session so Shutdown can tear it down on server exit.
+	_, unregister := p.register(cleanup)
+	defer unregister()
 
 	// pty → WebSocket (stdout to browser)
 	go func() {
@@ -118,6 +201,18 @@ func (p *Proxy) HandleTerminal(w http.ResponseWriter, r *http.Request) {
 			ptmx.Write(msg)
 		}
 	}
+}
+
+func terminalAgentName(path string) (string, bool) {
+	parts := strings.Split(path, "/")
+	if len(parts) != 4 || parts[1] != "ws" || parts[2] != "terminal" {
+		return "", false
+	}
+	name := strings.TrimSpace(parts[3])
+	if name == "" || strings.ContainsAny(name, `/\`) {
+		return "", false
+	}
+	return name, true
 }
 
 func parseResize(msg []byte) *pty.Winsize {
