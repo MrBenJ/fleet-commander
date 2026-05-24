@@ -1,0 +1,90 @@
+{
+  "projects": {
+    "-Users-bjunya-code-fleet-commander--fleet-worktrees-cost-viewer": [
+      {
+        "cacheCreationTokens": 59850,
+        "cacheReadTokens": 751607,
+        "date": "2026-05-23",
+        "inputTokens": 9893,
+        "modelBreakdowns": [
+          {
+            "cacheCreationTokens": 59850,
+            "cacheReadTokens": 751607,
+            "cost": 0.9584560000000001,
+            "inputTokens": 9893,
+            "modelName": "claude-opus-4-7",
+            "outputTokens": 6365
+          }
+        ],
+        "modelsUsed": [
+          "claude-opus-4-7"
+        ],
+        "outputTokens": 6365,
+        "project": "-Users-bjunya-code-fleet-commander--fleet-worktrees-cost-viewer",
+        "totalCost": 0.9584560000000001,
+        "totalTokens": 827715
+      }
+    ],
+    "-Users-bjunya-code-ableton-live-mcp-server": [
+      {
+        "cacheCreationTokens": 77047,
+        "cacheReadTokens": 229794,
+        "date": "2026-03-13",
+        "inputTokens": 4264,
+        "modelBreakdowns": [
+          {
+            "cacheCreationTokens": 77047,
+            "cacheReadTokens": 229794,
+            "cost": 0.13236715,
+            "inputTokens": 4264,
+            "modelName": "claude-haiku-4-5-20251001",
+            "outputTokens": 1763
+          }
+        ],
+        "modelsUsed": [
+          "claude-haiku-4-5-20251001"
+        ],
+        "outputTokens": 1763,
+        "project": "-Users-bjunya-code-ableton-live-mcp-server",
+        "totalCost": 0.13236715,
+        "totalTokens": 312868
+      },
+      {
+        "cacheCreationTokens": 32483,
+        "cacheReadTokens": 0,
+        "date": "2026-05-23",
+        "inputTokens": 6,
+        "modelBreakdowns": [
+          {
+            "cacheCreationTokens": 32483,
+            "cacheReadTokens": 0,
+            "cost": 0.21602375,
+            "inputTokens": 6,
+            "modelName": "claude-opus-4-7",
+            "outputTokens": 519
+          }
+        ],
+        "modelsUsed": [
+          "claude-opus-4-7"
+        ],
+        "outputTokens": 519,
+        "project": "-Users-bjunya-code-ableton-live-mcp-server",
+        "totalCost": 0.21602375,
+        "totalTokens": 33008
+      },
+      {
+        "cacheCreationTokens": 999,
+        "cacheReadTokens": 999,
+        "date": "2026-05-23",
+        "inputTokens": 1,
+        "modelsUsed": [
+          "claude-opus-4-7"
+        ],
+        "outputTokens": 1,
+        "project": "-Users-bjunya-code-ableton-live-mcp-server",
+        "totalCost": "MALFORMED_NOT_A_NUMBER",
+        "totalTokens": 2000
+      }
+    ]
+  }
+}

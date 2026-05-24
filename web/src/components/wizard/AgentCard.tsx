@@ -61,6 +61,19 @@ export function AgentCard({
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
+                <label htmlFor={`edit-display-name-${agent.name}`} style={labelStyle}>Display Name</label>
+                <HelpTooltip text="The agent's discreet name (e.g. 'Alex'). Distinct from the persona. Defaults to the agent name if blank." />
+              </div>
+              <input
+                id={`edit-display-name-${agent.name}`}
+                style={inputStyle}
+                value={editDraft.displayName ?? ""}
+                placeholder={editDraft.name}
+                onChange={(e) => onDraftChange({ ...editDraft, displayName: e.target.value })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
                 <label htmlFor={`edit-branch-${agent.name}`} style={labelStyle}>Branch</label>
                 <HelpTooltip text="The git branch name for this agent's worktree. Each agent works in its own isolated branch." />
               </div>
@@ -175,6 +188,11 @@ export function AgentCard({
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <strong>{agent.name}</strong>
+            {agent.displayName && (
+              <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>
+                “<span>{agent.displayName}</span>”
+              </span>
+            )}
             <span
               style={{
                 fontSize: "0.7rem",

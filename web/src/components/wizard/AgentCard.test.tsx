@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AgentCard } from "./AgentCard";
 import type { SquadronAgent, Persona } from "../../types";
@@ -111,6 +111,47 @@ describe("AgentCard", () => {
       renderCard({ isEditing: true, editDraft, onCancel });
       await userEvent.click(screen.getByText("Cancel"));
       expect(onCancel).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("display name", () => {
+    it("shows the display name on the summary when set", () => {
+      render(
+        <AgentCard
+          agent={{ name: "alex-slug", displayName: "Alex", branch: "b", prompt: "p", driver: "claude-code", persona: "" }}
+          isEditing={false}
+          editDraft={null}
+          drivers={["claude-code"]}
+          personas={[]}
+          onEdit={() => {}}
+          onSave={() => {}}
+          onCancel={() => {}}
+          onRemove={() => {}}
+          onDraftChange={() => {}}
+        />
+      );
+      expect(screen.getByText("Alex")).toBeInTheDocument();
+    });
+
+    it("edits the display name via the draft", () => {
+      const onDraftChange = vi.fn();
+      const draft = { name: "alex-slug", displayName: "Alex", branch: "b", prompt: "p", driver: "claude-code", persona: "" };
+      render(
+        <AgentCard
+          agent={draft}
+          isEditing={true}
+          editDraft={draft}
+          drivers={["claude-code"]}
+          personas={[]}
+          onEdit={() => {}}
+          onSave={() => {}}
+          onCancel={() => {}}
+          onRemove={() => {}}
+          onDraftChange={onDraftChange}
+        />
+      );
+      fireEvent.change(screen.getByLabelText(/display name/i), { target: { value: "Alexandra" } });
+      expect(onDraftChange).toHaveBeenCalledWith(expect.objectContaining({ displayName: "Alexandra" }));
     });
   });
 });

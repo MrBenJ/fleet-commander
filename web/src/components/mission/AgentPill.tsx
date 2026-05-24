@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import type { Persona, SquadronAgent } from "../../types";
+import type { Persona, SquadronAgent, AgentCost } from "../../types";
 import { AgentTooltip } from "./AgentTooltip";
 import { ClaudeCodeIcon } from "../icons/ClaudeCodeIcon";
 import { CodexIcon } from "../icons/CodexIcon";
@@ -10,6 +10,7 @@ interface AgentPillProps {
   state: string;
   persona?: Persona;
   isMerger?: boolean;
+  cost?: AgentCost;
 }
 
 const stateColors: Record<string, string> = {
@@ -76,7 +77,7 @@ export function DriverIcon({ driver, size = 14 }: { driver: string; size?: numbe
   }
 }
 
-export function AgentPill({ agent, state, persona, isMerger }: AgentPillProps) {
+export function AgentPill({ agent, state, persona, isMerger, cost }: AgentPillProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -148,6 +149,9 @@ export function AgentPill({ agent, state, persona, isMerger }: AgentPillProps) {
             MERGE
           </span>
         )}
+        <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginLeft: 4 }}>
+          {cost ? `$${cost.costUSD.toFixed(2)}` : "—"}
+        </span>
       </button>
 
       {showTooltip && (
@@ -155,6 +159,7 @@ export function AgentPill({ agent, state, persona, isMerger }: AgentPillProps) {
           agent={agent}
           state={state}
           persona={persona}
+          cost={cost}
         />
       )}
     </div>

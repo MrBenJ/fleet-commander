@@ -14,25 +14,54 @@ func TestLookupPersona_Unknown(t *testing.T) {
 	}
 }
 
-func TestApplyPersona_PrependsPreamble(t *testing.T) {
+func TestApplyPersona_FramesIdentityAbovePreamble(t *testing.T) {
 	p := squadron.Persona{
 		Name:        "test",
-		DisplayName: "Test",
-		Preamble:    "You are Test.",
+		DisplayName: "Test Persona",
+		Preamble:    "Persona preamble body.",
 	}
-	got := squadron.ApplyPersona(p, "ORIGINAL PROMPT")
+	got := squadron.ApplyPersona(p, "Alex", "ORIGINAL PROMPT")
 
-	if !strings.HasPrefix(got, "You are Test.") {
-		t.Errorf("persona preamble should be at the top, got: %q", got[:30])
+	if !strings.HasPrefix(got, "## Your Identity") {
+		t.Errorf("identity block should be at the very top, got: %q", got[:40])
+	}
+	if !strings.Contains(got, "Your name is Alex") {
+		t.Error("identity block should name the agent")
+	}
+	if !strings.Contains(got, "Never say your name is Test Persona") {
+		t.Error("identity block should forbid claiming the persona's name")
+	}
+	if !strings.Contains(got, "Persona preamble body.") {
+		t.Error("persona preamble should be preserved")
 	}
 	if !strings.Contains(got, "ORIGINAL PROMPT") {
 		t.Error("original prompt should be preserved")
 	}
-	if !strings.Contains(got, "\n---\n") {
-		t.Error("preamble and prompt should be separated by a --- divider")
+	if strings.Index(got, "## Your Identity") > strings.Index(got, "Persona preamble body.") {
+		t.Error("identity block should come before the persona preamble")
 	}
-	if strings.Index(got, "You are Test.") > strings.Index(got, "ORIGINAL PROMPT") {
-		t.Error("preamble should come before the original prompt")
+	if strings.Index(got, "Persona preamble body.") > strings.Index(got, "ORIGINAL PROMPT") {
+		t.Error("persona preamble should come before the original prompt")
+	}
+}
+
+func TestPersonaPreambles_DoNotAssertIdentity(t *testing.T) {
+	keys := []string{
+		"overconfident-engineer", "zen-master",
+		"paranoid-perfectionist", "raging-jerk", "peter-molyneux",
+	}
+	for _, key := range keys {
+		p, ok := squadron.LookupPersona(key)
+		if !ok {
+			t.Errorf("persona %q not registered", key)
+			continue
+		}
+		if strings.HasPrefix(p.Preamble, "You are the ") || strings.HasPrefix(p.Preamble, "You are Peter") {
+			t.Errorf("persona %q preamble still asserts identity: %q", key, p.Preamble[:30])
+		}
+		if !strings.Contains(p.Preamble, "playing") {
+			t.Errorf("persona %q preamble should frame itself as a role (contain 'playing')", key)
+		}
 	}
 }
 

@@ -177,3 +177,26 @@ func TestHubMultipleClients(t *testing.T) {
 		}
 	}
 }
+
+func TestPollCostsOnce_BroadcastsOnlyOnChange(t *testing.T) {
+	last := map[string]float64{}
+	costs := map[string]float64{"api": 1.25}
+
+	events := pollCostsOnce(costs, last)
+	if len(events) != 1 || events[0].Type != "agent_cost" || events[0].Agent != "api" {
+		t.Fatalf("expected one agent_cost event for api, got %+v", events)
+	}
+
+	// Unchanged cost → no event.
+	events = pollCostsOnce(costs, last)
+	if len(events) != 0 {
+		t.Errorf("expected no events when cost is unchanged, got %+v", events)
+	}
+
+	// Changed cost → event.
+	costs["api"] = 2.0
+	events = pollCostsOnce(costs, last)
+	if len(events) != 1 {
+		t.Errorf("expected one event after cost change, got %+v", events)
+	}
+}

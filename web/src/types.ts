@@ -1,5 +1,6 @@
 export interface SquadronAgent {
   name: string;
+  displayName?: string;
   branch: string;
   prompt: string;
   driver: string;
@@ -23,6 +24,7 @@ export interface FleetInfo {
   repoPath: string;
   currentBranch: string;
   ghAvailable: boolean;
+  ccusageAvailable: boolean;
   agents: AgentInfo[];
 }
 
@@ -51,4 +53,23 @@ export type WSEvent =
   | { type: "context_message"; agent: string; message: string; timestamp: string }
   | { type: "agent_state"; agent: string; state: string; timestamp: string }
   | { type: "squadron_launched"; name: string; agents: string[] }
-  | { type: "agent_stopped"; agent: string };
+  | { type: "agent_stopped"; agent: string }
+  | {
+      type: "agent_cost";
+      agent: string;
+      costUSD: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheCreationTokens?: number;
+      cacheReadTokens?: number;
+      models?: string[];
+    };
+
+export interface AgentCost {
+  costUSD: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  models: string[];
+}

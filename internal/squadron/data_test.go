@@ -238,3 +238,29 @@ func TestParseAndValidate_AutoPRDefaultsFalse(t *testing.T) {
 		t.Error("AutoPR should default to false when unset")
 	}
 }
+
+func TestParseAndValidate_DisplayName(t *testing.T) {
+	payload := []byte(`{
+		"name":"alpha","consensus":"none",
+		"agents":[{"name":"alex-slug","displayName":"Alex","branch":"squadron/alpha/alex-slug","prompt":"p"}]
+	}`)
+	data, errs := squadron.ParseAndValidate(payload)
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if data.Agents[0].DisplayName != "Alex" {
+		t.Errorf("DisplayName = %q, want Alex", data.Agents[0].DisplayName)
+	}
+}
+
+func TestParseAndValidate_DisplayNameTooLong(t *testing.T) {
+	long := strings.Repeat("x", 51)
+	payload := []byte(`{
+		"name":"alpha","consensus":"none",
+		"agents":[{"name":"a","displayName":"` + long + `","branch":"b","prompt":"p"}]
+	}`)
+	_, errs := squadron.ParseAndValidate(payload)
+	if !errContains(errs, "displayName") {
+		t.Errorf("expected displayName length error, got: %v", errs)
+	}
+}

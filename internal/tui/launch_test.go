@@ -768,7 +768,18 @@ func TestLaunchCurrent_PersonaPrepended(t *testing.T) {
 
 	got := m.applySquadronSuffixes("a", "ORIGINAL")
 
-	if !strings.HasPrefix(got, "You are the Overconfident Engineer") {
-		t.Errorf("persona should be prepended above everything, got prefix: %q", got[:60])
+	// The identity-framing block now sits above the persona preamble. The
+	// interactive flow has no cosmetic display name, so the slug "a" is used.
+	if !strings.HasPrefix(got, "## Your Identity") {
+		t.Errorf("identity block should be prepended above everything, got prefix: %q", got[:60])
+	}
+	if !strings.Contains(got, "Your name is a") {
+		t.Error("identity block should name the agent by its slug")
+	}
+	if !strings.Contains(got, "You are playing the Overconfident Engineer") {
+		t.Error("persona preamble should still be applied below the identity block")
+	}
+	if !strings.Contains(got, "ORIGINAL") {
+		t.Error("original prompt should be preserved")
 	}
 }

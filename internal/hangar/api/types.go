@@ -1,10 +1,11 @@
 package api
 
 type FleetResponse struct {
-	RepoPath      string          `json:"repoPath"`
-	CurrentBranch string          `json:"currentBranch"`
-	GHAvailable   bool            `json:"ghAvailable"`
-	Agents        []AgentResponse `json:"agents"`
+	RepoPath         string          `json:"repoPath"`
+	CurrentBranch    string          `json:"currentBranch"`
+	GHAvailable      bool            `json:"ghAvailable"`
+	CcusageAvailable bool            `json:"ccusageAvailable"`
+	Agents           []AgentResponse `json:"agents"`
 }
 
 type AgentResponse struct {
@@ -44,12 +45,13 @@ type LaunchRequest struct {
 }
 
 type LaunchAgentInput struct {
-	Name      string `json:"name"`
-	Branch    string `json:"branch"`
-	Prompt    string `json:"prompt"`
-	Driver    string `json:"driver,omitempty"`
-	Persona   string `json:"persona,omitempty"`
-	FightMode bool   `json:"fightMode,omitempty"`
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+	Branch      string `json:"branch"`
+	Prompt      string `json:"prompt"`
+	Driver      string `json:"driver,omitempty"`
+	Persona     string `json:"persona,omitempty"`
+	FightMode   bool   `json:"fightMode,omitempty"`
 }
 
 type LaunchResponse struct {
