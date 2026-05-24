@@ -13,7 +13,7 @@ func TestDriverSource(t *testing.T) {
 		{"kimi-code", "kimi", true}, // reconcile exact name in Task 2
 		{"aider", "", false},
 		{"generic", "", false},
-		{"", "", false},
+		{"", "claude", true}, // empty == default == claude-code
 	}
 	for _, tt := range tests {
 		t.Run(tt.driver, func(t *testing.T) {

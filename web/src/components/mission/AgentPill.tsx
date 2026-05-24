@@ -11,6 +11,7 @@ interface AgentPillProps {
   persona?: Persona;
   isMerger?: boolean;
   cost?: AgentCost;
+  showCost?: boolean;
 }
 
 const stateColors: Record<string, string> = {
@@ -77,7 +78,7 @@ export function DriverIcon({ driver, size = 14 }: { driver: string; size?: numbe
   }
 }
 
-export function AgentPill({ agent, state, persona, isMerger, cost }: AgentPillProps) {
+export function AgentPill({ agent, state, persona, isMerger, cost, showCost = true }: AgentPillProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -149,9 +150,11 @@ export function AgentPill({ agent, state, persona, isMerger, cost }: AgentPillPr
             MERGE
           </span>
         )}
-        <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginLeft: 4 }}>
-          {cost ? `$${cost.costUSD.toFixed(2)}` : "—"}
-        </span>
+        {showCost && (
+          <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginLeft: 4 }}>
+            {cost ? `$${cost.costUSD.toFixed(2)}` : "—"}
+          </span>
+        )}
       </button>
 
       {showTooltip && (

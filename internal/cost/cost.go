@@ -16,7 +16,10 @@ import (
 // The second return is false for drivers ccusage cannot report (rendered as "—").
 func driverSource(driver string) (string, bool) {
 	switch driver {
-	case "claude-code":
+	case "", "claude-code":
+		// An empty driver means the default, which is claude-code (mirrors
+		// driver.Get). Squadron launch only persists a driver field when it's
+		// non-default, so default agents carry "" in config.json.
 		return "claude", true
 	case "codex":
 		return "codex", true
