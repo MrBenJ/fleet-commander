@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 var nameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
@@ -28,12 +29,13 @@ type SquadronData struct {
 }
 
 type SquadronAgent struct {
-	Name      string `json:"name"`
-	Branch    string `json:"branch"`
-	Prompt    string `json:"prompt"`
-	Driver    string `json:"driver,omitempty"`
-	Persona   string `json:"persona,omitempty"`
-	FightMode bool   `json:"fightMode,omitempty"`
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+	Branch      string `json:"branch"`
+	Prompt      string `json:"prompt"`
+	Driver      string `json:"driver,omitempty"`
+	Persona     string `json:"persona,omitempty"`
+	FightMode   bool   `json:"fightMode,omitempty"`
 }
 
 type rawSquadronData struct {
@@ -117,6 +119,9 @@ func ParseAndValidate(jsonBytes []byte) (*SquadronData, []error) {
 			if _, ok := LookupPersona(a.Persona); !ok {
 				errs = append(errs, fmt.Errorf("agents[%d].persona %q is not a known persona", i, a.Persona))
 			}
+		}
+		if dn := strings.TrimSpace(a.DisplayName); len(dn) > 50 {
+			errs = append(errs, fmt.Errorf("agents[%d].displayName is too long (%d chars, max 50)", i, len(dn)))
 		}
 	}
 
