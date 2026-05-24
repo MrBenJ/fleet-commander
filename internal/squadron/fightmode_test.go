@@ -267,14 +267,14 @@ func TestRunHeadless_PromptIncludesPersonaPreamble(t *testing.T) {
 		t.Fatalf("read prompt: %v", err)
 	}
 	body := string(prompt)
-	if !strings.Contains(body, "You are the Overconfident Engineer") {
+	if !strings.Contains(body, "You are playing the Overconfident Engineer") {
 		t.Error("expected persona preamble at top of prompt")
 	}
 	if !strings.Contains(body, "implement features") {
 		t.Error("expected original task prompt preserved")
 	}
 	// Persona preamble comes before the original prompt.
-	if strings.Index(body, "You are the Overconfident Engineer") > strings.Index(body, "implement features") {
+	if strings.Index(body, "You are playing the Overconfident Engineer") > strings.Index(body, "implement features") {
 		t.Error("persona preamble should appear before original prompt")
 	}
 }

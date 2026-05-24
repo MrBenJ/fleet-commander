@@ -29,6 +29,7 @@ const labelStyle: React.CSSProperties = {
 
 export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }: ManualAddFormProps) {
   const [name, setName] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [branch, setBranch] = useState("");
   const [prompt, setPrompt] = useState("");
   const [selectedDriver, setSelectedDriver] = useState(drivers[0] || "claude-code");
@@ -37,8 +38,9 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
   const handleAddManual = () => {
     if (!name || !prompt) return;
     const agentBranch = branch || `squadron/${squadronName}/${name}`;
-    onAgentAdded({ name, branch: agentBranch, prompt, driver: selectedDriver, persona: manualPersona });
+    onAgentAdded({ name, displayName, branch: agentBranch, prompt, driver: selectedDriver, persona: manualPersona });
     setName("");
+    setDisplayName("");
     setBranch("");
     setPrompt("");
     setManualPersona("");
@@ -65,6 +67,19 @@ export function ManualAddForm({ squadronName, drivers, personas, onAgentAdded }:
             <HelpTooltip text="A short identifier for this agent. Used in branch names and tmux session names." />
           </div>
           <input id="manual-agent-name" style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="auth-agent" />
+        </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>
+            <label htmlFor="manual-display-name" style={labelStyle}>Display Name</label>
+            <HelpTooltip text="The agent's discreet name (e.g. 'Alex'). Distinct from the persona it wears. Defaults to the agent name if left blank." />
+          </div>
+          <input
+            id="manual-display-name"
+            style={inputStyle}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder={name || "Alex"}
+          />
         </div>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: "0.25rem" }}>

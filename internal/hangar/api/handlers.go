@@ -121,12 +121,13 @@ func (h *Handlers) HandleLaunchSquadron(w http.ResponseWriter, r *http.Request) 
 	}
 	for _, a := range req.Agents {
 		squadronData.Agents = append(squadronData.Agents, squadron.SquadronAgent{
-			Name:      a.Name,
-			Branch:    a.Branch,
-			Prompt:    a.Prompt,
-			Driver:    a.Driver,
-			Persona:   a.Persona,
-			FightMode: a.FightMode,
+			Name:        a.Name,
+			DisplayName: a.DisplayName,
+			Branch:      a.Branch,
+			Prompt:      a.Prompt,
+			Driver:      a.Driver,
+			Persona:     a.Persona,
+			FightMode:   a.FightMode,
 		})
 	}
 

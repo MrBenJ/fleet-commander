@@ -134,7 +134,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 
 		if a.Persona != "" {
 			if p, ok := LookupPersona(a.Persona); ok {
-				fullPrompt = ApplyPersona(p, fullPrompt)
+				fullPrompt = ApplyPersona(p, resolveDisplayName(a), fullPrompt)
 			}
 		}
 
@@ -191,7 +191,8 @@ func buildHeadlessPrompt(systemPrompt string, all []SquadronAgent, current Squad
 		b.WriteString("\n\n")
 	}
 	b.WriteString("## Active Fleet Agents\n\n")
-	b.WriteString(fmt.Sprintf("You are: %s (branch: %s)\n\n", current.Name, current.Branch))
+	b.WriteString(fmt.Sprintf("You are: %s (coordination handle: %s, branch: %s)\n\n",
+		resolveDisplayName(current), current.Name, current.Branch))
 	b.WriteString("| Agent | Branch | Task |\n")
 	b.WriteString("|-------|--------|------|\n")
 	for _, a := range all {

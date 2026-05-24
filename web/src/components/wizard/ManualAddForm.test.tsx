@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ManualAddForm } from "./ManualAddForm";
 import type { Persona } from "../../types";
@@ -55,6 +55,7 @@ describe("ManualAddForm", () => {
 
     expect(onAgentAdded).toHaveBeenCalledWith({
       name: "auth-agent",
+      displayName: "",
       branch: "squadron/test-squad/auth-agent",
       prompt: "Build login",
       driver: "claude-code",
@@ -108,6 +109,27 @@ describe("ManualAddForm", () => {
 
     expect(onAgentAdded).toHaveBeenCalledWith(
       expect.objectContaining({ persona: "zen-master" }),
+    );
+  });
+
+  it("includes the display name in the added agent", async () => {
+    const onAgentAdded = vi.fn();
+    render(
+      <ManualAddForm
+        squadronName="alpha"
+        drivers={["claude-code"]}
+        personas={[]}
+        onAgentAdded={onAgentAdded}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/agent name/i), { target: { value: "alex-slug" } });
+    fireEvent.change(screen.getByLabelText(/display name/i), { target: { value: "Alex" } });
+    fireEvent.change(screen.getByLabelText(/prompt/i), { target: { value: "do work" } });
+    fireEvent.click(screen.getByRole("button", { name: /add agent/i }));
+
+    expect(onAgentAdded).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "alex-slug", displayName: "Alex" })
     );
   });
 

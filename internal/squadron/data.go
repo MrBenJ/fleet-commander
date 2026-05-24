@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 var nameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
@@ -13,6 +14,16 @@ var nameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 // non-empty, max 30 chars, matching ^[a-zA-Z0-9][a-zA-Z0-9_-]*$.
 func ValidName(s string) bool {
 	return s != "" && len(s) <= 30 && nameRe.MatchString(s)
+}
+
+// resolveDisplayName returns the agent's display name, falling back to the slug
+// Name when no display name is set. The result is the agent's cosmetic identity
+// (voice only); the slug Name remains the coordination key.
+func resolveDisplayName(a SquadronAgent) string {
+	if dn := strings.TrimSpace(a.DisplayName); dn != "" {
+		return dn
+	}
+	return a.Name
 }
 
 type SquadronData struct {
@@ -28,12 +39,13 @@ type SquadronData struct {
 }
 
 type SquadronAgent struct {
-	Name      string `json:"name"`
-	Branch    string `json:"branch"`
-	Prompt    string `json:"prompt"`
-	Driver    string `json:"driver,omitempty"`
-	Persona   string `json:"persona,omitempty"`
-	FightMode bool   `json:"fightMode,omitempty"`
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+	Branch      string `json:"branch"`
+	Prompt      string `json:"prompt"`
+	Driver      string `json:"driver,omitempty"`
+	Persona     string `json:"persona,omitempty"`
+	FightMode   bool   `json:"fightMode,omitempty"`
 }
 
 type rawSquadronData struct {
@@ -117,6 +129,9 @@ func ParseAndValidate(jsonBytes []byte) (*SquadronData, []error) {
 			if _, ok := LookupPersona(a.Persona); !ok {
 				errs = append(errs, fmt.Errorf("agents[%d].persona %q is not a known persona", i, a.Persona))
 			}
+		}
+		if dn := strings.TrimSpace(a.DisplayName); len(dn) > 50 {
+			errs = append(errs, fmt.Errorf("agents[%d].displayName is too long (%d chars, max 50)", i, len(dn)))
 		}
 	}
 
