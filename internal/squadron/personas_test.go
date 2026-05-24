@@ -45,6 +45,26 @@ func TestApplyPersona_FramesIdentityAbovePreamble(t *testing.T) {
 	}
 }
 
+func TestPersonaPreambles_DoNotAssertIdentity(t *testing.T) {
+	keys := []string{
+		"overconfident-engineer", "zen-master",
+		"paranoid-perfectionist", "raging-jerk", "peter-molyneux",
+	}
+	for _, key := range keys {
+		p, ok := squadron.LookupPersona(key)
+		if !ok {
+			t.Errorf("persona %q not registered", key)
+			continue
+		}
+		if strings.HasPrefix(p.Preamble, "You are the ") || strings.HasPrefix(p.Preamble, "You are Peter") {
+			t.Errorf("persona %q preamble still asserts identity: %q", key, p.Preamble[:30])
+		}
+		if !strings.Contains(p.Preamble, "playing") {
+			t.Errorf("persona %q preamble should frame itself as a role (contain 'playing')", key)
+		}
+	}
+}
+
 func TestBuiltInPersonas(t *testing.T) {
 	want := []string{
 		"overconfident-engineer",
