@@ -210,4 +210,20 @@ describe("MissionControl", () => {
     expect(screen.getByRole("log", { name: /context messages/ })).toBeInTheDocument();
     expect(screen.queryByTestId("multi-view-grid")).not.toBeInTheDocument();
   });
+
+  it("sums agent costs into a squadron total", () => {
+    renderMission({
+      agents: [
+        { name: "a", branch: "b1", prompt: "", driver: "claude-code", persona: "" },
+        { name: "b", branch: "b2", prompt: "", driver: "claude-code", persona: "" },
+      ],
+    });
+
+    act(() => {
+      capturedOnEvent!({ type: "agent_cost", agent: "a", costUSD: 1.0 });
+      capturedOnEvent!({ type: "agent_cost", agent: "b", costUSD: 2.5 });
+    });
+
+    expect(screen.getByText("$3.50")).toBeInTheDocument();
+  });
 });

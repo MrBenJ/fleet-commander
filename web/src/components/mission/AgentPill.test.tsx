@@ -96,4 +96,14 @@ describe("AgentPill", () => {
     render(<AgentPill {...defaultProps} />);
     expect(screen.queryByText("MERGE")).not.toBeInTheDocument();
   });
+
+  it("renders a cost badge when cost is provided", () => {
+    render(<AgentPill {...defaultProps} cost={{ costUSD: 1.5, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, models: [] }} />);
+    expect(screen.getByText("$1.50")).toBeInTheDocument();
+  });
+
+  it("renders an em dash when cost is unavailable", () => {
+    render(<AgentPill {...defaultProps} cost={undefined} />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,4 @@
-import type { Persona, SquadronAgent } from "../../types";
+import type { Persona, SquadronAgent, AgentCost } from "../../types";
 import { stopAgent } from "../../api";
 import { useState } from "react";
 import Markdown from "react-markdown";
@@ -7,6 +7,7 @@ interface AgentTooltipProps {
   agent: SquadronAgent;
   state: string;
   persona?: Persona;
+  cost?: AgentCost;
 }
 
 const personaIcons: Record<string, string> = {
@@ -28,6 +29,7 @@ export function AgentTooltip({
   agent,
   state,
   persona,
+  cost,
 }: AgentTooltipProps) {
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
@@ -141,6 +143,14 @@ export function AgentTooltip({
           <dd style={{ margin: 0, color: "var(--blue)" }}>{agent.driver}</dd>
         </div>
       </dl>
+
+      {cost && (
+        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.4rem" }}>
+          <div><strong>Cost:</strong> ${cost.costUSD.toFixed(2)}</div>
+          <div>in {cost.inputTokens} · out {cost.outputTokens} · cache {cost.cacheReadTokens}</div>
+          {cost.models.length > 0 && <div>{cost.models.join(", ")}</div>}
+        </div>
+      )}
 
       {/* Task */}
       <div style={{ marginBottom: "1rem" }}>
