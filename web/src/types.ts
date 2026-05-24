@@ -1,5 +1,6 @@
 export interface SquadronAgent {
   name: string;
+  displayName?: string;
   branch: string;
   prompt: string;
   driver: string;
