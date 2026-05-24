@@ -24,6 +24,55 @@ func runGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
+func TestRunHeadless_DisplayNameAndPersonaFraming(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	dir := t.TempDir()
+	runGit(t, dir, "init")
+	runGit(t, dir, "commit", "--allow-empty", "-m", "init")
+
+	f, err := fleet.Init(dir, "")
+	if err != nil {
+		t.Fatalf("fleet.Init: %v", err)
+	}
+
+	data := &squadron.SquadronData{
+		Name:       "alpha",
+		Consensus:  "none",
+		BaseBranch: "main",
+		AutoMerge:  false,
+		Agents: []squadron.SquadronAgent{
+			{Name: "alex-slug", DisplayName: "Alex", Branch: "squadron/alpha/alex-slug", Prompt: "do work", Persona: "peter-molyneux"},
+			{Name: "second", Branch: "squadron/alpha/second", Prompt: "support"},
+		},
+	}
+
+	if _, err := squadron.RunHeadless(f, data); err != nil {
+		t.Fatalf("RunHeadless: %v", err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(f.FleetDir, "prompts", "alex-slug.txt"))
+	if err != nil {
+		t.Fatalf("read prompt: %v", err)
+	}
+	content := string(body)
+
+	if !strings.Contains(content, "You are: Alex (coordination handle: alex-slug") {
+		t.Errorf("prompt should headline the display name with the slug as handle, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Your name is Alex") {
+		t.Error("prompt missing identity framing naming the agent")
+	}
+	if !strings.Contains(content, "Never say your name is Peter Molyneux") {
+		t.Error("prompt should forbid claiming the persona's name")
+	}
+	if !strings.Contains(content, "| alex-slug |") {
+		t.Error("agent table should still address the slug, not the display name")
+	}
+}
+
 func TestRunHeadless_WritesPromptsWithSuffixes(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
