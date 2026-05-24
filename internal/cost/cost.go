@@ -4,9 +4,12 @@
 package cost
 
 import (
+	"context"
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/MrBenJ/fleet-commander/internal/execx"
 )
 
 // driverSource maps a Fleet driver name to the ccusage source subcommand.
@@ -30,12 +33,20 @@ func DriverSource(driver string) (string, bool) { return driverSource(driver) }
 
 // Seams overridable in tests.
 var (
-	lookPath   = exec.LookPath
-	nowFunc    = time.Now
-	cacheTTL   = 10 * time.Second
-	runCcusage = func(source string) ([]byte, error) {
-		cmd := exec.Command("ccusage", source, "daily", "--instances", "--json", "--offline")
-		return cmd.Output()
+	lookPath = exec.LookPath
+	nowFunc  = time.Now
+	cacheTTL = 10 * time.Second
+	// ccusageTimeout bounds a single ccusage invocation. The hangar hub calls
+	// Report from the same poll loop that drives live channel/state updates
+	// (internal/hangar/ws/hub.go), so an unbounded subprocess hang would freeze
+	// those updates indefinitely. Keep this well under the hub's cost poll
+	// interval so a hang can't pile up across ticks.
+	ccusageTimeout = 8 * time.Second
+	runCcusage     = func(source string) ([]byte, error) {
+		return execx.NewRunner(ccusageTimeout).Output(context.Background(), execx.Options{
+			Name: "ccusage",
+			Args: []string{source, "daily", "--instances", "--json", "--offline"},
+		})
 	}
 )
 
