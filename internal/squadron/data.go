@@ -16,6 +16,16 @@ func ValidName(s string) bool {
 	return s != "" && len(s) <= 30 && nameRe.MatchString(s)
 }
 
+// resolveDisplayName returns the agent's display name, falling back to the slug
+// Name when no display name is set. The result is the agent's cosmetic identity
+// (voice only); the slug Name remains the coordination key.
+func resolveDisplayName(a SquadronAgent) string {
+	if dn := strings.TrimSpace(a.DisplayName); dn != "" {
+		return dn
+	}
+	return a.Name
+}
+
 type SquadronData struct {
 	Name         string          `json:"name"`
 	Consensus    string          `json:"consensus"`
