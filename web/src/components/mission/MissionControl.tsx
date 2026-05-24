@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import type { ContextMessage, SquadronAgent, Persona, WSEvent } from "../../types";
+import type { ContextMessage, SquadronAgent, Persona, WSEvent, AgentCost } from "../../types";
 import { useWebSocket } from "../../hooks/useWebSocket";
 import { getFleet } from "../../api";
 import { AgentPill } from "./AgentPill";
@@ -35,6 +35,7 @@ export function MissionControl({
 }: MissionControlProps) {
   const [messages, setMessages] = useState<ContextMessage[]>([]);
   const [agentStates, setAgentStates] = useState<Record<string, string>>({});
+  const [costByAgent, setCostByAgent] = useState<Record<string, AgentCost>>({});
   const [multiView, setMultiView] = useState(false);
 
   const agentColors = useMemo(() => {
@@ -59,8 +60,26 @@ export function MissionControl({
       case "agent_stopped":
         setAgentStates((prev) => ({ ...prev, [event.agent]: "stopped" }));
         break;
+      case "agent_cost":
+        setCostByAgent((prev) => ({
+          ...prev,
+          [event.agent]: {
+            costUSD: event.costUSD,
+            inputTokens: event.inputTokens ?? 0,
+            outputTokens: event.outputTokens ?? 0,
+            cacheCreationTokens: event.cacheCreationTokens ?? 0,
+            cacheReadTokens: event.cacheReadTokens ?? 0,
+            models: event.models ?? [],
+          },
+        }));
+        break;
     }
   }, []);
+
+  const squadronTotal = agents.reduce(
+    (sum, a) => sum + (costByAgent[a.name]?.costUSD ?? 0),
+    0
+  );
 
   const { connected } = useWebSocket("/ws/events", { onEvent: handleEvent });
 
@@ -109,8 +128,13 @@ export function MissionControl({
             {consensus} consensus · auto-merge {autoMerge ? "on" : "off"}
           </span>
         </div>
-        <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-          {agents.length} agents
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+            Total: <span>{`$${squadronTotal.toFixed(2)}`}</span>
+          </span>
+          <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+            {agents.length} agents
+          </span>
         </div>
       </header>
 
@@ -147,6 +171,7 @@ export function MissionControl({
               state={agentStates[a.name] || "starting"}
               persona={personas.find((p) => p.name === a.persona)}
               isMerger={!!mergeMaster && a.name === mergeMaster}
+              cost={costByAgent[a.name]}
             />
           ))}
         </div>
