@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MrBenJ/fleet-commander/internal/cost"
 	"github.com/MrBenJ/fleet-commander/internal/driver"
 	"github.com/MrBenJ/fleet-commander/internal/execx"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
@@ -54,10 +55,11 @@ func (h *Handlers) HandleGetFleet(w http.ResponseWriter, r *http.Request) {
 	_, ghErr := h.runner.LookPath("gh")
 
 	writeJSON(w, http.StatusOK, FleetResponse{
-		RepoPath:      f.RepoPath,
-		CurrentBranch: branch,
-		GHAvailable:   ghErr == nil,
-		Agents:        agents,
+		RepoPath:         f.RepoPath,
+		CurrentBranch:    branch,
+		GHAvailable:      ghErr == nil,
+		CcusageAvailable: cost.Available(),
+		Agents:           agents,
 	})
 }
 
