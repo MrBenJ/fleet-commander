@@ -24,6 +24,10 @@ func driverSource(driver string) (string, bool) {
 	}
 }
 
+// DriverSource is the exported form of the driver→source mapping for callers
+// outside this package (CLI, hangar hub).
+func DriverSource(driver string) (string, bool) { return driverSource(driver) }
+
 // Seams overridable in tests.
 var (
 	lookPath   = exec.LookPath

@@ -136,6 +136,19 @@ func openBrowser(url string) {
 	cmd.Start()
 }
 
+var costCmd = &cobra.Command{
+	Use:   "cost",
+	Short: "Show per-agent cost (via ccusage)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		allRepos, _ := cmd.Flags().GetBool("all")
+		asJSON, _ := cmd.Flags().GetBool("json")
+		if allRepos {
+			return runCostAll(asJSON)
+		}
+		return runCost(asJSON)
+	},
+}
+
 func init() {
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
 	initCmd.Flags().String("name", "", "Short name for this repo (defaults to directory name)")
@@ -207,6 +220,10 @@ func init() {
 	hangarCmd.Flags().Bool("dev", false, "Proxy to Vite dev server for hot reload")
 	hangarCmd.Flags().String("control", "", "Open directly to mission control for the named squadron")
 	rootCmd.AddCommand(hangarCmd)
+
+	costCmd.Flags().Bool("all", false, "Show cost across all registered repositories")
+	costCmd.Flags().Bool("json", false, "Output machine-readable JSON")
+	rootCmd.AddCommand(costCmd)
 }
 
 // run executes the root command with a signal-aware context and returns the
