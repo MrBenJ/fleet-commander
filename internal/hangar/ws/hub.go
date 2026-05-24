@@ -225,6 +225,11 @@ func (h *Hub) pollCosts() {
 	if err != nil {
 		return
 	}
+
+	// Gather current per-agent cost, keyed by name, plus the full breakdown so
+	// changed agents can be broadcast with token detail.
+	costs := map[string]float64{}
+	details := map[string]cost.AgentCost{}
 	for _, a := range f.Agents {
 		source, ok := cost.DriverSource(a.Driver)
 		if !ok {
@@ -238,19 +243,25 @@ func (h *Hub) pollCosts() {
 		if !found {
 			continue
 		}
-		if prev, ok := h.lastCosts[a.Name]; !ok || prev != ac.TotalCostUSD {
-			h.lastCosts[a.Name] = ac.TotalCostUSD
-			h.Broadcast(Event{
-				Type:                "agent_cost",
-				Agent:               a.Name,
-				CostUSD:             ac.TotalCostUSD,
-				InputTokens:         ac.InputTokens,
-				OutputTokens:        ac.OutputTokens,
-				CacheCreationTokens: ac.CacheCreationTokens,
-				CacheReadTokens:     ac.CacheReadTokens,
-				Models:              ac.Models,
-			})
-		}
+		costs[a.Name] = ac.TotalCostUSD
+		details[a.Name] = ac
+	}
+
+	// pollCostsOnce is the single, unit-tested diff: it decides which agents
+	// changed (updating h.lastCosts in place). We then enrich each changed
+	// agent's event with its token breakdown before broadcasting.
+	for _, ev := range pollCostsOnce(costs, h.lastCosts) {
+		ac := details[ev.Agent]
+		h.Broadcast(Event{
+			Type:                "agent_cost",
+			Agent:               ev.Agent,
+			CostUSD:             ac.TotalCostUSD,
+			InputTokens:         ac.InputTokens,
+			OutputTokens:        ac.OutputTokens,
+			CacheCreationTokens: ac.CacheCreationTokens,
+			CacheReadTokens:     ac.CacheReadTokens,
+			Models:              ac.Models,
+		})
 	}
 }
 

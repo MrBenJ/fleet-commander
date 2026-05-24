@@ -15,9 +15,11 @@ type AgentCost struct {
 	Available           bool     `json:"available"`
 }
 
-// ccusageReport mirrors `ccusage <source> daily --instances --json`.
-// Entry uses json.Number so a malformed (string) numeric field fails to decode
-// into the typed entry and is skipped, rather than aborting the whole parse.
+// ccusageReport mirrors `ccusage <source> daily --instances --json`. Each
+// project maps to a slice of raw daily entries, decoded one at a time so a
+// malformed entry (e.g. a numeric field arriving as a string) fails to decode
+// into the typed ccusageEntry and is skipped, rather than aborting the whole
+// parse.
 type ccusageReport struct {
 	Projects map[string][]json.RawMessage `json:"projects"`
 }
