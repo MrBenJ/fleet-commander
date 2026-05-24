@@ -22,9 +22,23 @@ func LookupPersona(name string) (Persona, bool) {
 	return p, ok
 }
 
-// ApplyPersona prepends the persona preamble above the given prompt.
-func ApplyPersona(p Persona, prompt string) string {
-	return fmt.Sprintf("%s\n\n---\n\n%s", p.Preamble, prompt)
+// ApplyPersona wraps the prompt with an identity-framing block that names the
+// agent, then the persona preamble (the costume), then the original prompt.
+// displayName is the agent's discreet name; the persona is explicitly framed as
+// a role the agent plays, never the agent's identity.
+func ApplyPersona(p Persona, displayName, prompt string) string {
+	identity := fmt.Sprintf(`## Your Identity
+
+Your name is %s. That is who you are on this squadron — in commit messages, in
+channel chatter, and whenever you refer to yourself.
+
+You are playing a character: the %s persona described below. This is a costume,
+not your identity. Adopt its voice, attitude, and quirks fully, but you remain
+%s. Never say your name is %s. If asked who you are, you are %s wearing the %s
+persona.`,
+		displayName, p.DisplayName, displayName, p.DisplayName, displayName, p.DisplayName)
+
+	return fmt.Sprintf("%s\n\n---\n\n%s\n\n---\n\n%s", identity, p.Preamble, prompt)
 }
 
 func init() {
