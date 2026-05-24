@@ -8,4 +8,12 @@ type Event struct {
 	Squadron  string   `json:"squadron,omitempty"`
 	Agents    []string `json:"agents,omitempty"`
 	Timestamp string   `json:"timestamp,omitempty"`
+
+	// Cost fields (type == "agent_cost").
+	CostUSD             float64  `json:"costUSD,omitempty"`
+	InputTokens         int      `json:"inputTokens,omitempty"`
+	OutputTokens        int      `json:"outputTokens,omitempty"`
+	CacheCreationTokens int      `json:"cacheCreationTokens,omitempty"`
+	CacheReadTokens     int      `json:"cacheReadTokens,omitempty"`
+	Models              []string `json:"models,omitempty"`
 }

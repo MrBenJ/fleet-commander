@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
+	"github.com/MrBenJ/fleet-commander/internal/cost"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/hangar/security"
 	"github.com/MrBenJ/fleet-commander/internal/monitor"
@@ -27,6 +28,7 @@ type Hub struct {
 	lastLogLen map[string]int
 	monitor    *monitor.Monitor
 	lastStates map[string]string
+	lastCosts  map[string]float64
 	upgrader   websocket.Upgrader
 }
 
@@ -48,6 +50,7 @@ func NewHubWithValidator(fleetDir, repoPath, tmuxPrefix string, logger *log.Logg
 		lastLogLen: make(map[string]int),
 		monitor:    monitor.NewMonitor(tm),
 		lastStates: make(map[string]string),
+		lastCosts:  map[string]float64{},
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return v.AllowWebSocket(r)
@@ -131,16 +134,20 @@ func (h *Hub) Broadcast(event Event) {
 }
 
 func (h *Hub) PollLoop(ctx context.Context) {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+	stateTicker := time.NewTicker(2 * time.Second)
+	costTicker := time.NewTicker(15 * time.Second)
+	defer stateTicker.Stop()
+	defer costTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-stateTicker.C:
 			h.pollChannels()
 			h.pollAgentStates()
+		case <-costTicker.C:
+			h.pollCosts()
 		}
 	}
 }
@@ -192,6 +199,56 @@ func (h *Hub) pollAgentStates() {
 				Agent:     a.Name,
 				State:     state,
 				Timestamp: snap.Timestamp.Format(time.RFC3339),
+			})
+		}
+	}
+}
+
+// pollCostsOnce returns agent_cost events only for agents whose cost changed
+// since the last poll, updating last in place.
+func pollCostsOnce(costs map[string]float64, last map[string]float64) []Event {
+	var events []Event
+	for agent, c := range costs {
+		if prev, ok := last[agent]; !ok || prev != c {
+			last[agent] = c
+			events = append(events, Event{Type: "agent_cost", Agent: agent, CostUSD: c})
+		}
+	}
+	return events
+}
+
+func (h *Hub) pollCosts() {
+	if !cost.Available() {
+		return // missing ccusage → no cost events (UI shows a note instead)
+	}
+	f, err := fleet.Load(h.repoPath)
+	if err != nil {
+		return
+	}
+	for _, a := range f.Agents {
+		source, ok := cost.DriverSource(a.Driver)
+		if !ok {
+			continue
+		}
+		report, err := cost.Report(source)
+		if err != nil {
+			continue
+		}
+		ac, found := cost.MatchProjectKey(a.WorktreePath, report)
+		if !found {
+			continue
+		}
+		if prev, ok := h.lastCosts[a.Name]; !ok || prev != ac.TotalCostUSD {
+			h.lastCosts[a.Name] = ac.TotalCostUSD
+			h.Broadcast(Event{
+				Type:                "agent_cost",
+				Agent:               a.Name,
+				CostUSD:             ac.TotalCostUSD,
+				InputTokens:         ac.InputTokens,
+				OutputTokens:        ac.OutputTokens,
+				CacheCreationTokens: ac.CacheCreationTokens,
+				CacheReadTokens:     ac.CacheReadTokens,
+				Models:              ac.Models,
 			})
 		}
 	}
