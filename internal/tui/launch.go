@@ -559,7 +559,10 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 
 	if key, ok := m.personas[agentName]; ok && key != "" {
 		if p, ok := squadron.LookupPersona(key); ok {
-			result = squadron.ApplyPersona(p, result)
+			// The interactive launch flow does not collect a cosmetic display
+			// name, so the agent's slug name is its display name (the same
+			// slug-fallback resolveDisplayName applies in the headless path).
+			result = squadron.ApplyPersona(p, agentName, result)
 		}
 	}
 
