@@ -106,4 +106,15 @@ describe("AgentPill", () => {
     render(<AgentPill {...defaultProps} cost={undefined} />);
     expect(screen.getByText("—")).toBeInTheDocument();
   });
+
+  it("hides the cost badge when showCost is false", () => {
+    render(
+      <AgentPill
+        {...defaultProps}
+        showCost={false}
+        cost={{ costUSD: 1.5, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, models: [] }}
+      />
+    );
+    expect(screen.queryByText("$1.50")).not.toBeInTheDocument();
+  });
 });

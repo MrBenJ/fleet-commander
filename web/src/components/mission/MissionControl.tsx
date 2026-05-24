@@ -5,6 +5,7 @@ import { getFleet } from "../../api";
 import { AgentPill } from "./AgentPill";
 import { ContextLog } from "./ContextLog";
 import { MultiViewToggle } from "./MultiViewToggle";
+import { CostToggle } from "./CostToggle";
 import { MultiView } from "./MultiView";
 
 interface MissionControlProps {
@@ -37,6 +38,7 @@ export function MissionControl({
   const [agentStates, setAgentStates] = useState<Record<string, string>>({});
   const [costByAgent, setCostByAgent] = useState<Record<string, AgentCost>>({});
   const [multiView, setMultiView] = useState(false);
+  const [showCost, setShowCost] = useState(true);
 
   const agentColors = useMemo(() => {
     const colors: Record<string, string> = {};
@@ -129,9 +131,11 @@ export function MissionControl({
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-            Total: <span>{`$${squadronTotal.toFixed(2)}`}</span>
-          </span>
+          {showCost && (
+            <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+              Total: <span>{`$${squadronTotal.toFixed(2)}`}</span>
+            </span>
+          )}
           <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
             {agents.length} agents
           </span>
@@ -153,6 +157,10 @@ export function MissionControl({
           active={multiView}
           onToggle={() => setMultiView((v) => !v)}
         />
+        <CostToggle
+          active={showCost}
+          onToggle={() => setShowCost((v) => !v)}
+        />
         <span
           style={{
             width: 1,
@@ -172,6 +180,7 @@ export function MissionControl({
               persona={personas.find((p) => p.name === a.persona)}
               isMerger={!!mergeMaster && a.name === mergeMaster}
               cost={costByAgent[a.name]}
+              showCost={showCost}
             />
           ))}
         </div>
