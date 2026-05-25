@@ -4,6 +4,7 @@ import { AgentTooltip } from "./AgentTooltip";
 import { ClaudeCodeIcon } from "../icons/ClaudeCodeIcon";
 import { CodexIcon } from "../icons/CodexIcon";
 import { AiderIcon } from "../icons/AiderIcon";
+import { AntigravityIcon } from "../icons/AntigravityIcon";
 
 interface AgentPillProps {
   agent: SquadronAgent;
@@ -31,6 +32,8 @@ export function DriverIcon({ driver, size = 14 }: { driver: string; size?: numbe
       return <span style={style}><CodexIcon size={size} /></span>;
     case "aider":
       return <span style={style}><AiderIcon size={size} /></span>;
+    case "antigravity":
+      return <span style={style}><AntigravityIcon size={size} /></span>;
     case "kimi-code":
       return (
         <span
