@@ -1146,3 +1146,72 @@ func TestHandleLaunchSquadron_AutoPR_False_NoGHCheck(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleGenerate_UsesAntigravityDriver(t *testing.T) {
+	origDriverGet := driverGet
+	origLookPath := execLookPath
+	planner := &fakePlannerDriver{
+		name:   "antigravity",
+		output: []byte(`[{"name":"agy-agent","prompt":"Do agy things","branch":"","driver":"antigravity","persona":""}]`),
+	}
+	driverGet = func(name string) (driver.Driver, error) {
+		if name != "antigravity" {
+			t.Fatalf("expected antigravity driver lookup, got %q", name)
+		}
+		return planner, nil
+	}
+	execLookPath = func(file string) (string, error) {
+		if file == "agy" {
+			return "/usr/local/bin/agy", nil
+		}
+		return "", exec.ErrNotFound
+	}
+	t.Cleanup(func() {
+		driverGet = origDriverGet
+		execLookPath = origLookPath
+	})
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"split this up","driver":"antigravity"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(planner.lastPrompt, `"driver": "antigravity"`) {
+		t.Fatalf("expected metaprompt to request antigravity driver, got %q", planner.lastPrompt)
+	}
+
+	var resp GenerateResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+	if len(resp.Agents) != 1 || resp.Agents[0].Driver != "antigravity" {
+		t.Fatalf("expected antigravity agent response, got %+v", resp.Agents)
+	}
+}
+
+func TestHandleGenerate_RejectsUnavailableAntigravity(t *testing.T) {
+	origLookPath := execLookPath
+	execLookPath = func(file string) (string, error) {
+		if file == "agy" {
+			return "", exec.ErrNotFound
+		}
+		return "/bin/" + file, nil
+	}
+	t.Cleanup(func() { execLookPath = origLookPath })
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"split this up","driver":"antigravity"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

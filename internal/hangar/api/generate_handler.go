@@ -29,12 +29,15 @@ func (h *Handlers) HandleGenerate(w http.ResponseWriter, r *http.Request) {
 	if selectedDriver == "" {
 		selectedDriver = "claude-code"
 	}
-	if selectedDriver != "claude-code" && selectedDriver != "codex" {
-		writeError(w, http.StatusBadRequest, "driver must be claude-code or codex")
+	if selectedDriver != "claude-code" && selectedDriver != "codex" && selectedDriver != "antigravity" {
+		writeError(w, http.StatusBadRequest, "driver must be claude-code, codex, or antigravity")
 		return
 	}
-	if selectedDriver == "codex" && !isDriverBinaryAvailable("codex") {
-		writeError(w, http.StatusBadRequest, "codex not installed")
+	// isDriverBinaryAvailable returns true for drivers without a binary mapping
+	// (claude-code), so this generalized check preserves claude-code behavior
+	// while covering codex and antigravity from driverBinaries.
+	if !isDriverBinaryAvailable(selectedDriver) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("%s not installed", selectedDriver))
 		return
 	}
 
