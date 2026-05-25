@@ -264,6 +264,20 @@ Global log entries are automatically attributed with the repo short name and age
 | `fleet context clear --all-channels` | Clear all channel logs |
 | `fleet context clear --channel <name>` | Clear a specific channel's log |
 
+### Cost Reporting
+
+Fleet Commander can track and display the cumulative API spend for each agent session by wrapping the external `ccusage` CLI. 
+
+> [!NOTE]
+> Cost reporting requires the `ccusage` package to be installed globally.
+> Install it using: `npm install -g ccusage`
+
+| Command | Description |
+|---------|-------------|
+| `fleet cost` | Show API cost report for the current fleet (requires `ccusage`) |
+| `fleet cost --all` | Show API cost report across all registered repositories |
+| `fleet cost --json` | Output the cost report as machine-readable JSON |
+
 ### Utilities
 
 | Command | Description |
@@ -422,6 +436,25 @@ The global directory stores the multi-repo index and cross-repo communication:
 └── context.lock             # Exclusive flock for global context
 ```
 
+## Environment Variables
+
+Fleet Commander recognizes several environment variables to customize its behavior:
+
+| Environment Variable | Default | Description |
+|----------------------|---------|-------------|
+| `FLEET_PORT` | `4242` | The port the Hangar web server listens on. Overridden by the `--port` flag. |
+| `FLEET_LISTEN` | `127.0.0.1` | The bind address for the Hangar server. (Use `0.0.0.0` to expose to the LAN - not recommended). Overridden by the `--listen` flag. |
+| `FLEET_LOG_LEVEL` | `info` | The log severity level. Supported values: `debug`, `info`, `warn`, `error`. |
+| `FLEET_LOG_FORMAT` | `text` | The output format for logs. Supported values: `text`, `json`. |
+| `FLEET_HIDE_COST_TOGGLE` | `false` | If set to `true`, hides the cost toggle controls in the Hangar UI and forces cost indicators to be hidden. |
+
+### Automatically Injected Variables
+
+When Fleet Commander launches an agent session, it automatically injects the following variables into the agent's environment:
+
+- `FLEET_AGENT_NAME`: The name assigned to the agent (e.g., `feat-auth`). Used by CLI utilities to attribute context and logs to the current agent.
+- `FLEET_STATE_FILE`: The path to the state JSON file where the agent signals its lifecycle state (`working`/`waiting`).
+
 ## Building
 
 ```bash
@@ -444,3 +477,38 @@ The binary should be placed alongside `fleet.tmux.conf` for the tmux config to b
 | `make test` | `go test ./...` |
 | `make vet` | `go vet ./...` |
 | `make release [BUMP=major\|minor\|patch]` | Bump the latest semver git tag (defaults to a patch bump) and create the tag locally |
+
+## Testing
+
+Fleet Commander includes test suites for both the backend Go code and the frontend React application.
+
+### Backend Tests (Go)
+
+The Go test suite covers CLI commands, orchestration logic, and context channels.
+
+To run the Go tests:
+```bash
+make test
+```
+
+To run Go linter checks (vet):
+```bash
+make vet
+```
+
+### Frontend Tests (React)
+
+The frontend SPA includes unit and component tests powered by Vitest and React Testing Library.
+
+To run the frontend tests:
+```bash
+cd web
+npm run test
+```
+
+To run frontend linting and formatting checks:
+```bash
+cd web
+npm run lint         # Check ESLint rules
+npm run format:check # Verify Prettier formatting
+```
