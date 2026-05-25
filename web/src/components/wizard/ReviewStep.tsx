@@ -257,8 +257,8 @@ export function ReviewStep({
           <span aria-hidden="true">⚠️</span>
           <span>
             Antigravity agents don't have a true bypass-permissions flag. You may
-            need to babysit this agent and respond to its approval prompts instead
-            of leaving it unattended.
+            need to babysit them and respond to their approval prompts instead of
+            leaving them unattended.
           </span>
         </div>
       )}
