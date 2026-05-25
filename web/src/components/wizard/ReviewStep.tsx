@@ -2,6 +2,7 @@ import { useReducer } from "react";
 import type { SquadronAgent, Persona } from "../../types";
 import { launchSquadron, ApiError } from "../../api";
 import type { ConsensusType } from "./review-constants";
+import { costUnsupportedDrivers } from "./review-constants";
 import { AgentCard } from "./AgentCard";
 import { ConsensusSelector } from "./ConsensusSelector";
 import { HelpTooltip } from "../common/HelpTooltip";
@@ -108,6 +109,10 @@ export function ReviewStep({
   const [state, dispatch] = useReducer(reviewReducer, initialState);
 
   const hasAntigravity = agents.some((a) => a.driver === "antigravity");
+
+  const unsupportedCostDrivers = [...new Set(
+    agents.map((a) => a.driver).filter((d) => costUnsupportedDrivers.includes(d))
+  )];
 
   const handleLaunch = async () => {
     dispatch({ type: "LAUNCH_START" });
@@ -254,6 +259,32 @@ export function ReviewStep({
             Antigravity agents don't have a true bypass-permissions flag. You may
             need to babysit this agent and respond to its approval prompts instead
             of leaving it unattended.
+          </span>
+        </div>
+      )}
+
+      {unsupportedCostDrivers.length > 0 && (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "flex-start",
+            borderLeft: "3px solid var(--border)",
+            background: "var(--bg-secondary)",
+            borderRadius: 6,
+            padding: "0.75rem 1rem",
+            marginBottom: "1rem",
+            color: "var(--text-secondary)",
+            fontSize: "0.85rem",
+          }}
+        >
+          <span aria-hidden="true">ℹ️</span>
+          <span>
+            The selected {unsupportedCostDrivers.length === 1 ? "harness" : "harnesses"}{" "}
+            ({unsupportedCostDrivers.join(", ")}){" "}
+            {unsupportedCostDrivers.length === 1 ? "does" : "do"} not have cost
+            analysis enabled due to tooling limitations and will display blank.
           </span>
         </div>
       )}

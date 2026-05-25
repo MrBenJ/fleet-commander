@@ -66,6 +66,35 @@ describe("ReviewStep", () => {
     expect(screen.getByRole("button", { name: /launch squadron/i })).not.toBeDisabled();
   });
 
+  it("does not show the cost-analysis info panel for cost-supported drivers", () => {
+    render(<ReviewStep {...defaultProps} />);
+    expect(screen.queryByText(/does not have cost analysis enabled/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the cost-analysis info panel naming a single unsupported harness", () => {
+    const withAgy: SquadronAgent[] = [
+      agents[0], // claude-code (supported)
+      { name: "agy-agent", branch: "feat/agy", prompt: "do agy", driver: "antigravity", persona: "" },
+    ];
+    render(<ReviewStep {...defaultProps} agents={withAgy} />);
+    const panel = screen.getByText(/does not have cost analysis enabled/i);
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveTextContent("(antigravity)");
+    expect(panel).toHaveTextContent(/harness \(/i); // singular
+    expect(screen.getByRole("button", { name: /launch squadron/i })).not.toBeDisabled();
+  });
+
+  it("names multiple distinct unsupported harnesses in the cost panel", () => {
+    const mixed: SquadronAgent[] = [
+      { name: "a", branch: "b1", prompt: "p", driver: "aider", persona: "" },
+      { name: "b", branch: "b2", prompt: "p", driver: "antigravity", persona: "" },
+    ];
+    render(<ReviewStep {...defaultProps} agents={mixed} />);
+    const panel = screen.getByText(/do not have cost analysis enabled/i); // plural
+    expect(panel).toHaveTextContent("aider");
+    expect(panel).toHaveTextContent("antigravity");
+  });
+
   it("renders all agent cards", () => {
     render(<ReviewStep {...defaultProps} />);
     expect(screen.getByText("agent-alpha")).toBeInTheDocument();
