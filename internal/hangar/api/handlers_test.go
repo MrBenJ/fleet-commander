@@ -165,14 +165,22 @@ func TestHandleAvailableDrivers(t *testing.T) {
 	}
 
 	availability := map[string]bool{}
+	present := map[string]bool{}
 	for _, d := range drivers {
 		availability[d.Name] = d.Available
+		present[d.Name] = true
 	}
 	if !availability["claude-code"] {
 		t.Fatal("expected claude-code to always be available")
 	}
 	if availability["codex"] {
 		t.Fatal("expected codex to be unavailable when binary lookup fails")
+	}
+	if !present["antigravity"] {
+		t.Fatal("expected antigravity to be reported by available-drivers")
+	}
+	if !availability["antigravity"] {
+		t.Fatal("expected antigravity to be available when agy lookup succeeds")
 	}
 }
 
