@@ -49,7 +49,7 @@ An **Agent** represents one coding agent session:
 - `Name` — unique identifier (used for tmux session name: `fleet-<Name>`)
 - `Branch` — git branch the agent works on
 - `WorktreePath` — path to the git worktree
-- `Driver` — which agent CLI drives this session (`claude-code`, `codex`, `aider`, `kimi-code`, `generic`)
+- `Driver` — which agent CLI drives this session (`claude-code`, `codex`, `aider`, `kimi-code`, `antigravity`, `generic`)
 - `StateFile` — path to `.fleet/states/<Name>.json` (used by hooks)
 - `Persona` — optional built-in personality key
 - `FightMode` — whether the agent roasts squadron mates

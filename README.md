@@ -117,7 +117,7 @@ fleet queue
 | `fleet init <repo>` | Initialize a fleet for a repository (also creates `.fleet/FLEET_SYSTEM_PROMPT.md`) |
 | `fleet init <repo> --name <short>` | Initialize with a custom short name (defaults to directory basename) |
 | `fleet add <name> <branch>` | Add a new agent with its own worktree and branch |
-| `fleet add <name> <branch> --driver <name>` | Add an agent backed by a specific driver (`claude-code`, `codex`, `aider`, `kimi-code`, `generic`) |
+| `fleet add <name> <branch> --driver <name>` | Add an agent backed by a specific driver (`claude-code`, `codex`, `aider`, `kimi-code`, `antigravity`, `generic`) |
 | `fleet remove <name> [--branch]` | Remove an agent, kill its session, clean up worktree (pass `--branch` to also delete the git branch) |
 | `fleet clear [--force]` | Remove every agent: kill sessions, tear down worktrees, drop from config (branches kept) |
 | `fleet rename <old> <new>` | Rename an agent and move its worktree (agent must be stopped) |
@@ -319,6 +319,7 @@ Fleet Commander talks to coding agents through a `Driver` interface, so you're n
 | `codex` | [Codex CLI](https://github.com/openai/codex) | Pane-scrape state detection |
 | `aider` | [Aider](https://aider.chat) | Pane-scrape state detection |
 | `kimi-code` | [Kimi Code](https://www.kimi.com/code/docs/en/) | Pane-scrape state detection; YOLO via `--yolo` |
+| `antigravity` | [Google Antigravity](https://antigravity.google) | Pane-scrape state detection; headless planning via `agy -p`. No bypass flag — squadron YOLO is best-effort. No `ccusage` source, so cost shows blank. |
 | `generic` | Any terminal-based agent | Supply `--command`, optional `--prompt-flag` and `--yolo-args` |
 
 Example -- add a Codex agent and a custom agent alongside Claude Code:

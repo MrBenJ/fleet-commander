@@ -42,7 +42,7 @@ Fleet Commander is a CLI + TUI tool for managing parallel AI coding agent sessio
 
 **Data model:**
 - `Fleet` — owns `RepoPath`, `ShortName`, and a list of `Agent`s. Persisted at `.fleet/config.json` inside the managed repo.
-- `Agent` — `Name` (unique, used as tmux session: `fleet-<Name>`), `Branch`, `WorktreePath`, `Driver` (one of `claude-code`, `codex`, `aider`, `kimi-code`, `generic`), `StateFile`, optional `Persona`, `FightMode` bool.
+- `Agent` — `Name` (unique, used as tmux session: `fleet-<Name>`), `Branch`, `WorktreePath`, `Driver` (one of `claude-code`, `codex`, `aider`, `kimi-code`, `antigravity`, `generic`), `StateFile`, optional `Persona`, `FightMode` bool.
 - **Global index:** `~/.fleet/repos.json` tracks all registered repos for cross-repo commands (`fleet queue --all`).
 
 **Package layout:**
@@ -64,7 +64,7 @@ Fleet Commander is a CLI + TUI tool for managing parallel AI coding agent sessio
   - `internal/hangar/api/` — REST handlers for fleet info, personas, drivers, squadron launch, agent generation, and stop.
   - `internal/hangar/ws/` — WebSocket hub that polls `.fleet/context.json` every 2s and broadcasts new channel messages and agent state changes.
   - `internal/hangar/terminal/` — WebSocket-to-PTY proxy for `tmux attach-session`, powers the browser terminal.
-- `internal/driver/` — Driver interface and implementations (`claude-code`, `codex`, `aider`, `kimi-code`, `generic`). Each driver implements state detection, hook injection (where supported), and command building.
+- `internal/driver/` — Driver interface and implementations (`claude-code`, `codex`, `aider`, `kimi-code`, `antigravity`, `generic`). Each driver implements state detection, hook injection (where supported), and command building.
 - `internal/squadron/` — Squadron launch logic. `RunHeadless()` creates worktrees, tmux sessions, context channels, and prompt files. `BuildMergerSuffix()`, `BuildConsensusSuffix()`, `ApplyPersona()`, and fight-mode suffix assembly live here.
 - `web/` — React 18 + TypeScript + Vite SPA for the hangar UI. Built with `make build-web`, embedded into the Go binary via `make build-all`.
   - `web/src/components/wizard/` — Squadron setup wizard (SetupStep → AgentsStep → ReviewStep, with PersonaStep as a per-agent modal from AgentsStep).
