@@ -56,3 +56,6 @@ web/dist/
 cmd/fleet/webdist/*
 !cmd/fleet/webdist/.gitkeep
 .aider*
+
+# Antigravity (agy) per-project config/state
+.antigravitycli/

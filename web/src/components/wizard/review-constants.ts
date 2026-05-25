@@ -36,6 +36,7 @@ export const driverColors: Record<string, string> = {
   codex: "rgba(46,160,67,0.2)",
   aider: "rgba(240,136,62,0.2)",
   "kimi-code": "rgba(167,139,250,0.2)",
+  antigravity: "rgba(66,133,244,0.2)",
   generic: "rgba(139,148,158,0.2)",
 };
 
@@ -44,8 +45,14 @@ export const driverTextColors: Record<string, string> = {
   codex: "var(--green)",
   aider: "var(--orange)",
   "kimi-code": "#a78bfa",
+  antigravity: "#4285f4",
   generic: "var(--text-secondary)",
 };
+
+// Drivers ccusage cannot report on — their cost column renders blank.
+// Mirror of the Go source of truth in internal/cost/cost.go (driverSource);
+// keep these two in sync by hand.
+export const costUnsupportedDrivers = ["aider", "generic", "antigravity"];
 
 export const inputStyle: React.CSSProperties = {
   background: "var(--bg-primary)",

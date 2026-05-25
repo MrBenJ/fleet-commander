@@ -31,7 +31,8 @@ var (
 	driverGet      = driver.Get
 	execLookPath   = exec.LookPath
 	driverBinaries = map[string]string{
-		"codex": "codex",
+		"codex":       "codex",
+		"antigravity": "agy",
 	}
 )
 
@@ -78,6 +79,7 @@ func (h *Handlers) HandleAvailableDrivers(w http.ResponseWriter, r *http.Request
 	drivers := []AvailableDriverResponse{
 		{Name: "claude-code", Available: true},
 		{Name: "codex", Available: isDriverBinaryAvailable("codex")},
+		{Name: "antigravity", Available: isDriverBinaryAvailable("antigravity")},
 	}
 
 	writeJSON(w, http.StatusOK, drivers)

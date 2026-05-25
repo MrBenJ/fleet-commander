@@ -165,14 +165,22 @@ func TestHandleAvailableDrivers(t *testing.T) {
 	}
 
 	availability := map[string]bool{}
+	present := map[string]bool{}
 	for _, d := range drivers {
 		availability[d.Name] = d.Available
+		present[d.Name] = true
 	}
 	if !availability["claude-code"] {
 		t.Fatal("expected claude-code to always be available")
 	}
 	if availability["codex"] {
 		t.Fatal("expected codex to be unavailable when binary lookup fails")
+	}
+	if !present["antigravity"] {
+		t.Fatal("expected antigravity to be reported by available-drivers")
+	}
+	if !availability["antigravity"] {
+		t.Fatal("expected antigravity to be available when agy lookup succeeds")
 	}
 }
 
@@ -1136,5 +1144,104 @@ func TestHandleLaunchSquadron_AutoPR_False_NoGHCheck(t *testing.T) {
 		if strings.Contains(errResp.Error, "gh") {
 			t.Fatalf("should not check for gh when autoPR is false, got: %s", errResp.Error)
 		}
+	}
+}
+
+func TestHandleGenerate_UsesAntigravityDriver(t *testing.T) {
+	origDriverGet := driverGet
+	origLookPath := execLookPath
+	planner := &fakePlannerDriver{
+		name:   "antigravity",
+		output: []byte(`[{"name":"agy-agent","prompt":"Do agy things","branch":"","driver":"antigravity","persona":""}]`),
+	}
+	driverGet = func(name string) (driver.Driver, error) {
+		if name != "antigravity" {
+			t.Fatalf("expected antigravity driver lookup, got %q", name)
+		}
+		return planner, nil
+	}
+	execLookPath = func(file string) (string, error) {
+		if file == "agy" {
+			return "/usr/local/bin/agy", nil
+		}
+		return "", exec.ErrNotFound
+	}
+	t.Cleanup(func() {
+		driverGet = origDriverGet
+		execLookPath = origLookPath
+	})
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"split this up","driver":"antigravity"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(planner.lastPrompt, `"driver": "antigravity"`) {
+		t.Fatalf("expected metaprompt to request antigravity driver, got %q", planner.lastPrompt)
+	}
+
+	var resp GenerateResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+	if len(resp.Agents) != 1 || resp.Agents[0].Driver != "antigravity" {
+		t.Fatalf("expected antigravity agent response, got %+v", resp.Agents)
+	}
+}
+
+func TestHandleGenerate_RejectsUnavailableAntigravity(t *testing.T) {
+	origLookPath := execLookPath
+	execLookPath = func(file string) (string, error) {
+		if file == "agy" {
+			return "", exec.ErrNotFound
+		}
+		return "/bin/" + file, nil
+	}
+	t.Cleanup(func() { execLookPath = origLookPath })
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"split this up","driver":"antigravity"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleGenerate_SurfacesModelRefusal(t *testing.T) {
+	origDriverGet := driverGet
+	// The model declines and replies in prose instead of the requested JSON
+	// array — e.g. a safety over-refusal on a "security audit" task.
+	planner := &fakePlannerDriver{
+		name:   "claude-code",
+		output: []byte("Sorry, I cannot fulfill your request to plan or perform a security audit on the repository."),
+	}
+	driverGet = func(name string) (driver.Driver, error) { return planner, nil }
+	t.Cleanup(func() { driverGet = origDriverGet })
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"run a security audit","driver":"claude-code"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code == http.StatusOK {
+		t.Fatalf("expected an error status, got 200")
+	}
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+	if !strings.Contains(resp.Error, "Sorry, I cannot fulfill") {
+		t.Fatalf("expected error to surface the model's actual reply, got: %q", resp.Error)
 	}
 }

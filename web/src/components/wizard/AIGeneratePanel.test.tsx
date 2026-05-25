@@ -24,6 +24,7 @@ describe("AIGeneratePanel", () => {
     mockGetAvailableDrivers.mockResolvedValue([
       { name: "claude-code", available: true },
       { name: "codex", available: false },
+      { name: "antigravity", available: false },
     ]);
   });
 
@@ -139,6 +140,37 @@ describe("AIGeneratePanel", () => {
         expect.objectContaining({ driver: "codex" }),
       ]);
     });
+  });
+
+  it("disables the Antigravity option when agy is not installed", async () => {
+    render(<AIGeneratePanel {...defaultProps} />);
+    expect(
+      await screen.findByRole("option", { name: /antigravity not installed/i })
+    ).toBeDisabled();
+  });
+
+  it("sends antigravity when available and selected", async () => {
+    const user = userEvent.setup();
+    mockGetAvailableDrivers.mockResolvedValue([
+      { name: "claude-code", available: true },
+      { name: "codex", available: false },
+      { name: "antigravity", available: true },
+    ]);
+    mockGenerateAgents.mockResolvedValue({
+      agents: [
+        { name: "agy-agent", branch: "", prompt: "Build with agy", driver: "antigravity", persona: "" },
+      ],
+    });
+
+    render(<AIGeneratePanel {...defaultProps} />);
+    await vi.waitFor(() => {
+      expect(screen.getByRole("option", { name: "Antigravity" })).not.toBeDisabled();
+    });
+    await user.selectOptions(screen.getByLabelText("Driver"), "antigravity");
+    await user.type(screen.getByLabelText("Task description for AI generation"), "Build agy things");
+    await user.click(screen.getByRole("button", { name: /generate agent breakdown/i }));
+
+    expect(mockGenerateAgents).toHaveBeenCalledWith("Build agy things", "antigravity");
   });
 
   it("displays an error message on generation failure", async () => {

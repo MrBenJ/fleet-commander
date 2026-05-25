@@ -95,6 +95,7 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
   const [description, setDescription] = useState("");
   const [selectedDriver, setSelectedDriver] = useState("claude-code");
   const [codexAvailable, setCodexAvailable] = useState(false);
+  const [antigravityAvailable, setAntigravityAvailable] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
 
@@ -106,10 +107,14 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
         setCodexAvailable(
           drivers.some((driver) => driver.name === "codex" && driver.available)
         );
+        setAntigravityAvailable(
+          drivers.some((driver) => driver.name === "antigravity" && driver.available)
+        );
       })
       .catch(() => {
         if (!cancelled) {
           setCodexAvailable(false);
+          setAntigravityAvailable(false);
         }
       });
     return () => {
@@ -176,6 +181,9 @@ export function AIGeneratePanel({ squadronName, onAgentsGenerated }: AIGenerateP
           <option value="claude-code">Claude Code</option>
           <option value="codex" disabled={!codexAvailable} title={!codexAvailable ? "codex not installed" : undefined}>
             Codex{codexAvailable ? "" : " (codex not installed)"}
+          </option>
+          <option value="antigravity" disabled={!antigravityAvailable} title={!antigravityAvailable ? "antigravity not installed" : undefined}>
+            Antigravity{antigravityAvailable ? "" : " (antigravity not installed)"}
           </option>
         </select>
       </div>
