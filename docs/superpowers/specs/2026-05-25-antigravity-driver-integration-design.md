@@ -1,5 +1,16 @@
 # Antigravity (`agy`) Driver Integration
 
+> **Correction (2026-05-25, post-implementation):** Empirical `agy --help` on a
+> real install (agy **1.0.2**) shows `agy` **does** ship
+> `--dangerously-skip-permissions` ("Auto-approve all tool permission requests
+> without prompting") plus `--sandbox`, and seeds an interactive session via `-i`
+> /`--prompt-interactive` (not a bare positional arg). This reverses the
+> "no bypass flag / yolo is best-effort" premise below, which was based on older
+> docs and a now-stale forum thread. As built: `BuildCommand` passes
+> `--dangerously-skip-permissions` in YoloMode and seeds with `-i`, and the
+> pre-launch **babysitting warning was removed**. The cost-analysis info panel and
+> everything else stand. Treat the struck-through framing below as historical.
+
 ## Goal
 
 Add Google Antigravity's `agy` coding-agent CLI as a first-class driver in Fleet
@@ -9,10 +20,8 @@ Commander, on par with `claude-code` and `codex`. After this change a user can:
 - Pick **Antigravity** in the hangar's "AI Generate from Description" panel to
   decompose a task description into agent prompts.
 - See the Antigravity brand icon on agent pills and driver chips.
-- Launch Antigravity-backed agents via `fleet launch` / squadron mode.
-- Be warned, **before launching a squadron**, when any selected agent uses the
-  Antigravity driver — because it has no true bypass-permissions flag and may
-  need babysitting rather than running unattended.
+- Launch Antigravity-backed agents via `fleet launch` / squadron mode, with
+  YoloMode passing `--dangerously-skip-permissions` for unattended runs.
 - Be informed, **before launching a squadron**, when any selected agent uses a
   harness that `ccusage` cannot report on (aider, generic, antigravity) — so the
   blank cost column is expected, not a bug.
@@ -39,13 +48,12 @@ Key facts that shape the design:
   use `--output-format json` for planning, because that wraps the answer in a JSON
   envelope that `extractJSON` (which scans for a bare object-array) would not
   match — same reasoning the codebase already applies to `kimi --quiet`.
-- **There is no documented permission-bypass / yolo flag.** `agy` is
-  human-in-the-loop by default; autonomy is reached via the in-TUI `/goal` slash
-  command, which we cannot pass as a launch argument. So squadron "yolo" mode is
-  **best-effort**: the agent still launches and runs, but approval prompts may
-  appear and are surfaced by the monitor as "needs input." This is documented
-  inline, mirroring the existing "may need empirical tuning" comments on the
-  codex and kimi drivers.
+- ~~**There is no documented permission-bypass / yolo flag.**~~ **(Corrected — see
+  the note at the top.)** `agy 1.0.2` exposes `--dangerously-skip-permissions`
+  ("Auto-approve all tool permission requests without prompting"), so `BuildCommand`
+  passes it in YoloMode, exactly like the codex and claude-code drivers. The
+  prompt is seeded into an interactive session via `-i` /`--prompt-interactive`
+  (which needs the TTY the tmux pane provides), not a bare positional argument.
 - **No Claude-Code-style hook injection point.** `agy` has its own
   hooks/plugins/MCP config surfaced by `agy inspect`, but nothing equivalent to
   writing `.claude/settings.json`. So `InjectHooks`/`RemoveHooks` are no-ops and
@@ -75,10 +83,10 @@ Implements the full `driver.Driver` interface:
   ```
   #!/usr/bin/env bash
   prompt=$(cat "<PromptFile>")
-  exec agy "$prompt"
+  exec agy --dangerously-skip-permissions -i "$prompt"   # --dangerously... only when YoloMode
   ```
-  `opts.YoloMode` currently changes nothing (no bypass flag exists). A comment
-  documents this and marks it as the spot to add a flag if Antigravity ships one.
+  In YoloMode it adds `--dangerously-skip-permissions`; otherwise it omits it.
+  The prompt is always seeded via `-i` (`--prompt-interactive`).
 - `DetectState(bottomLines []string, fullContent string) *AgentState` →
   pane-content heuristics. Empty content → `StateStarting`. **Waiting** patterns
   (checked first): approval/confirmation prompts (`[Y/n]`, `[y/N]`, `(y/n)`,
@@ -144,21 +152,13 @@ Add an `antigravity` entry to both `driverColors` and `driverTextColors` so the
 review-step driver chip and `AgentCard` pill render with a recognizable color
 (blue family, matching the icon's dominant hue).
 
-**9. `web/src/components/wizard/ReviewStep.tsx` — pre-launch babysitting warning**
+**9. ~~`ReviewStep.tsx` — pre-launch babysitting warning~~ (REMOVED — superseded)**
 
-When any agent in the squadron uses the Antigravity driver
-(`agents.some(a => a.driver === "antigravity")`), render an inline warning banner
-above the **Launch Squadron** button. Copy, in plain language:
-
-> ⚠️ Antigravity agents don't have a true bypass-permissions flag. You may need to
-> babysit this agent and respond to its approval prompts instead of leaving it
-> unattended.
-
-The banner is purely advisory — it does **not** block or disable launch. It uses
-the warning/orange palette (`var(--orange)`), `role="status"`, and only appears
-while at least one Antigravity agent is present (it re-evaluates as agents are
-added, edited, or removed). This is the user-facing surface of the "yolo is
-best-effort" caveat documented in the Background section.
+This item was built and then **removed** once `agy 1.0.2` was confirmed to support
+`--dangerously-skip-permissions` (see the correction note at the top). With real
+YOLO support, the "you must babysit this agent" caveat no longer holds, so the
+orange warning banner was deleted. Only the cost-analysis info panel (item 10)
+remains in the review step.
 
 **10. `web/src/components/wizard/ReviewStep.tsx` — cost-analysis info panel**
 
@@ -177,9 +177,9 @@ distinct unsupported harness(es) present, e.g.:
 Tone and styling are **informational, not a warning or error**: neutral/info
 palette (muted text on `var(--bg-secondary)`, e.g. `var(--text-secondary)` with a
 subtle left border / ℹ️ affordance — *not* orange or red), `role="status"`. Purely
-advisory; does not block or disable launch. Re-evaluates as agents change. It can
-coexist with the Antigravity babysitting warning (item 9) — an antigravity-only
-squadron shows both panels, each making its own point.
+advisory; does not block or disable launch. Re-evaluates as agents change. (It was
+originally designed to coexist with the item-9 babysitting warning; that warning
+has since been removed, so this cost panel is now the only advisory panel.)
 
 The cost-unsupported set lives as an exported constant
 (`costUnsupportedDrivers`) in `review-constants.ts`, alongside the existing
@@ -257,9 +257,8 @@ expected rather than broken.
   hint when unavailable, and is selectable/submittable when available.
 - `AgentPill` / `DriverIcon`: a render assertion that `driver="antigravity"`
   produces the Antigravity icon (if the existing test file covers the switch).
-- `ReviewStep.test.tsx`: the babysitting warning appears when an Antigravity agent
-  is present, is absent when no agent uses Antigravity, and does not disable the
-  Launch button.
+- `ReviewStep.test.tsx`: no babysitting warning renders even when an Antigravity
+  agent is present (the warning was removed once real YOLO support was confirmed).
 - `ReviewStep.test.tsx`: the cost-analysis info panel appears (naming the
   harness) when an agent uses a cost-unsupported driver (aider/generic/
   antigravity), names multiple distinct harnesses when several are present, is
@@ -268,8 +267,9 @@ expected rather than broken.
 
 **Manual / empirical**
 
-- Run `agy --help` during implementation to confirm the `-p` flag and the absence
-  of a bypass flag before finalizing `BuildCommand`/`PlanCommand`.
+- Run `agy --help` during implementation to confirm the available flags before
+  finalizing `BuildCommand`/`PlanCommand`. (This is exactly what surfaced
+  `--dangerously-skip-permissions` and `-i` post-implementation.)
 - If `agy` is installed locally, capture a real pane via `tmux capture-pane` to
   validate `DetectState` patterns and tune them.
 
@@ -285,8 +285,6 @@ Update the driver lists and references so the new driver is discoverable:
 
 ## Non-goals
 
-- Implementing a real yolo/auto-approve path for `agy` — blocked on Antigravity
-  shipping a bypass flag. Documented as a best-effort fallback.
 - Wiring Antigravity's native hooks/plugins/MCP config (`agy inspect`) into
   Fleet's state system. Pane-scraping is sufficient and matches codex/aider.
 - Model selection (`agy -m`) in the UI — out of scope for this change.

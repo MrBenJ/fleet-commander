@@ -319,7 +319,7 @@ Fleet Commander talks to coding agents through a `Driver` interface, so you're n
 | `codex` | [Codex CLI](https://github.com/openai/codex) | Pane-scrape state detection |
 | `aider` | [Aider](https://aider.chat) | Pane-scrape state detection |
 | `kimi-code` | [Kimi Code](https://www.kimi.com/code/docs/en/) | Pane-scrape state detection; YOLO via `--yolo` |
-| `antigravity` | [Google Antigravity](https://antigravity.google) | Pane-scrape state detection; headless planning via `agy -p`. No bypass flag — squadron YOLO is best-effort. No `ccusage` source, so cost shows blank. |
+| `antigravity` | [Google Antigravity](https://antigravity.google) | Pane-scrape state detection; headless planning via `agy -p`; YOLO via `--dangerously-skip-permissions` (agy 1.0.2+). No `ccusage` source, so cost shows blank. |
 | `generic` | Any terminal-based agent | Supply `--command`, optional `--prompt-flag` and `--yolo-args` |
 
 Example -- add a Codex agent and a custom agent alongside Claude Code:
