@@ -1215,3 +1215,33 @@ func TestHandleGenerate_RejectsUnavailableAntigravity(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestHandleGenerate_SurfacesModelRefusal(t *testing.T) {
+	origDriverGet := driverGet
+	// The model declines and replies in prose instead of the requested JSON
+	// array — e.g. a safety over-refusal on a "security audit" task.
+	planner := &fakePlannerDriver{
+		name:   "claude-code",
+		output: []byte("Sorry, I cannot fulfill your request to plan or perform a security audit on the repository."),
+	}
+	driverGet = func(name string) (driver.Driver, error) { return planner, nil }
+	t.Cleanup(func() { driverGet = origDriverGet })
+
+	h := NewHandlers("/tmp/fake", "/tmp/fake/.fleet")
+	req := httptest.NewRequest(http.MethodPost, "/api/squadron/generate", strings.NewReader(`{"description":"run a security audit","driver":"claude-code"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleGenerate(w, req)
+
+	if w.Code == http.StatusOK {
+		t.Fatalf("expected an error status, got 200")
+	}
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+	if !strings.Contains(resp.Error, "Sorry, I cannot fulfill") {
+		t.Fatalf("expected error to surface the model's actual reply, got: %q", resp.Error)
+	}
+}

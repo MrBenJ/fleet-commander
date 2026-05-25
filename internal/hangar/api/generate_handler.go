@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // HandleGenerate handles POST /api/squadron/generate — generates an agent
@@ -73,7 +74,11 @@ Example format:
 
 	jsonData := extractJSON(out)
 	if jsonData == nil {
-		writeError(w, http.StatusInternalServerError, "no JSON array found in plan output")
+		// No array means the model replied in prose instead of the requested
+		// JSON — typically a refusal (e.g. a safety over-refusal on a "security
+		// audit" task) or a clarifying question. Surface its actual words so the
+		// failure is actionable rather than a cryptic parse error.
+		writeError(w, http.StatusUnprocessableEntity, planNoArrayMessage(out))
 		return
 	}
 
@@ -91,6 +96,22 @@ Example format:
 	}
 
 	writeJSON(w, http.StatusOK, GenerateResponse{Agents: agents})
+}
+
+// planNoArrayMessage builds an actionable error for when the planner returned no
+// JSON array. The model usually replied in prose — a refusal or a clarifying
+// question — so we echo its actual words (rune-truncated) instead of a generic
+// "no JSON array" message.
+func planNoArrayMessage(out []byte) string {
+	reply := strings.TrimSpace(string(out))
+	const max = 600
+	if r := []rune(reply); len(r) > max {
+		reply = strings.TrimSpace(string(r[:max])) + "…"
+	}
+	if reply == "" {
+		return "the agent returned no output and no task list (no JSON array). Try again or rephrase your description."
+	}
+	return "the agent did not return a task list (no JSON array). It replied: " + reply
 }
 
 // extractJSON finds the JSON array carrying the planner's answer. Three driver
