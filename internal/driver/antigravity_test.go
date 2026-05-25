@@ -147,3 +147,26 @@ func TestAntigravityCheckAvailable(t *testing.T) {
 		}
 	}
 }
+
+func TestAntigravityRegistered(t *testing.T) {
+	d, err := Get("antigravity")
+	if err != nil {
+		t.Fatalf("Get('antigravity') returned error: %v", err)
+	}
+	if d.Name() != "antigravity" {
+		t.Errorf("expected 'antigravity', got %q", d.Name())
+	}
+}
+
+func TestAntigravityInAvailable(t *testing.T) {
+	found := false
+	for _, name := range Available() {
+		if name == "antigravity" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected 'antigravity' in Available(), got %v", Available())
+	}
+}
