@@ -23,7 +23,7 @@ func TestAntigravityInteractiveCommand(t *testing.T) {
 func TestAntigravityBuildCommand(t *testing.T) {
 	d := &AntigravityDriver{}
 
-	t.Run("normal mode seeds interactive agy with the prompt", func(t *testing.T) {
+	t.Run("normal mode seeds an interactive agy session, no auto-approve", func(t *testing.T) {
 		script := d.BuildCommand(LaunchOpts{PromptFile: "/tmp/prompt.txt", YoloMode: false})
 		if !strings.HasPrefix(script, "#!/usr/bin/env bash") {
 			t.Errorf("script does not start with shebang: %q", script)
@@ -31,23 +31,30 @@ func TestAntigravityBuildCommand(t *testing.T) {
 		if !strings.Contains(script, "exec agy") {
 			t.Errorf("script does not exec agy: %q", script)
 		}
+		if !strings.Contains(script, " -i ") {
+			t.Errorf("normal mode should seed interactively via -i: %q", script)
+		}
 		if !strings.Contains(script, "/tmp/prompt.txt") {
 			t.Errorf("script does not contain prompt file path: %q", script)
 		}
+		if strings.Contains(script, "--dangerously-skip-permissions") {
+			t.Errorf("normal mode must not auto-approve: %q", script)
+		}
 	})
 
-	// Intentional non-YOLO limitation (see BuildCommand): agy has no
-	// permission-bypass flag, so yolo must NOT emit one. Emitting a
-	// nonexistent flag like --dangerously-skip-permissions would make agy
-	// reject it and fail to launch, so this guard is a real safety check, not
-	// a stale assumption. Revisit only if Antigravity ships a documented flag.
-	t.Run("yolo mode emits no bypass flag (agy has none)", func(t *testing.T) {
+	// agy 1.0.2+ has --dangerously-skip-permissions ("Auto-approve all tool
+	// permission requests without prompting"), so squadron yolo runs use it,
+	// matching the codex/claude-code drivers.
+	t.Run("yolo mode auto-approves via --dangerously-skip-permissions", func(t *testing.T) {
 		script := d.BuildCommand(LaunchOpts{PromptFile: "/tmp/prompt.txt", YoloMode: true})
 		if !strings.Contains(script, "exec agy") {
 			t.Errorf("yolo script does not exec agy: %q", script)
 		}
-		if strings.Contains(script, "--dangerously") || strings.Contains(script, "--yolo") {
-			t.Errorf("agy has no documented bypass flag; none should be emitted: %q", script)
+		if !strings.Contains(script, "--dangerously-skip-permissions") {
+			t.Errorf("yolo mode should pass agy's auto-approve flag: %q", script)
+		}
+		if !strings.Contains(script, " -i ") {
+			t.Errorf("yolo mode should still seed interactively via -i: %q", script)
 		}
 	})
 }

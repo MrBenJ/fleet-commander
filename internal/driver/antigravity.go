@@ -27,22 +27,21 @@ func (d *AntigravityDriver) PlanCommand(prompt string) ([]byte, error) {
 	return exec.Command("agy", "-p", prompt).CombinedOutput()
 }
 
-// BuildCommand seeds an interactive agy session with the prompt so the user can
-// watch and intervene in the tmux pane.
+// BuildCommand seeds an interactive agy session with the prompt via -i
+// (--prompt-interactive, "Run an initial prompt interactively and continue the
+// session") so the user can watch and steer it in the tmux pane — which supplies
+// the TTY agy's interactive TUI requires.
 //
-// YoloMode is an INTENTIONAL no-op, not an oversight: as of 2026-05, agy exposes
-// no permission-bypass flag. This was verified against the official Antigravity
-// CLI docs and confirmed by an open feature request on Google's AI Developers
-// Forum ("True YOLO Mode — Bypass ALL Accept/Reject Confirmations"), where Google
-// staff treat the capability as pending, not shipped. A Claude-Code-style
-// `--dangerously-skip-permissions` does NOT exist for agy; passing one would make
-// agy reject the unknown flag and fail to launch. agy's only autonomy lever is
-// the in-TUI /goal slash command, which cannot be passed as a launch argument.
-// So squadron "yolo" runs fall back to agy's human-in-the-loop approval prompts,
-// which the monitor surfaces as "needs input" (the hangar warns about this before
-// launch). If Antigravity ships a real bypass flag, wire it in here.
+// In YoloMode it adds --dangerously-skip-permissions ("Auto-approve all tool
+// permission requests without prompting"), agy's documented bypass flag as of
+// agy 1.0.2, matching how the codex and claude-code drivers skip approvals for
+// unattended squadron runs.
 func (d *AntigravityDriver) BuildCommand(opts LaunchOpts) string {
-	return fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec agy \"$prompt\"\n", opts.PromptFile)
+	yolo := ""
+	if opts.YoloMode {
+		yolo = " --dangerously-skip-permissions"
+	}
+	return fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec agy%s -i \"$prompt\"\n", opts.PromptFile, yolo)
 }
 
 // DetectState analyzes tmux pane content to determine the agy agent state.
