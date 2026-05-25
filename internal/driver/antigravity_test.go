@@ -36,7 +36,12 @@ func TestAntigravityBuildCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("yolo mode is best-effort: no bypass flag exists", func(t *testing.T) {
+	// Intentional non-YOLO limitation (see BuildCommand): agy has no
+	// permission-bypass flag, so yolo must NOT emit one. Emitting a
+	// nonexistent flag like --dangerously-skip-permissions would make agy
+	// reject it and fail to launch, so this guard is a real safety check, not
+	// a stale assumption. Revisit only if Antigravity ships a documented flag.
+	t.Run("yolo mode emits no bypass flag (agy has none)", func(t *testing.T) {
 		script := d.BuildCommand(LaunchOpts{PromptFile: "/tmp/prompt.txt", YoloMode: true})
 		if !strings.Contains(script, "exec agy") {
 			t.Errorf("yolo script does not exec agy: %q", script)

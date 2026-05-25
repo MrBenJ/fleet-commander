@@ -30,10 +30,17 @@ func (d *AntigravityDriver) PlanCommand(prompt string) ([]byte, error) {
 // BuildCommand seeds an interactive agy session with the prompt so the user can
 // watch and intervene in the tmux pane.
 //
-// YoloMode is best-effort: agy exposes no documented permission-bypass flag
-// (its autonomy lives behind the in-TUI /goal slash command, which cannot be
-// passed as a launch argument), so yolo currently adds nothing. If Antigravity
-// ships a bypass flag, add it here.
+// YoloMode is an INTENTIONAL no-op, not an oversight: as of 2026-05, agy exposes
+// no permission-bypass flag. This was verified against the official Antigravity
+// CLI docs and confirmed by an open feature request on Google's AI Developers
+// Forum ("True YOLO Mode — Bypass ALL Accept/Reject Confirmations"), where Google
+// staff treat the capability as pending, not shipped. A Claude-Code-style
+// `--dangerously-skip-permissions` does NOT exist for agy; passing one would make
+// agy reject the unknown flag and fail to launch. agy's only autonomy lever is
+// the in-TUI /goal slash command, which cannot be passed as a launch argument.
+// So squadron "yolo" runs fall back to agy's human-in-the-loop approval prompts,
+// which the monitor surfaces as "needs input" (the hangar warns about this before
+// launch). If Antigravity ships a real bypass flag, wire it in here.
 func (d *AntigravityDriver) BuildCommand(opts LaunchOpts) string {
 	return fmt.Sprintf("#!/usr/bin/env bash\nprompt=$(cat %q)\nexec agy \"$prompt\"\n", opts.PromptFile)
 }
