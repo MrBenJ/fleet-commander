@@ -108,8 +108,6 @@ export function ReviewStep({
 }: ReviewStepProps) {
   const [state, dispatch] = useReducer(reviewReducer, initialState);
 
-  const hasAntigravity = agents.some((a) => a.driver === "antigravity");
-
   const unsupportedCostDrivers = [...new Set(
     agents.map((a) => a.driver).filter((d) => costUnsupportedDrivers.includes(d))
   )];
@@ -238,30 +236,6 @@ export function ReviewStep({
           </div>
         )}
       </div>
-
-      {hasAntigravity && (
-        <div
-          role="status"
-          style={{
-            display: "flex",
-            gap: "0.5rem",
-            alignItems: "flex-start",
-            border: "1px solid var(--orange)",
-            borderRadius: 8,
-            padding: "0.75rem 1rem",
-            marginBottom: "1rem",
-            color: "var(--orange)",
-            fontSize: "0.85rem",
-          }}
-        >
-          <span aria-hidden="true">⚠️</span>
-          <span>
-            Antigravity agents don't have a true bypass-permissions flag. You may
-            need to babysit them and respond to their approval prompts instead of
-            leaving them unattended.
-          </span>
-        </div>
-      )}
 
       {unsupportedCostDrivers.length > 0 && (
         <div
