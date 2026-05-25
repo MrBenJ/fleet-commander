@@ -51,6 +51,21 @@ describe("ReviewStep", () => {
     expect(screen.getByText("test-squadron")).toBeInTheDocument();
   });
 
+  it("does not show the antigravity babysitting warning without an antigravity agent", () => {
+    render(<ReviewStep {...defaultProps} />);
+    expect(screen.queryByText(/babysit/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the antigravity babysitting warning when an antigravity agent is present", () => {
+    const withAgy: SquadronAgent[] = [
+      ...agents,
+      { name: "agy-agent", branch: "feat/agy", prompt: "do agy", driver: "antigravity", persona: "" },
+    ];
+    render(<ReviewStep {...defaultProps} agents={withAgy} />);
+    expect(screen.getByText(/babysit/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /launch squadron/i })).not.toBeDisabled();
+  });
+
   it("renders all agent cards", () => {
     render(<ReviewStep {...defaultProps} />);
     expect(screen.getByText("agent-alpha")).toBeInTheDocument();

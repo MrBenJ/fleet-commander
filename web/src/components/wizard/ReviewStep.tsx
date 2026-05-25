@@ -107,6 +107,8 @@ export function ReviewStep({
 }: ReviewStepProps) {
   const [state, dispatch] = useReducer(reviewReducer, initialState);
 
+  const hasAntigravity = agents.some((a) => a.driver === "antigravity");
+
   const handleLaunch = async () => {
     dispatch({ type: "LAUNCH_START" });
     try {
@@ -231,6 +233,30 @@ export function ReviewStep({
           </div>
         )}
       </div>
+
+      {hasAntigravity && (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "flex-start",
+            border: "1px solid var(--orange)",
+            borderRadius: 8,
+            padding: "0.75rem 1rem",
+            marginBottom: "1rem",
+            color: "var(--orange)",
+            fontSize: "0.85rem",
+          }}
+        >
+          <span aria-hidden="true">⚠️</span>
+          <span>
+            Antigravity agents don't have a true bypass-permissions flag. You may
+            need to babysit this agent and respond to its approval prompts instead
+            of leaving it unattended.
+          </span>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: "1rem" }}>
         <button
