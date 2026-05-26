@@ -14,6 +14,7 @@ Fleet Commander is agent-agnostic: Claude Code is the default, but Codex CLI, Ai
 - **[tmux](https://github.com/tmux/tmux/wiki)** -- each agent runs in its own tmux session
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** -- the AI coding agent (`claude` must be on your `PATH`)
 - **[GitHub CLI (`gh`)](https://cli.github.com)** -- *optional*, required only if you want the squadron merge master to open a pull request automatically (Auto PR). Run `gh auth login` after installing.
+- **[ccusage](https://github.com/ryoppippi/ccusage)** -- *optional*, required only for cost reporting (`fleet cost` and the Hangar cost badges). Install with `npm i -g ccusage`.
 
 ## Quick Start (Hangar Mode -- Recommended)
 
@@ -36,7 +37,7 @@ That's it. The Hangar walks you through:
 3. **Persona** -- pick a built-in personality per agent (Overconfident Engineer, Zen Master, Paranoid Perfectionist, Raging Jerk, Peter Molyneux). Fight Mode can also be fine-tuned per-agent.
 4. **Review & Launch** -- inline-edit anything, then fire all agents in parallel.
 
-Once launched, mission control shows live status pills for every agent, a streaming context log driven by a WebSocket event stream, and an "Assume Control" button that opens an in-browser xterm.js terminal connected directly to the agent's tmux session.
+Once launched, mission control shows live status pills for every agent, per-agent cost badges with a squadron total (toggleable, requires `ccusage`), a streaming context log driven by a WebSocket event stream, and an "Assume Control" button that opens an in-browser xterm.js terminal connected directly to the agent's tmux session.
 
 ```bash
 fleet hangar --port 4242         # custom port (default 4242)
@@ -151,6 +152,7 @@ Fleet Commander maintains a global index at `~/.fleet/repos.json` that tracks al
 |---------|-------------|
 | `fleet hangar` | Launch the web-based squadron mission control in your browser (recommended interface) |
 | `fleet hangar --port <n>` | Listen on a custom port (default 4242) |
+| `fleet hangar --listen <addr>` | Bind to a custom address (default localhost; use `0.0.0.0` to expose to the LAN -- not recommended) |
 | `fleet hangar --no-open` | Start the server without auto-opening the browser |
 | `fleet hangar --control <squadron>` | Jump straight to mission control for an existing squadron |
 | `fleet hangar --dev` | Proxy to a Vite dev server for hot-reload (development only) |
@@ -263,6 +265,18 @@ Global log entries are automatically attributed with the repo short name and age
 | `fleet context clear --all` | Clear everything: shared context, agent sections, log, and channels |
 | `fleet context clear --all-channels` | Clear all channel logs |
 | `fleet context clear --channel <name>` | Clear a specific channel's log |
+
+### Cost Reporting
+
+Fleet Commander reports per-agent token spend via [`ccusage`](https://github.com/ryoppippi/ccusage). Costs are matched to each agent by its worktree path, summed into a squadron total. Drivers without a usage source (e.g. `antigravity`) show a blank cost.
+
+| Command | Description |
+|---------|-------------|
+| `fleet cost` | Show a per-agent cost table for the current repo with a squadron total |
+| `fleet cost --all` | Show costs across all registered repositories |
+| `fleet cost --json` | Output machine-readable JSON |
+
+Requires `ccusage` on your `PATH` (`npm i -g ccusage`); the command exits with a hint if it's missing. The Hangar surfaces the same data as live cost badges in mission control.
 
 ### Utilities
 
