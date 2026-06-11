@@ -443,6 +443,22 @@ func TestSendToChannelNotExists(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing channel, got nil")
 	}
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"names the missing channel", `"no-such-channel"`},
+		{"states the channel does not exist", "does not exist"},
+		{"suggests channel-list", "fleet context channel-list"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.want)
+			}
+		})
+	}
 }
 
 func TestSendToChannelEmptyMessage(t *testing.T) {

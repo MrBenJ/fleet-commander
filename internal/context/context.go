@@ -274,7 +274,7 @@ func SendToChannel(fleetDir, channelName, agentName, message string) error {
 	}
 	ch, ok := ctx.Channels[channelName]
 	if !ok {
-		return fmt.Errorf("channel not found: %s", channelName)
+		return fmt.Errorf("channel %q does not exist — run 'fleet context channel-list' to see available channels", channelName)
 	}
 
 	isMember := false
