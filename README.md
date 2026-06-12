@@ -233,7 +233,7 @@ Named channels with fixed membership for private agent-to-agent communication:
 
 | Command | Description |
 |---------|-------------|
-| `fleet context channel-create <name> <agent1> <agent2> [...]` | Create a private channel (2-member channels auto-name to `dm-<a>-<b>`) |
+| `fleet context channel-create <name> <agent1> <agent2> [...]` | Create a private channel with the given name and fixed membership |
 | `fleet context channel-create <name> <agents...> --description <text>` | Create a channel with a description |
 | `fleet context channel-send <channel> <msg>` | Send a message to a channel |
 | `fleet context channel-read <channel>` | Read channel messages |

@@ -359,6 +359,8 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 		channelName := "squadron-" + m.squadronName
 		description := fmt.Sprintf("Squadron %s (%s)", m.squadronName, m.consensusType)
 		if _, err := fleetctx.CreateChannel(m.fleet.FleetDir, channelName, description, agentNames); err != nil {
+			// A channel left over from a previous launch of the same squadron
+			// is fine — it already has the right name and members.
 			if !strings.Contains(err.Error(), "already exists") {
 				m.log.Log("ERROR: squadron channel create failed: %v", err)
 				return m, tea.Quit
@@ -528,14 +530,16 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 		agentNames = append(agentNames, p.AgentName)
 	}
 
+	channelName := "squadron-" + m.squadronName
+
 	result := basePrompt
 
 	switch m.consensusType {
 	case "universal", "review_master", "none":
 		if m.consensusType == "review_master" && agentName == m.reviewMaster {
-			result += "\n" + squadron.BuildReviewMasterReviewerSuffix(m.squadronName, agentNames, m.baseBranch)
+			result += "\n" + squadron.BuildReviewMasterReviewerSuffix(m.squadronName, channelName, agentNames, m.baseBranch)
 		} else {
-			if suffix := squadron.BuildConsensusSuffix(m.consensusType, m.squadronName, agentNames, m.reviewMaster, m.baseBranch); suffix != "" {
+			if suffix := squadron.BuildConsensusSuffix(m.consensusType, m.squadronName, channelName, agentNames, m.reviewMaster, m.baseBranch); suffix != "" {
 				result += "\n" + suffix
 			}
 		}
@@ -544,7 +548,7 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 	// When consensus is "none" but auto-merge is enabled, non-merger agents
 	// still need to poll for MERGE_COMPLETE/MERGE_FAILED.
 	if m.consensusType == "none" && m.autoMerge && m.mergeMaster != "" && agentName != m.mergeMaster {
-		result += "\n" + squadron.BuildNoConsensusAutoMergeSuffix(m.squadronName)
+		result += "\n" + squadron.BuildNoConsensusAutoMergeSuffix(m.squadronName, channelName)
 	}
 
 	if m.autoMerge && agentName == m.mergeMaster && m.mergeMaster != "" {
@@ -552,7 +556,7 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 		for _, p := range m.prompts {
 			agentBranches = append(agentBranches, squadron.AgentBranch{Name: p.AgentName, Branch: p.Branch})
 		}
-		result += "\n" + squadron.BuildMergerSuffix(m.squadronName, m.baseBranch, agentBranches, m.autoPR)
+		result += "\n" + squadron.BuildMergerSuffix(m.squadronName, channelName, m.baseBranch, agentBranches, m.autoPR)
 	} else if m.autoMerge && m.autoPR && m.mergeMaster != "" && agentName != m.mergeMaster {
 		result += "\n" + squadron.BuildNoPRForNonMergerSuffix(m.squadronName)
 	}

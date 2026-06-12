@@ -8,7 +8,7 @@ import (
 )
 
 func TestBuildConsensusSuffix_None(t *testing.T) {
-	got := squadron.BuildConsensusSuffix("none", "alpha", []string{"a", "b"}, "", "main")
+	got := squadron.BuildConsensusSuffix("none", "alpha", "squadron-alpha", []string{"a", "b"}, "", "main")
 	if got != "" {
 		t.Fatalf("expected empty suffix for 'none' consensus, got %q", got)
 	}
@@ -18,6 +18,7 @@ func TestBuildConsensusSuffix_Universal(t *testing.T) {
 	got := squadron.BuildConsensusSuffix(
 		"universal",
 		"alpha",
+		"squadron-alpha",
 		[]string{"api-refactor", "db-migration", "ui-polish"},
 		"",
 		"main",
@@ -47,6 +48,7 @@ func TestBuildConsensusSuffix_Universal(t *testing.T) {
 func TestBuildConsensusSuffix_ReviewMaster_Reviewer(t *testing.T) {
 	got := squadron.BuildReviewMasterReviewerSuffix(
 		"alpha",
+		"squadron-alpha",
 		[]string{"a", "b", "c"},
 		"main",
 	)
@@ -73,6 +75,7 @@ func TestBuildConsensusSuffix_ReviewMaster_NonReviewer(t *testing.T) {
 	got := squadron.BuildConsensusSuffix(
 		"review_master",
 		"alpha",
+		"squadron-alpha",
 		[]string{"a", "b", "c"},
 		"b", // review master
 		"main",
@@ -112,14 +115,14 @@ func TestBuildConsensusSuffix_ReviewMaster_NonReviewer(t *testing.T) {
 }
 
 func TestBuildConsensusSuffix_UnknownType(t *testing.T) {
-	got := squadron.BuildConsensusSuffix("bogus", "alpha", []string{"a"}, "", "main")
+	got := squadron.BuildConsensusSuffix("bogus", "alpha", "squadron-alpha", []string{"a"}, "", "main")
 	if got != "" {
 		t.Fatalf("expected empty suffix for unknown consensus type, got %q", got)
 	}
 }
 
 func TestBuildConsensusSuffix_EmptyAgents(t *testing.T) {
-	got := squadron.BuildConsensusSuffix("universal", "alpha", []string{}, "", "main")
+	got := squadron.BuildConsensusSuffix("universal", "alpha", "squadron-alpha", []string{}, "", "main")
 	if !strings.Contains(got, "Squadron Consensus Protocol (UNIVERSAL)") {
 		t.Error("should still produce universal suffix even with empty agents")
 	}
@@ -132,6 +135,7 @@ func TestBuildConsensusSuffix_SpecialCharsInNames(t *testing.T) {
 	got := squadron.BuildConsensusSuffix(
 		"universal",
 		"my-squad_123",
+		"squadron-my-squad_123",
 		[]string{"agent-one", "agent_two"},
 		"",
 		"develop",
@@ -148,7 +152,7 @@ func TestBuildConsensusSuffix_SpecialCharsInNames(t *testing.T) {
 }
 
 func TestBuildReviewMasterReviewerSuffix_EmptyAgents(t *testing.T) {
-	got := squadron.BuildReviewMasterReviewerSuffix("alpha", []string{}, "main")
+	got := squadron.BuildReviewMasterReviewerSuffix("alpha", "squadron-alpha", []string{}, "main")
 	if !strings.Contains(got, "You are the REVIEW MASTER") {
 		t.Error("should still produce reviewer suffix with empty agents")
 	}
@@ -161,6 +165,7 @@ func TestBuildConsensusSuffix_ReviewMasterSingleAgent(t *testing.T) {
 	got := squadron.BuildConsensusSuffix(
 		"review_master",
 		"solo",
+		"squadron-solo",
 		[]string{"only-one"},
 		"only-one",
 		"main",
@@ -174,7 +179,7 @@ func TestBuildConsensusSuffix_ReviewMasterSingleAgent(t *testing.T) {
 }
 
 func TestBuildMergerSuffix_EmptyAgents(t *testing.T) {
-	got := squadron.BuildMergerSuffix("alpha", "main", nil, false)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "main", nil, false)
 	if !strings.Contains(got, "Squadron Merge Duties") {
 		t.Error("should still produce merger suffix even with no agents")
 	}
@@ -187,7 +192,7 @@ func TestBuildMergerSuffix_SingleAgent(t *testing.T) {
 	agents := []squadron.AgentBranch{
 		{Name: "solo", Branch: "squadron/alpha/solo"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "develop", agents, false)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "develop", agents, false)
 	if !strings.Contains(got, "git worktree add -b squadron/alpha-merged ../alpha-merged develop") {
 		t.Error("base branch 'develop' should appear as the start point of the integration worktree")
 	}
@@ -202,7 +207,7 @@ func TestBuildMergerSuffix(t *testing.T) {
 		{Name: "b", Branch: "squadron/alpha/b"},
 		{Name: "c", Branch: "squadron/alpha/c"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "main", agents, false)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "main", agents, false)
 
 	mustContain := []string{
 		"Squadron Merge Duties",
@@ -234,7 +239,7 @@ func TestBuildMergerSuffix(t *testing.T) {
 }
 
 func TestBuildNoConsensusAutoMergeSuffix(t *testing.T) {
-	got := squadron.BuildNoConsensusAutoMergeSuffix("alpha")
+	got := squadron.BuildNoConsensusAutoMergeSuffix("alpha", "squadron-alpha")
 
 	mustContain := []string{
 		"Squadron Merge Monitoring",
@@ -255,7 +260,7 @@ func TestBuildNoConsensusAutoMergeSuffix(t *testing.T) {
 func TestBuildConsensusSuffix_NoneStillEmpty(t *testing.T) {
 	// Verify that "none" consensus still returns empty string —
 	// the auto-merge polling is handled separately by the caller.
-	got := squadron.BuildConsensusSuffix("none", "alpha", []string{"a", "b"}, "", "main")
+	got := squadron.BuildConsensusSuffix("none", "alpha", "squadron-alpha", []string{"a", "b"}, "", "main")
 	if got != "" {
 		t.Fatalf("expected empty suffix for 'none' consensus, got %q", got)
 	}
@@ -266,7 +271,7 @@ func TestBuildMergerSuffix_WithAutoPR(t *testing.T) {
 		{Name: "a", Branch: "squadron/alpha/a"},
 		{Name: "b", Branch: "squadron/alpha/b"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "main", agents, true)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "main", agents, true)
 
 	// Must contain standard merger content
 	if !strings.Contains(got, "Squadron Merge Duties") {
@@ -296,7 +301,7 @@ func TestBuildMergerSuffix_WithAutoPR_ContainsAuthCheck(t *testing.T) {
 	agents := []squadron.AgentBranch{
 		{Name: "a", Branch: "squadron/alpha/a"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "main", agents, true)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "main", agents, true)
 
 	mustContain := []string{
 		"gh auth status",
@@ -314,7 +319,7 @@ func TestBuildMergerSuffix_WithoutAutoPR(t *testing.T) {
 	agents := []squadron.AgentBranch{
 		{Name: "a", Branch: "squadron/alpha/a"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "main", agents, false)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "main", agents, false)
 
 	// Must NOT contain autoPR-specific instructions
 	forbidden := []string{
@@ -335,7 +340,7 @@ func TestBuildMergerSuffix_CreatesIntegrationWorktree(t *testing.T) {
 		{Name: "a", Branch: "squadron/alpha/a"},
 		{Name: "b", Branch: "squadron/alpha/b"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "main", agents, false)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "main", agents, false)
 
 	mustContain := []string{
 		// New behavior: merger creates a dedicated worktree for integration
@@ -366,7 +371,7 @@ func TestBuildMergerSuffix_CreatesIntegrationWorktree(t *testing.T) {
 
 func TestBuildMergerSuffix_WorktreeNameInterpolation(t *testing.T) {
 	// Squadron name with hyphens and underscores must be substituted verbatim.
-	got := squadron.BuildMergerSuffix("my-trio_v2", "develop", nil, false)
+	got := squadron.BuildMergerSuffix("my-trio_v2", "squadron-my-trio_v2", "develop", nil, false)
 
 	mustContain := []string{
 		"squadron/my-trio_v2-merged",
@@ -384,7 +389,7 @@ func TestBuildMergerSuffix_AutoPRPushesMergedBranch(t *testing.T) {
 	agents := []squadron.AgentBranch{
 		{Name: "a", Branch: "squadron/alpha/a"},
 	}
-	got := squadron.BuildMergerSuffix("alpha", "main", agents, true)
+	got := squadron.BuildMergerSuffix("alpha", "squadron-alpha", "main", agents, true)
 
 	mustContain := []string{
 		// AutoPR pushes the new merged branch, not the old squadron/<name> branch
@@ -394,6 +399,46 @@ func TestBuildMergerSuffix_AutoPRPushesMergedBranch(t *testing.T) {
 		if !strings.Contains(got, s) {
 			t.Errorf("autoPR merger suffix missing %q\n---\n%s", s, got)
 		}
+	}
+}
+
+// Every builder that emits channel commands must use the channel name passed
+// by the caller verbatim — never a re-derived "squadron-<name>" — so the
+// prompts always reference the channel that was actually created.
+func TestSuffixBuilders_UseActualChannelName(t *testing.T) {
+	const channel = "custom-channel"
+	agents := []string{"aaa", "bbb"}
+	branches := []squadron.AgentBranch{
+		{Name: "aaa", Branch: "squadron/alpha/aaa"},
+		{Name: "bbb", Branch: "squadron/alpha/bbb"},
+	}
+
+	tests := []struct {
+		name   string
+		suffix string
+	}{
+		{"universal", squadron.BuildConsensusSuffix("universal", "alpha", channel, agents, "", "main")},
+		{"review_master non-reviewer", squadron.BuildConsensusSuffix("review_master", "alpha", channel, agents, "aaa", "main")},
+		{"review_master reviewer", squadron.BuildReviewMasterReviewerSuffix("alpha", channel, agents, "main")},
+		{"no-consensus auto-merge", squadron.BuildNoConsensusAutoMergeSuffix("alpha", channel)},
+		{"merger", squadron.BuildMergerSuffix("alpha", channel, "main", branches, true)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(tt.suffix, "channel-send "+channel) && !strings.Contains(tt.suffix, "channel-read "+channel) {
+				t.Errorf("suffix has no channel command targeting %q\n---\n%s", channel, tt.suffix)
+			}
+			if strings.Contains(tt.suffix, "channel-send squadron-alpha") || strings.Contains(tt.suffix, "channel-read squadron-alpha") {
+				t.Errorf("suffix re-derived squadron-alpha instead of using the caller's channel name\n---\n%s", tt.suffix)
+			}
+		})
+	}
+
+	// The merger suffix must keep using the squadron name (not the channel
+	// name) for branch and worktree naming.
+	merger := squadron.BuildMergerSuffix("alpha", channel, "main", branches, false)
+	if !strings.Contains(merger, "git worktree add -b squadron/alpha-merged ../alpha-merged main") {
+		t.Errorf("merger suffix lost squadron-name-based branch naming\n---\n%s", merger)
 	}
 }
 
