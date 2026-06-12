@@ -402,6 +402,16 @@ func TestBuildMergerSuffix_AutoPRPushesMergedBranch(t *testing.T) {
 	}
 }
 
+// Pins the squadron channel naming convention. Channel creation, prompt
+// assembly, and the hangar API lookups all resolve names through
+// squadron.ChannelName, so this format is a cross-package protocol — changing
+// it changes the wire format everywhere at once.
+func TestChannelName(t *testing.T) {
+	if got := squadron.ChannelName("alpha"); got != "squadron-alpha" {
+		t.Errorf("ChannelName(alpha) = %q, want squadron-alpha", got)
+	}
+}
+
 // Every builder that emits channel commands must use the channel name passed
 // by the caller verbatim — never a re-derived "squadron-<name>" — so the
 // prompts always reference the channel that was actually created.

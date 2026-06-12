@@ -356,7 +356,7 @@ func (m LaunchModel) launchCurrent() (tea.Model, tea.Cmd) {
 			m.log.Log("Squadron merge master selected: %s", m.mergeMaster)
 		}
 
-		channelName := "squadron-" + m.squadronName
+		channelName := squadron.ChannelName(m.squadronName)
 		description := fmt.Sprintf("Squadron %s (%s)", m.squadronName, m.consensusType)
 		if _, err := fleetctx.CreateChannel(m.fleet.FleetDir, channelName, description, agentNames); err != nil {
 			// A channel left over from a previous launch of the same squadron
@@ -530,7 +530,7 @@ func (m LaunchModel) applySquadronSuffixes(agentName, basePrompt string) string 
 		agentNames = append(agentNames, p.AgentName)
 	}
 
-	channelName := "squadron-" + m.squadronName
+	channelName := squadron.ChannelName(m.squadronName)
 
 	result := basePrompt
 

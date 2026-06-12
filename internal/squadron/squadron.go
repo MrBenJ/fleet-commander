@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// ChannelName returns the fleet context channel name for a squadron.
+// Every creator and consumer of squadron channels must use this — never
+// construct the name inline — so that channel creation, prompt assembly,
+// and API lookups can never disagree on the name.
+func ChannelName(squadronName string) string {
+	return "squadron-" + squadronName
+}
+
 const universalTemplate = `---
 
 ## Squadron Consensus Protocol (UNIVERSAL)

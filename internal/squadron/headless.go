@@ -45,7 +45,7 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 		agentBranches = append(agentBranches, AgentBranch{Name: a.Name, Branch: a.Branch})
 	}
 
-	channelName := "squadron-" + data.Name
+	channelName := ChannelName(data.Name)
 	description := fmt.Sprintf("Squadron %s (%s)", data.Name, data.Consensus)
 	if _, err := fleetctx.CreateChannel(f.FleetDir, channelName, description, agentNames); err != nil {
 		// A channel left over from a previous launch of the same squadron is
