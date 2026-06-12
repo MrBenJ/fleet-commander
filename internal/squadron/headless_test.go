@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
 	"github.com/MrBenJ/fleet-commander/internal/fleet"
 	"github.com/MrBenJ/fleet-commander/internal/squadron"
 )
@@ -118,6 +119,125 @@ func TestRunHeadless_WritesPromptsWithSuffixes(t *testing.T) {
 		}
 		if !strings.Contains(content, "do "+name) {
 			t.Errorf("prompt %s missing original text", name)
+		}
+	}
+}
+
+// Regression: CreateChannel used to auto-rename 2-member channels to
+// dm-[a]-[b], leaving 2-agent squadron prompts pointing at a channel that
+// didn't exist. Explicit names are now always honored, so a 2-agent squadron
+// gets squadron-<name> exactly like larger squadrons.
+func TestRunHeadless_TwoAgentSquadron_PromptsReferenceActualChannel(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	dir := t.TempDir()
+	runGit(t, dir, "init")
+	runGit(t, dir, "commit", "--allow-empty", "-m", "init")
+
+	f, err := fleet.Init(dir, "")
+	if err != nil {
+		t.Fatalf("fleet.Init: %v", err)
+	}
+
+	mergerName := "duo-a"
+	data := &squadron.SquadronData{
+		Name:        "duo",
+		Consensus:   "universal",
+		BaseBranch:  "main",
+		AutoMerge:   true,
+		AutoPR:      true,
+		MergeMaster: &mergerName,
+		Agents: []squadron.SquadronAgent{
+			{Name: "duo-a", Branch: "squadron/duo/duo-a", Prompt: "do a"},
+			{Name: "duo-b", Branch: "squadron/duo/duo-b", Prompt: "do b"},
+		},
+	}
+
+	if _, err := squadron.RunHeadless(f, data); err != nil {
+		t.Fatalf("RunHeadless: %v", err)
+	}
+
+	// 2-agent squadrons get squadron-<name>, exactly like larger squadrons.
+	wantChannel := "squadron-duo"
+	ctx, err := fleetctx.Load(f.FleetDir)
+	if err != nil {
+		t.Fatalf("load context: %v", err)
+	}
+	if _, ok := ctx.Channels[wantChannel]; !ok {
+		t.Fatalf("expected channel %q to exist, channels: %v", wantChannel, ctx.Channels)
+	}
+	if _, ok := ctx.Channels["dm-[duo-a]-[duo-b]"]; ok {
+		t.Fatalf("dm-style channel should not exist for a 2-agent squadron")
+	}
+
+	for _, name := range []string{"duo-a", "duo-b"} {
+		b, err := os.ReadFile(filepath.Join(f.FleetDir, "prompts", name+".txt"))
+		if err != nil {
+			t.Fatalf("read prompt %s: %v", name, err)
+		}
+		content := string(b)
+		if !strings.Contains(content, "channel-send "+wantChannel) {
+			t.Errorf("prompt %s does not send to the channel that exists (%s)\n---\n%s", name, wantChannel, content)
+		}
+		if !strings.Contains(content, "channel-read "+wantChannel) {
+			t.Errorf("prompt %s does not read the channel that exists (%s)", name, wantChannel)
+		}
+		if strings.Contains(content, "dm-[") {
+			t.Errorf("prompt %s references a retired dm- channel name\n---\n%s", name, content)
+		}
+	}
+}
+
+// 3+ agent squadrons keep the squadron-<name> channel; no regression from the
+// 2-agent fix.
+func TestRunHeadless_ThreeAgentSquadron_UsesSquadronChannel(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	dir := t.TempDir()
+	runGit(t, dir, "init")
+	runGit(t, dir, "commit", "--allow-empty", "-m", "init")
+
+	f, err := fleet.Init(dir, "")
+	if err != nil {
+		t.Fatalf("fleet.Init: %v", err)
+	}
+
+	data := &squadron.SquadronData{
+		Name:       "trio",
+		Consensus:  "universal",
+		BaseBranch: "main",
+		AutoMerge:  false,
+		Agents: []squadron.SquadronAgent{
+			{Name: "tri-a", Branch: "squadron/trio/tri-a", Prompt: "do a"},
+			{Name: "tri-b", Branch: "squadron/trio/tri-b", Prompt: "do b"},
+			{Name: "tri-c", Branch: "squadron/trio/tri-c", Prompt: "do c"},
+		},
+	}
+
+	if _, err := squadron.RunHeadless(f, data); err != nil {
+		t.Fatalf("RunHeadless: %v", err)
+	}
+
+	ctx, err := fleetctx.Load(f.FleetDir)
+	if err != nil {
+		t.Fatalf("load context: %v", err)
+	}
+	if _, ok := ctx.Channels["squadron-trio"]; !ok {
+		t.Fatalf("expected channel squadron-trio to exist, channels: %v", ctx.Channels)
+	}
+
+	for _, name := range []string{"tri-a", "tri-b", "tri-c"} {
+		b, err := os.ReadFile(filepath.Join(f.FleetDir, "prompts", name+".txt"))
+		if err != nil {
+			t.Fatalf("read prompt %s: %v", name, err)
+		}
+		content := string(b)
+		if !strings.Contains(content, "channel-send squadron-trio") {
+			t.Errorf("prompt %s should reference squadron-trio channel\n---\n%s", name, content)
 		}
 	}
 }

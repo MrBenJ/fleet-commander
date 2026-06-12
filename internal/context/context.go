@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -208,9 +209,11 @@ func TrimChannel(fleetDir, channelName string, keep int) error {
 	return saveUnlocked(fleetDir, ctx)
 }
 
-// CreateChannel creates a new named channel with fixed membership.
-// For 2-member channels, the name is auto-set to dm-[member1]-[member2] and
-// the provided name is ignored. Returns the resolved channel name.
+// CreateChannel creates a new named channel with fixed membership. The
+// provided name is always honored, regardless of member count. If name is
+// empty or whitespace-only, it defaults to "channel-default" — deliberately
+// not prefixed with "squadron-" so a defaulted name can never be mistaken
+// for a real squadron channel. Returns the resolved channel name.
 func CreateChannel(fleetDir, name, description string, members []string) (string, error) {
 	if len(members) < 2 {
 		return "", fmt.Errorf("channel requires at least 2 members")
@@ -221,9 +224,8 @@ func CreateChannel(fleetDir, name, description string, members []string) (string
 		}
 	}
 
-	// Auto-name DM channels
-	if len(members) == 2 {
-		name = fmt.Sprintf("dm-[%s]-[%s]", members[0], members[1])
+	if strings.TrimSpace(name) == "" {
+		name = "channel-default"
 	}
 
 	lf, err := acquireLock(fleetDir)

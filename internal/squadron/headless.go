@@ -45,9 +45,11 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 		agentBranches = append(agentBranches, AgentBranch{Name: a.Name, Branch: a.Branch})
 	}
 
-	channelName := "squadron-" + data.Name
+	channelName := ChannelName(data.Name)
 	description := fmt.Sprintf("Squadron %s (%s)", data.Name, data.Consensus)
 	if _, err := fleetctx.CreateChannel(f.FleetDir, channelName, description, agentNames); err != nil {
+		// A channel left over from a previous launch of the same squadron is
+		// fine — it already has the right name and members.
 		if !strings.Contains(err.Error(), "already exists") {
 			return "", fmt.Errorf("create squadron channel %q: %w", channelName, err)
 		}
@@ -101,12 +103,12 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 
 		switch data.Consensus {
 		case "universal":
-			fullPrompt += "\n" + BuildConsensusSuffix("universal", data.Name, agentNames, "", baseBranch)
+			fullPrompt += "\n" + BuildConsensusSuffix("universal", data.Name, channelName, agentNames, "", baseBranch)
 		case "review_master":
 			if a.Name == data.ReviewMaster {
-				fullPrompt += "\n" + BuildReviewMasterReviewerSuffix(data.Name, agentNames, baseBranch)
+				fullPrompt += "\n" + BuildReviewMasterReviewerSuffix(data.Name, channelName, agentNames, baseBranch)
 			} else {
-				fullPrompt += "\n" + BuildConsensusSuffix("review_master", data.Name, agentNames, data.ReviewMaster, baseBranch)
+				fullPrompt += "\n" + BuildConsensusSuffix("review_master", data.Name, channelName, agentNames, data.ReviewMaster, baseBranch)
 			}
 		}
 
@@ -123,11 +125,11 @@ func RunHeadless(f *fleet.Fleet, data *SquadronData) (string, error) {
 		// When consensus is "none" but auto-merge is enabled, non-merger agents
 		// still need to poll for MERGE_COMPLETE/MERGE_FAILED.
 		if data.Consensus == "none" && data.AutoMerge && mergeMaster != "" && a.Name != mergeMaster {
-			fullPrompt += "\n" + BuildNoConsensusAutoMergeSuffix(data.Name)
+			fullPrompt += "\n" + BuildNoConsensusAutoMergeSuffix(data.Name, channelName)
 		}
 
 		if data.AutoMerge && a.Name == mergeMaster {
-			fullPrompt += "\n" + BuildMergerSuffix(data.Name, baseBranch, agentBranches, data.AutoPR)
+			fullPrompt += "\n" + BuildMergerSuffix(data.Name, channelName, baseBranch, agentBranches, data.AutoPR)
 		} else if data.AutoPR && data.AutoMerge {
 			fullPrompt += "\n" + BuildNoPRForNonMergerSuffix(data.Name)
 		}

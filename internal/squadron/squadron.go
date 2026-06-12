@@ -5,31 +5,39 @@ import (
 	"strings"
 )
 
+// ChannelName returns the fleet context channel name for a squadron.
+// Every creator and consumer of squadron channels must use this — never
+// construct the name inline — so that channel creation, prompt assembly,
+// and API lookups can never disagree on the name.
+func ChannelName(squadronName string) string {
+	return "squadron-" + squadronName
+}
+
 const universalTemplate = `---
 
 ## Squadron Consensus Protocol (UNIVERSAL)
 
-You are a member of squadron "%s". Your squadron channel is ` + "`squadron-%s`" + `.
+You are a member of squadron "%s". Your squadron channel is ` + "`%s`" + `.
 
 After completing your primary task, you MUST participate in the squadron review process:
 
 1. Announce completion:
-   fleet context channel-send squadron-%s "COMPLETED: <one-line summary of what you did>"
+   fleet context channel-send %s "COMPLETED: <one-line summary of what you did>"
 
 2. Poll for other agents' status (every 30 seconds):
-   fleet context channel-read squadron-%s
+   fleet context channel-read %s
 
 3. Once ALL squadron members have posted COMPLETED, review each agent's work:
    - Check out their branch: git diff %s...<their-branch>
    - Evaluate: does their work meet the requirements described in their prompt?
 
 4. Post your review for each agent:
-   fleet context channel-send squadron-%s "APPROVED: <agent-name>"
+   fleet context channel-send %s "APPROVED: <agent-name>"
    OR
-   fleet context channel-send squadron-%s "CHANGES_REQUESTED: <agent-name> - <reason>"
+   fleet context channel-send %s "CHANGES_REQUESTED: <agent-name> - <reason>"
 
 5. If changes are requested on YOUR work, address them and re-announce:
-   fleet context channel-send squadron-%s "REVISED: <summary of changes>"
+   fleet context channel-send %s "REVISED: <summary of changes>"
 
 6. Your work is ONLY complete when:
    - You have approved ALL other squadron members
@@ -53,29 +61,29 @@ const reviewMasterReviewerTemplate = `---
 
 ## Squadron Consensus Protocol (REVIEW MASTER)
 
-You are the REVIEW MASTER for squadron "%s". Your squadron channel is ` + "`squadron-%s`" + `.
+You are the REVIEW MASTER for squadron "%s". Your squadron channel is ` + "`%s`" + `.
 
 After completing your own primary task:
 
 1. Announce your own completion:
-   fleet context channel-send squadron-%s "COMPLETED: <one-line summary>"
+   fleet context channel-send %s "COMPLETED: <one-line summary>"
 
 2. Poll for other agents' status (every 30 seconds):
-   fleet context channel-read squadron-%s
+   fleet context channel-read %s
 
 3. Once ALL squadron members have posted COMPLETED, review each agent's work:
    - Check out their branch: git diff %s...<their-branch>
    - Evaluate: does their work meet the requirements described in their prompt?
 
 4. Post your review for each agent:
-   fleet context channel-send squadron-%s "APPROVED: <agent-name>"
+   fleet context channel-send %s "APPROVED: <agent-name>"
    OR
-   fleet context channel-send squadron-%s "CHANGES_REQUESTED: <agent-name> - <reason>"
+   fleet context channel-send %s "CHANGES_REQUESTED: <agent-name> - <reason>"
 
 5. If you requested changes, wait for their REVISED message, then re-review.
 
 6. Once all agents are approved, post:
-   fleet context channel-send squadron-%s "ALL_APPROVED: Squadron review complete"
+   fleet context channel-send %s "ALL_APPROVED: Squadron review complete"
 
 CRITICAL: After posting ALL_APPROVED, if auto-merge is enabled, you MUST continue polling the channel every 30 seconds to monitor merge progress. Only stop when you see MERGE_COMPLETE or MERGE_FAILED. Do NOT exit your session prematurely.
 
@@ -86,35 +94,36 @@ const reviewMasterNonReviewerTemplate = `---
 
 ## Squadron Consensus Protocol (REVIEW MASTER)
 
-You are a member of squadron "%s". Your squadron channel is ` + "`squadron-%s`" + `.
+You are a member of squadron "%s". Your squadron channel is ` + "`%s`" + `.
 Agent "%s" is the designated review master.
 
 After completing your primary task:
 
 1. Announce completion:
-   fleet context channel-send squadron-%s "COMPLETED: <one-line summary of what you did>"
+   fleet context channel-send %s "COMPLETED: <one-line summary of what you did>"
 
 2. Poll for the review master's feedback (every 30 seconds):
-   fleet context channel-read squadron-%s
+   fleet context channel-read %s
 
 3. If changes are requested on your work, address them and re-announce:
-   fleet context channel-send squadron-%s "REVISED: <summary of changes>"
+   fleet context channel-send %s "REVISED: <summary of changes>"
 
 4. Your work is complete when the review master posts APPROVED for you.
 
-CRITICAL: Do NOT stop after receiving approval. If auto-merge is enabled, continue polling the squadron channel every 30 seconds until the merge master posts MERGE_COMPLETE or MERGE_FAILED. Only then may you stop. If you are idle waiting, periodically run: fleet context channel-read squadron-%s
+CRITICAL: Do NOT stop after receiving approval. If auto-merge is enabled, continue polling the squadron channel every 30 seconds until the merge master posts MERGE_COMPLETE or MERGE_FAILED. Only then may you stop. If you are idle waiting, periodically run: fleet context channel-read %s
 
 Squadron members: %s
 Review master: %s
 `
 
 // BuildReviewMasterReviewerSuffix returns the suffix for the designated reviewer.
-func BuildReviewMasterReviewerSuffix(squadronName string, agents []string, baseBranch string) string {
+// channelName is the squadron channel as actually created ("squadron-<name>").
+func BuildReviewMasterReviewerSuffix(squadronName, channelName string, agents []string, baseBranch string) string {
 	return fmt.Sprintf(
 		reviewMasterReviewerTemplate,
-		squadronName, squadronName, squadronName, squadronName,
+		squadronName, channelName, channelName, channelName,
 		baseBranch,
-		squadronName, squadronName, squadronName,
+		channelName, channelName, channelName,
 		strings.Join(agents, ", "),
 	)
 }
@@ -139,10 +148,10 @@ CRITICAL: Before starting the merge, verify ALL agents have reached consensus by
 3. If a merge produces conflicts, resolve them yourself. Use each agent's original prompt (available in the squadron channel) as context for what they were trying to accomplish. Prefer preserving all agents' intent.
 
 4. After all merges succeed, announce:
-   fleet context channel-send squadron-%s "MERGE_COMPLETE: squadron/%s-merged"
+   fleet context channel-send %s "MERGE_COMPLETE: squadron/%s-merged"
 
 5. If a merge fails and you cannot resolve it safely, announce:
-   fleet context channel-send squadron-%s "MERGE_FAILED: <agent-name> - <reason>"
+   fleet context channel-send %s "MERGE_FAILED: <agent-name> - <reason>"
    and stop. Do not force-merge or discard changes.
 
 Agent branches to merge (in order):
@@ -156,16 +165,17 @@ const noConsensusAutoMergeTemplate = `---
 You are a member of squadron "%s". Auto-merge is enabled for this squadron.
 
 After completing your primary task, announce completion:
-   fleet context channel-send squadron-%s "COMPLETED: <one-line summary of what you did>"
+   fleet context channel-send %s "COMPLETED: <one-line summary of what you did>"
 
-CRITICAL: Do NOT stop after completing your work. The merge master will merge all agents' branches after everyone is done. You MUST continue polling the squadron channel every 30 seconds until the merge master posts MERGE_COMPLETE or MERGE_FAILED. Only then may you stop. If you are idle waiting, periodically run: fleet context channel-read squadron-%s
+CRITICAL: Do NOT stop after completing your work. The merge master will merge all agents' branches after everyone is done. You MUST continue polling the squadron channel every 30 seconds until the merge master posts MERGE_COMPLETE or MERGE_FAILED. Only then may you stop. If you are idle waiting, periodically run: fleet context channel-read %s
 `
 
 // BuildNoConsensusAutoMergeSuffix returns a minimal polling suffix for non-merger
 // agents when consensus is "none" but auto-merge is enabled. These agents need
-// to stay alive to monitor for MERGE_COMPLETE/MERGE_FAILED.
-func BuildNoConsensusAutoMergeSuffix(squadronName string) string {
-	return fmt.Sprintf(noConsensusAutoMergeTemplate, squadronName, squadronName, squadronName)
+// to stay alive to monitor for MERGE_COMPLETE/MERGE_FAILED. channelName is the
+// squadron channel as actually created ("squadron-<name>").
+func BuildNoConsensusAutoMergeSuffix(squadronName, channelName string) string {
+	return fmt.Sprintf(noConsensusAutoMergeTemplate, squadronName, channelName, channelName)
 }
 
 const noPRForNonMergerTemplate = `---
@@ -197,12 +207,12 @@ After all branches are merged successfully into the squadron branch:
 **Step 0 — Verify gh CLI authentication:**
 Run: gh auth status
 If this command fails, STOP IMMEDIATELY and announce:
-   fleet context channel-send squadron-%s "GH_AUTH_FAILED: gh CLI is not authenticated — run gh auth login"
+   fleet context channel-send %s "GH_AUTH_FAILED: gh CLI is not authenticated — run gh auth login"
 Do NOT proceed with any of the steps below if auth fails.
 
 1. From inside the integration worktree (squadron/%s-merged), push the squadron branch to the remote: git push -u origin squadron/%s-merged
    If the push fails, announce the error and stop:
-   fleet context channel-send squadron-%s "PR_BLOCKED: git push failed: <error>"
+   fleet context channel-send %s "PR_BLOCKED: git push failed: <error>"
 
 2. Create a pull request on GitHub using the gh CLI:
    - Title: "Squadron %s: <brief summary of all agent work>"
@@ -210,7 +220,7 @@ Do NOT proceed with any of the steps below if auth fails.
    - Base branch: %s
    - Use: gh pr create --title "..." --body "..." --base %s
    If PR creation fails, announce the error and stop:
-   fleet context channel-send squadron-%s "PR_BLOCKED: gh pr create failed: <error>"
+   fleet context channel-send %s "PR_BLOCKED: gh pr create failed: <error>"
 
 3. After the PR is created, poll for CI/CD status:
    - Run: gh pr checks <pr-number> --watch
@@ -218,19 +228,21 @@ Do NOT proceed with any of the steps below if auth fails.
    - Continue polling until all required checks pass
 
 4. Once CI passes, announce in the squadron channel:
-   fleet context channel-send squadron-%s "PR_READY: <pr-url> - All CI checks passing"
+   fleet context channel-send %s "PR_READY: <pr-url> - All CI checks passing"
 
 5. If you cannot fix a CI failure after reasonable attempts, announce:
-   fleet context channel-send squadron-%s "PR_BLOCKED: <pr-url> - CI failing: <reason>"
+   fleet context channel-send %s "PR_BLOCKED: <pr-url> - CI failing: <reason>"
 
 You are NOT done until the PR exists and CI is passing (or you've announced PR_BLOCKED).
 `
 
 // BuildMergerSuffix returns the merger-duties suffix appended to the merge
 // master's prompt. Pass every agent in the squadron (including the merger
-// itself) in the order they should be merged. When autoPR is true, additional
-// instructions for creating a GitHub pull request and monitoring CI are appended.
-func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch, autoPR bool) string {
+// itself) in the order they should be merged. channelName is the squadron
+// channel as actually created ("squadron-<name>"). When autoPR is true,
+// additional instructions for creating a GitHub pull request and monitoring
+// CI are appended.
+func BuildMergerSuffix(squadronName, channelName, baseBranch string, agents []AgentBranch, autoPR bool) string {
 	var lines []string
 	for _, ab := range agents {
 		lines = append(lines, fmt.Sprintf("%s -> %s", ab.Name, ab.Branch))
@@ -239,28 +251,28 @@ func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch, au
 
 	result := fmt.Sprintf(
 		mergerTemplate,
-		squadronName,                             // header: MERGE MASTER for squadron "%s"
-		squadronName,                             // step 1 prose: branch "squadron/%s-merged"
-		squadronName, squadronName,               // step 1 cmd: -b squadron/%s-merged ../%s-merged
-		baseBranch,                               // step 1 cmd: start point
-		squadronName,                             // step 1 cd: ../%s-merged
-		squadronName,                             // step 1 closing prose: branch "squadron/%s-merged"
-		squadronName, squadronName,               // step 4: channel + MERGE_COMPLETE branch
-		squadronName,                             // step 5: channel for MERGE_FAILED
+		squadronName,               // header: MERGE MASTER for squadron "%s"
+		squadronName,               // step 1 prose: branch "squadron/%s-merged"
+		squadronName, squadronName, // step 1 cmd: -b squadron/%s-merged ../%s-merged
+		baseBranch,                // step 1 cmd: start point
+		squadronName,              // step 1 cd: ../%s-merged
+		squadronName,              // step 1 closing prose: branch "squadron/%s-merged"
+		channelName, squadronName, // step 4: channel + MERGE_COMPLETE branch
+		channelName, // step 5: channel for MERGE_FAILED
 		list,
 	)
 
 	if autoPR {
 		result += fmt.Sprintf(
 			autoPRTemplate,
-			squadronName,               // Step 0: auth fail channel-send
+			channelName,                // Step 0: auth fail channel-send
 			squadronName, squadronName, // Step 1: integration worktree prose + push branch
-			squadronName,               // Step 1: push fail channel-send
-			squadronName,               // Step 2: PR title
-			baseBranch, baseBranch,     // Step 2: base branch (text + flag)
-			squadronName,               // Step 2: PR fail channel-send
-			squadronName,               // Step 4: PR_READY channel-send
-			squadronName,               // Step 5: PR_BLOCKED channel-send
+			channelName,            // Step 1: push fail channel-send
+			squadronName,           // Step 2: PR title
+			baseBranch, baseBranch, // Step 2: base branch (text + flag)
+			channelName, // Step 2: PR fail channel-send
+			channelName, // Step 4: PR_READY channel-send
+			channelName, // Step 5: PR_BLOCKED channel-send
 		)
 	}
 
@@ -271,7 +283,8 @@ func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch, au
 // prompt based on the consensus type. Returns "" for "none" (no suffix).
 //
 //	consensusType: "universal" | "review_master" | "none"
-//	squadronName:  short name of the squadron (channel is "squadron-<name>")
+//	squadronName:  short name of the squadron
+//	channelName:   the squadron channel as actually created ("squadron-<name>")
 //	agents:        all agent names in the squadron (caller order preserved)
 //	reviewMaster:  name of the review master (only used when type=="review_master")
 //	baseBranch:    the branch squadron/<name> is cut from (used in git diff hints)
@@ -279,24 +292,24 @@ func BuildMergerSuffix(squadronName, baseBranch string, agents []AgentBranch, au
 // When consensusType == "review_master", the suffix returned is the one for
 // non-reviewer agents UNLESS the caller wants the reviewer's suffix — see
 // BuildReviewMasterReviewerSuffix for that case.
-func BuildConsensusSuffix(consensusType, squadronName string, agents []string, reviewMaster, baseBranch string) string {
+func BuildConsensusSuffix(consensusType, squadronName, channelName string, agents []string, reviewMaster, baseBranch string) string {
 	switch consensusType {
 	case "none":
 		return ""
 	case "universal":
 		return fmt.Sprintf(
 			universalTemplate,
-			squadronName, squadronName, squadronName, squadronName,
+			squadronName, channelName, channelName, channelName,
 			baseBranch,
-			squadronName, squadronName, squadronName,
+			channelName, channelName, channelName,
 			strings.Join(agents, ", "),
 		)
 	case "review_master":
 		return fmt.Sprintf(
 			reviewMasterNonReviewerTemplate,
-			squadronName, squadronName, reviewMaster,
-			squadronName, squadronName, squadronName,
-			squadronName,
+			squadronName, channelName, reviewMaster,
+			channelName, channelName, channelName,
+			channelName,
 			strings.Join(agents, ", "),
 			reviewMaster,
 		)

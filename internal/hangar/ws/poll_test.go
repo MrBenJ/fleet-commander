@@ -127,10 +127,10 @@ func TestPollChannels_BroadcastsNewMessages(t *testing.T) {
 	logger := log.New(log.Writer(), "[test] ", 0)
 	hub := NewHub(fleetDir, repoPath, "fleet", logger)
 
-	if _, err := fleetctx.CreateChannel(fleetDir, "ignored", "test channel", []string{"alice", "bob"}); err != nil {
+	chName := "pair-channel"
+	if _, err := fleetctx.CreateChannel(fleetDir, chName, "test channel", []string{"alice", "bob"}); err != nil {
 		t.Fatalf("CreateChannel: %v", err)
 	}
-	chName := "dm-[alice]-[bob]"
 	if err := fleetctx.SendToChannel(fleetDir, chName, "alice", "first msg"); err != nil {
 		t.Fatalf("SendToChannel: %v", err)
 	}

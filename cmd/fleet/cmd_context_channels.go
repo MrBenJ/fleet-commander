@@ -14,7 +14,7 @@ import (
 var channelCreateCmd = &cobra.Command{
 	Use:   "channel-create [name] [agent1] [agent2] [agent3...]",
 	Short: "Create a private channel between agents",
-	Long:  "Creates a named channel with fixed membership. For 2-member channels, the name is auto-set to dm-[agent1]-[agent2].",
+	Long:  "Creates a named channel with fixed membership. The provided name is used as-is, regardless of member count.",
 	Args:  cobra.MinimumNArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		f, err := fleet.Load(".")
