@@ -1,19 +1,31 @@
-// ESLint 9+ flat config.
+// ESLint 10 flat config.
 // Strict TypeScript + React rules; no `any` allowed.
+//
+// React linting is provided by @eslint-react/eslint-plugin (rule prefix
+// `@eslint-react/*`). The legacy jsx-eslint `eslint-plugin-react` was dropped
+// because it does not support ESLint 10 (it calls the removed
+// `context.getFilename()` API). React Hooks linting stays on the official
+// `eslint-plugin-react-hooks`; @eslint-react's own `rules-of-hooks` is turned
+// off below so the official plugin remains the single source for hook rules.
 import js from "@eslint/js";
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
-import react from "eslint-plugin-react";
+import eslintReact from "@eslint-react/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
+
+const SRC = ["src/**/*.{ts,tsx}"];
 
 export default [
   {
     ignores: ["dist/**", "node_modules/**", "vite.config.ts", "vitest.config.ts"],
   },
   js.configs.recommended,
+  // @eslint-react recommended ruleset (TypeScript-aware, no type info needed),
+  // scoped to source files.
+  { ...eslintReact.configs["recommended-typescript"], files: SRC },
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: SRC,
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -33,20 +45,18 @@ export default [
     },
     plugins: {
       "@typescript-eslint": tseslint,
-      react,
       "react-hooks": reactHooks,
     },
-    settings: { react: { version: "detect" } },
     rules: {
       ...tseslint.configs.recommended.rules,
-      ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       // TypeScript handles "not defined" via its own type checker. Leaving
       // no-undef on causes false positives for type-only references like
       // React.MouseEvent or RequestInit that exist as @types/* globals.
       "no-undef": "off",
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
+      // Hook linting is owned by eslint-plugin-react-hooks (below); disable
+      // @eslint-react's overlapping rule to avoid duplicate/erroring reports.
+      "@eslint-react/rules-of-hooks": "off",
       // Strict ergonomics are advisory until the existing codebase is
       // sweepingly cleaned up — the squadron PR is a tooling rollout, not
       // a code-quality migration.
@@ -62,7 +72,6 @@ export default [
       // useCallback that initializes a long-lived WebSocket). Demote
       // them while the codebase is cleaned up.
       "react-hooks/refs": "warn",
-      "react/no-unescaped-entities": "warn",
       "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },
