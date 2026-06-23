@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	fleetctx "github.com/MrBenJ/fleet-commander/internal/context"
@@ -264,22 +265,22 @@ func TestAppendLogEmptyMessage(t *testing.T) {
 	}
 }
 
-func TestCreateChannelDM(t *testing.T) {
+func TestCreateChannelTwoMembersKeepsExplicitName(t *testing.T) {
 	dir := t.TempDir()
 
-	name, err := fleetctx.CreateChannel(dir, "ignored", "auth discussion", []string{"alice", "bob"})
+	name, err := fleetctx.CreateChannel(dir, "auth-pair", "auth discussion", []string{"alice", "bob"})
 	if err != nil {
 		t.Fatalf("CreateChannel failed: %v", err)
 	}
-	if name != "dm-[alice]-[bob]" {
-		t.Errorf("expected dm-[alice]-[bob], got %q", name)
+	if name != "auth-pair" {
+		t.Errorf("expected auth-pair, got %q", name)
 	}
 
 	ctx, err := fleetctx.Load(dir)
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
-	ch, ok := ctx.Channels["dm-[alice]-[bob]"]
+	ch, ok := ctx.Channels["auth-pair"]
 	if !ok {
 		t.Fatal("channel not found in context")
 	}
@@ -288,6 +289,31 @@ func TestCreateChannelDM(t *testing.T) {
 	}
 	if len(ch.Members) != 2 || ch.Members[0] != "alice" || ch.Members[1] != "bob" {
 		t.Errorf("members: got %v", ch.Members)
+	}
+}
+
+func TestCreateChannelEmptyNameDefaults(t *testing.T) {
+	dir := t.TempDir()
+
+	for _, empty := range []string{"", "   "} {
+		dir := t.TempDir()
+		name, err := fleetctx.CreateChannel(dir, empty, "", []string{"alice", "bob"})
+		if err != nil {
+			t.Fatalf("CreateChannel(%q) failed: %v", empty, err)
+		}
+		if name != "channel-default" {
+			t.Errorf("CreateChannel(%q): expected channel-default, got %q", empty, name)
+		}
+	}
+
+	// A second unnamed channel collides with the default name and must fail
+	// with the existing duplicate error.
+	if _, err := fleetctx.CreateChannel(dir, "", "", []string{"alice", "bob"}); err != nil {
+		t.Fatalf("CreateChannel failed: %v", err)
+	}
+	_, err := fleetctx.CreateChannel(dir, "", "", []string{"carol", "dave"})
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("expected 'already exists' error for second unnamed channel, got %v", err)
 	}
 }
 
@@ -416,6 +442,22 @@ func TestSendToChannelNotExists(t *testing.T) {
 	err := fleetctx.SendToChannel(dir, "no-such-channel", "alice", "hello")
 	if err == nil {
 		t.Fatal("expected error for missing channel, got nil")
+	}
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"names the missing channel", `"no-such-channel"`},
+		{"states the channel does not exist", "does not exist"},
+		{"suggests channel-list", "fleet context channel-list"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.want)
+			}
+		})
 	}
 }
 

@@ -724,8 +724,35 @@ func TestLaunchCurrent_AppendsConsensusSuffix(t *testing.T) {
 	if !strings.Contains(got, "Squadron Consensus Protocol (UNIVERSAL)") {
 		t.Error("universal suffix missing")
 	}
-	if !strings.Contains(got, "squadron-alpha") {
-		t.Error("channel name missing")
+	// 2-agent squadrons use squadron-<name>, exactly like larger squadrons
+	// (the dm- auto-rename is retired).
+	if !strings.Contains(got, "channel-send squadron-alpha") {
+		t.Error("2-agent squadron should use the squadron-alpha channel name")
+	}
+	if strings.Contains(got, "dm-[") {
+		t.Error("prompt references a retired dm- channel name")
+	}
+}
+
+func TestLaunchCurrent_ThreeAgentSquadronKeepsSquadronChannel(t *testing.T) {
+	f := &fleet.Fleet{}
+	m := newSquadronLaunchModel(f, false)
+	m.squadronName = "alpha"
+	m.consensusType = "universal"
+	m.baseBranch = "main"
+	m.prompts = []LaunchItem{
+		{AgentName: "a", Branch: "squadron/alpha/a", Prompt: "do a"},
+		{AgentName: "b", Branch: "squadron/alpha/b", Prompt: "do b"},
+		{AgentName: "c", Branch: "squadron/alpha/c", Prompt: "do c"},
+	}
+
+	got := m.applySquadronSuffixes("a", "ORIGINAL")
+
+	if !strings.Contains(got, "channel-send squadron-alpha") {
+		t.Error("3-agent squadron should keep the squadron-alpha channel name")
+	}
+	if strings.Contains(got, "dm-[") {
+		t.Error("3-agent squadron should not use a dm- channel name")
 	}
 }
 

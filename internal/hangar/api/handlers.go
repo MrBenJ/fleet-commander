@@ -255,7 +255,7 @@ func (h *Handlers) HandleSquadronStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	channelName := "squadron-" + name
+	channelName := squadron.ChannelName(name)
 
 	ctx, err := fleetctx.Load(h.fleetDir)
 	if err != nil {
@@ -302,7 +302,7 @@ func (h *Handlers) HandleSquadronInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	channelName := "squadron-" + name
+	channelName := squadron.ChannelName(name)
 
 	ctx, err := fleetctx.Load(h.fleetDir)
 	if err != nil {
