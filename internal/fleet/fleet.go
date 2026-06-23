@@ -319,69 +319,59 @@ func (f *Fleet) RenameAgent(oldName, newName string) error {
 	return nil
 }
 
+func (f *Fleet) modifyAgent(name string, fn func(*Agent)) error {
+	for _, a := range f.Agents {
+		if a.Name == name {
+			fn(a)
+			return nil
+		}
+	}
+	return fmt.Errorf("agent '%s' not found", name)
+}
+
 // UpdateAgent updates an agent's status and PID
 func (f *Fleet) UpdateAgent(name string, status string, pid int) error {
 	return f.withLock(func() error {
-		for _, a := range f.Agents {
-			if a.Name == name {
-				a.Status = status
-				a.PID = pid
-				return nil
-			}
-		}
-		return fmt.Errorf("agent '%s' not found", name)
+		return f.modifyAgent(name, func(a *Agent) {
+			a.Status = status
+			a.PID = pid
+		})
 	})
 }
 
 // UpdateAgentStateFile persists the state file path for an agent
 func (f *Fleet) UpdateAgentStateFile(name, stateFilePath string) error {
 	return f.withLock(func() error {
-		for _, a := range f.Agents {
-			if a.Name == name {
-				a.StateFilePath = stateFilePath
-				return nil
-			}
-		}
-		return fmt.Errorf("agent '%s' not found", name)
+		return f.modifyAgent(name, func(a *Agent) {
+			a.StateFilePath = stateFilePath
+		})
 	})
 }
 
 // UpdateAgentHooks records whether fleet hooks are currently injected for an agent.
 func (f *Fleet) UpdateAgentHooks(name string, hooksOK bool) error {
 	return f.withLock(func() error {
-		for _, a := range f.Agents {
-			if a.Name == name {
-				a.HooksOK = hooksOK
-				return nil
-			}
-		}
-		return fmt.Errorf("agent '%s' not found", name)
+		return f.modifyAgent(name, func(a *Agent) {
+			a.HooksOK = hooksOK
+		})
 	})
 }
 
 // UpdateAgentDriver sets the driver for an agent.
 func (f *Fleet) UpdateAgentDriver(name, driverName string) error {
 	return f.withLock(func() error {
-		for _, a := range f.Agents {
-			if a.Name == name {
-				a.Driver = driverName
-				return nil
-			}
-		}
-		return fmt.Errorf("agent '%s' not found", name)
+		return f.modifyAgent(name, func(a *Agent) {
+			a.Driver = driverName
+		})
 	})
 }
 
 // UpdateAgentDriverConfig sets the driver config for an agent.
 func (f *Fleet) UpdateAgentDriverConfig(name string, config *DriverConfig) error {
 	return f.withLock(func() error {
-		for _, a := range f.Agents {
-			if a.Name == name {
-				a.DriverConfig = config
-				return nil
-			}
-		}
-		return fmt.Errorf("agent '%s' not found", name)
+		return f.modifyAgent(name, func(a *Agent) {
+			a.DriverConfig = config
+		})
 	})
 }
 
