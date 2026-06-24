@@ -49,8 +49,10 @@ function WavyText({ text }: { text: string }) {
   return (
     <span aria-label={text} style={{ display: "inline-flex" }}>
       {text.split("").map((char, i) => (
-        <span
-          key={`${text}-${i}`}
+        // Character position is the stable identity here — chars repeat within
+        // the string and the whole node re-renders when `text` changes.
+        // eslint-disable-next-line @eslint-react/no-array-index-key
+        <span key={`${text}-${i}`}
           style={{
             display: "inline-block",
             animation: "fc-wave 0.8s ease-in-out infinite",

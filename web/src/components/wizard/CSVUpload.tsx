@@ -199,8 +199,8 @@ export function CSVUpload({ squadronName, onAgentsParsed }: CSVUploadProps) {
               color: "var(--text-secondary)",
             }}
           >
-            {errors.map((err, i) => (
-              <li key={i}>
+            {errors.map((err) => (
+              <li key={`${err.row}-${err.message}`}>
                 {err.row > 0 && <>Row {err.row}: </>}
                 {err.message}
               </li>

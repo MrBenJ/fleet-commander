@@ -146,7 +146,7 @@ export function AgentTooltip({
 
       {cost && (
         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.4rem" }}>
-          <div><strong>Cost:</strong> ${cost.costUSD.toFixed(2)}</div>
+          <div><strong>Cost:</strong> {`$${cost.costUSD.toFixed(2)}`}</div>
           <div>in {cost.inputTokens} · out {cost.outputTokens} · cache {cost.cacheReadTokens}</div>
           {cost.models.length > 0 && <div>{cost.models.join(", ")}</div>}
         </div>

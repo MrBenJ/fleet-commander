@@ -93,7 +93,7 @@ export function AgentsStep({
           <ul style={{ display: "flex", flexDirection: "column", gap: "0.5rem", listStyle: "none", padding: 0 }} aria-label="Agent list">
             {agents.map((a, idx) => (
               <AgentListItem
-                key={idx}
+                key={a.name}
                 agent={a}
                 personas={personas}
                 onRemove={() => handleRemove(idx)}

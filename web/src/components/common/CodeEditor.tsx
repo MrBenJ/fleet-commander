@@ -68,8 +68,10 @@ export function CodeEditor({
   const heightValue =
     typeof minHeight === "number" ? `${minHeight}px` : minHeight;
 
+  // Mirrors `showLineNumbers` into a ref so the mount handler (which only runs
+  // once) can read the latest value without being re-created. Kept current by
+  // the effect below rather than written during render.
   const showLineNumbersRef = useRef(showLineNumbers);
-  showLineNumbersRef.current = showLineNumbers;
 
   const handleMount: OnMount = useCallback((editor) => {
     const container = editor.getDomNode();
@@ -81,6 +83,7 @@ export function CodeEditor({
   }, []);
 
   useEffect(() => {
+    showLineNumbersRef.current = showLineNumbers;
     if (gutterStyleRef.current) {
       gutterStyleRef.current.textContent = gutterCSS(showLineNumbers);
     }
