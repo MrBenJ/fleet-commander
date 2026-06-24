@@ -83,21 +83,21 @@ export function DriverIcon({ driver, size = 14 }: { driver: string; size?: numbe
 
 export function AgentPill({ agent, state, persona, isMerger, cost, showCost = true }: AgentPillProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dotColor = stateColors[state] || stateColors.starting;
   const isWaiting = state === "waiting";
 
   const handleMouseEnter = () => {
-    if (hideTimeout.current) {
-      clearTimeout(hideTimeout.current);
-      hideTimeout.current = null;
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
     }
     setShowTooltip(true);
   };
 
   const handleMouseLeave = () => {
-    hideTimeout.current = setTimeout(() => {
+    hideTimeoutRef.current = setTimeout(() => {
       setShowTooltip(false);
     }, 200);
   };

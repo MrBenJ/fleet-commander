@@ -57,9 +57,9 @@ export function AiderIcon({ size = 14 }: { size?: number }) {
     >
       <title>Aider</title>
       <rect width="24" height="24" rx="3" fill={dark} />
-      {pixels.map(([col, row, color], i) => (
+      {pixels.map(([col, row, color]) => (
         <rect
-          key={i}
+          key={`${col}-${row}`}
           x={col * cellSize}
           y={row * cellSize}
           width={cellSize}

@@ -53,7 +53,7 @@ export function ContextLog({ messages, agentColors, onAgentClick }: ContextLogPr
         const color = getColor(msg.agent);
 
         return (
-          <div key={idx} style={{
+          <div key={`${msg.timestamp}-${msg.agent}-${msg.message}`} style={{
             display: "flex",
             gap: "0.75rem",
             padding: "0.25rem 0.5rem",

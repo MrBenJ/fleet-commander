@@ -16,17 +16,26 @@ function getSquadronParam(): string | null {
 }
 
 export function App() {
-  // If we're on a /terminal/ path, render the terminal directly
+  // The terminal view lives at its own path and shares no state with the
+  // squadron UI. Render it as a separate component so neither component calls
+  // hooks conditionally (App itself uses none before this branch).
   if (window.location.pathname.startsWith("/terminal/")) {
-    const inIframe = window.self !== window.top;
-    return (
-      <>
-        {!inIframe && <ThemeToggle />}
-        <TerminalPage />
-      </>
-    );
+    return <TerminalView />;
   }
+  return <SquadronApp />;
+}
 
+function TerminalView() {
+  const inIframe = window.self !== window.top;
+  return (
+    <>
+      {!inIframe && <ThemeToggle />}
+      <TerminalPage />
+    </>
+  );
+}
+
+function SquadronApp() {
   const squadronParam = getSquadronParam();
   const { fleet, personas, drivers, loading, error } = useFleet();
   const [view, setView] = useState<View>(squadronParam ? "mission" : "wizard");

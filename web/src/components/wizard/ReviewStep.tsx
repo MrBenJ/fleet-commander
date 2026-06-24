@@ -162,7 +162,7 @@ export function ReviewStep({
       <ul style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem", listStyle: "none", padding: 0 }} aria-label="Agents to launch">
         {agents.map((a, idx) => (
           <AgentCard
-            key={idx}
+            key={a.name}
             agent={a}
             isEditing={state.editingIdx === idx}
             editDraft={state.editDraft}
@@ -228,8 +228,8 @@ export function ReviewStep({
             <div style={{ fontWeight: 600 }}>{state.error}</div>
             {state.errorDetails.length > 0 && (
               <ul style={{ margin: "0.4rem 0 0", paddingLeft: "1.25rem", fontSize: "0.85rem" }}>
-                {state.errorDetails.map((d, i) => (
-                  <li key={i}>{d}</li>
+                {state.errorDetails.map((d) => (
+                  <li key={d}>{d}</li>
                 ))}
               </ul>
             )}

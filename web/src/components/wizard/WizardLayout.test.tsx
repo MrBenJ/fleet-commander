@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WizardLayout } from "./WizardLayout";
-import type { Persona } from "../../types";
+import type { Persona, SquadronAgent } from "../../types";
 
 // Mock the api module
 vi.mock("../../api", () => ({
@@ -11,7 +11,12 @@ vi.mock("../../api", () => ({
 
 // Mock child components to isolate WizardLayout logic
 vi.mock("./AgentsStep", () => ({
-  AgentsStep: ({ agents, onDone, onPickPersona, onChange }: any) => (
+  AgentsStep: ({ agents, onDone, onPickPersona, onChange }: {
+    agents: SquadronAgent[];
+    onDone: (agents: SquadronAgent[]) => void;
+    onPickPersona: (index: number, agents: SquadronAgent[]) => void;
+    onChange?: (agents: SquadronAgent[]) => void;
+  }) => (
     <div data-testid="agents-step">
       <div data-testid="agents-count">{agents.length}</div>
       <button onClick={() => {
@@ -31,7 +36,7 @@ vi.mock("./AgentsStep", () => ({
 }));
 
 vi.mock("./ReviewStep", () => ({
-  ReviewStep: ({ onEdit, onAddMore }: any) => (
+  ReviewStep: ({ onEdit, onAddMore }: { onEdit: () => void; onAddMore: () => void }) => (
     <div data-testid="review-step">
       <button onClick={onEdit}>Edit Agents</button>
       <button onClick={onAddMore}>Add More</button>

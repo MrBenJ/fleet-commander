@@ -8,9 +8,13 @@ interface UseWebSocketOptions {
 export function useWebSocket(path: string, options: UseWebSocketOptions = {}) {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimer = useRef<number | undefined>(undefined);
+  const reconnectTimerRef = useRef<number | undefined>(undefined);
   const onEventRef = useRef(options.onEvent);
-  onEventRef.current = options.onEvent;
+  // Keep the latest handler in a ref so `connect` (memoized on `path` only)
+  // always invokes the current callback without re-subscribing the socket.
+  useEffect(() => {
+    onEventRef.current = options.onEvent;
+  });
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -20,6 +24,9 @@ export function useWebSocket(path: string, options: UseWebSocketOptions = {}) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      // Runs asynchronously on the socket 'open' event, not synchronously
+      // within the effect — not the re-render storm the rule guards against.
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
       setConnected(true);
     };
 
@@ -33,13 +40,15 @@ export function useWebSocket(path: string, options: UseWebSocketOptions = {}) {
     };
 
     ws.onclose = () => {
+      // Asynchronous 'close' event handler — see the onopen note above.
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
       setConnected(false);
       // Reconnect with backoff. `connect` self-references its own
       // useCallback identifier, which the react-hooks lint flags as
       // a TDZ access during render — fine at runtime because the
       // callback runs only after `connect` is fully assigned.
       // eslint-disable-next-line
-      reconnectTimer.current = window.setTimeout(connect, 2000);
+      reconnectTimerRef.current = window.setTimeout(connect, 2000);
     };
 
     ws.onerror = () => {
@@ -50,7 +59,7 @@ export function useWebSocket(path: string, options: UseWebSocketOptions = {}) {
   useEffect(() => {
     connect();
     return () => {
-      clearTimeout(reconnectTimer.current);
+      clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
     };
   }, [connect]);
